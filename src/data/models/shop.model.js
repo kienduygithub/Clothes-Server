@@ -1,0 +1,30 @@
+'use strict';
+const {
+    Model
+} = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+    class Shop extends Model {
+        static associate(models) {
+            Shop.hasMany(models.User, {
+                foreignKey: 'shopId',
+                as: 'users',
+                onDelete: 'SET NULL'
+            });
+            Shop.hasMany(models.Product, {
+                foreignKey: 'shopId',
+                as: 'products'
+            });
+        }
+    }
+    Shop.init({
+        shop_name: DataTypes.STRING,
+        logo_url: DataTypes.STRING,
+        contact_email: DataTypes.STRING,
+        contact_address: DataTypes.STRING,
+        description: DataTypes.STRING
+    }, {
+        sequelize,
+        modelName: 'Shop',
+    });
+    return Shop;
+};
