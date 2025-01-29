@@ -5,11 +5,27 @@ import HttpErrors from "../errors/http-errors";
 
 const storageProducts = multer.diskStorage({
     destination: function (req, file, cb) {
-        const uploadPath = path.resolve(
-            __dirname,
-            "../../assets/products"
-        );
-        cb(null, uploadPath);
+        if (file.fieldname === 'infoImages') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/products"
+            );
+            cb(null, uploadPath);
+
+        } else if (file.fieldname === 'variantImages') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/product_variants"
+            );
+            cb(null, uploadPath);
+
+        } else {
+            cb({
+                status: HttpErrors.NOT_FOUND,
+                message: 'Field không đúng',
+                body: null
+            });
+        }
     },
     filename: function (req, file, cb) {
         const fileName = `${Date.now()}-${file.originalname}`;

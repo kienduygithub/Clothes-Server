@@ -122,10 +122,11 @@ const createNewProduct = async (data, files, shopId) => {
             product_name,
             origin,
             description,
-            unit_price
+            unit_price,
+            product_variants
         } = JSON.parse(data.basicInfo);
 
-        if (!shopId) {
+        if (!shopId || !product_variants) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
         } else if (isNaN(unit_price)) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Giá thành sai kiểu dữ liệu', null);
@@ -147,7 +148,7 @@ const createNewProduct = async (data, files, shopId) => {
             unit_price: Number(unit_price)
         });
 
-        const imageFiles = files;
+        const imageFiles = files['infoImages'];
         if (imageFiles && imageFiles.length > 0) {
             const newImages = imageFiles.map((file) => ({
                 productId: product.id,
@@ -155,9 +156,24 @@ const createNewProduct = async (data, files, shopId) => {
             }));
             uploadImages.push(...newImages);
         };
-
         if (uploadImages.length > 0) {
             await db.ProductImages.bulkCreate(uploadImages);
+        }
+
+        const newProductVariants = [];
+        const variantImages = files['variantImages'];
+        if (variantImages && variantImages.length > 0) {
+            const temp = variantImages.map((file, index) => ({
+                productId: product.id,
+                colorId: Number(product_variants[index].colorId),
+                sizeId: Number(product_variants[index].sizeId),
+                image_url: `product_variants/${file.filename}`,
+                sku: product_variants[index].sku
+            }));
+            newProductVariants.push(...temp);
+        }
+        if (newProductVariants.length > 0) {
+            await db.ProductVariant.bulkCreate(newProductVariants);
         }
 
         return ResponseModel.success('Sản phẩm tạo thành công');

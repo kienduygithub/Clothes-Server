@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-    uploadProducts
+    uploadProducts,
 } from '../common/middleware/upload.middleware';
 import {
     fetchProductMobileById,
@@ -19,8 +19,19 @@ ProductRouter.get('/product/:id', fetchProductById);
 
 ProductRouter.get('/product', fetchAllProduct);
 
-ProductRouter.post('/product', uploadProducts.array('infoImages', 10), createNewProduct);
+ProductRouter.post(
+    '/product',
+    uploadProducts.fields([
+        { name: 'infoImages', maxCount: 10 },
+        { name: 'variantImages', maxCount: 30 }
+    ]),
+    createNewProduct
+);
 
-ProductRouter.patch('/product/:id', uploadProducts.array('infoImages', 10), updateProduct);
+ProductRouter.patch(
+    '/product/:id',
+    uploadProducts.array('infoImages', 10),
+    updateProduct
+);
 
 export default ProductRouter;
