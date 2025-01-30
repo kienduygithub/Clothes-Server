@@ -66,7 +66,16 @@ const fetchProductById = async (productId) => {
                     model: db.ProductImages,
                     as: 'product_images',
                     attributes: { exclude: ['createdAt', 'updatedAt'] }
+                },
+                {
+                    model: db.ProductVariant,
+                    as: 'variants',
+                    attributes: { exclude: ['updatedAt'] },
+
                 }
+            ],
+            order: [
+                [{ model: db.ProductVariant, as: 'variants' }, 'id', 'DESC']
             ]
         });
 
@@ -123,10 +132,10 @@ const createNewProduct = async (data, files, shopId) => {
             origin,
             description,
             unit_price,
-            product_variants
+            variants
         } = JSON.parse(data.basicInfo);
 
-        if (!shopId || !product_variants) {
+        if (!shopId || !variants) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
         } else if (isNaN(unit_price)) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Giá thành sai kiểu dữ liệu', null);
@@ -165,11 +174,12 @@ const createNewProduct = async (data, files, shopId) => {
         if (variantImages && variantImages.length > 0) {
             const temp = variantImages.map((file, index) => ({
                 productId: product.id,
-                colorId: Number(product_variants[index].colorId),
-                sizeId: Number(product_variants[index].sizeId),
+                colorId: Number(variants[index].colorId),
+                sizeId: Number(variants[index].sizeId),
                 image_url: `product_variants/${file.filename}`,
-                sku: product_variants[index].sku
-            }));
+                sku: variants[index].sku,
+                stock_quantity: variants[index].stock_quantity
+            })).reverse();
             newProductVariants.push(...temp);
         }
         if (newProductVariants.length > 0) {
@@ -190,10 +200,13 @@ const updateProduct = async (productId, data, files) => {
             origin,
             description,
             unit_price,
-            image_urls
+            image_urls,
+            variants
         } = JSON.parse(data.basicInfo);
-        if (!shopId || !productId || isNaN(unit_price) || !image_urls) {
+        if (!shopId || !productId || !variants || !image_urls) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
+        } else if (isNaN(unit_price)) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Giá thành sai kiểu dữ liệu', null);
         }
 
         const existShop = await db.Shop.findOne({ where: { id: shopId } });
@@ -203,12 +216,22 @@ const updateProduct = async (productId, data, files) => {
 
         const product = await db.Product.findOne({
             where: { id: productId },
-            include: {
-                model: db.ProductImages,
-                as: 'product_images',
-                attributes: { exclude: ['createdAt', 'updatedAt'] }
-            },
-            attributes: { exclude: ['updatedAt'] }
+            include: [
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: { exclude: ['createdAt', 'updatedAt'] }
+                },
+                {
+                    model: db.ProductVariant,
+                    as: 'variants',
+                    attributes: { exclude: ['createdAt', 'updatedAt'] },
+                }
+            ],
+            attributes: { exclude: ['updatedAt'] },
+            order: [
+                [{ model: db.ProductVariant, as: 'variants' }, 'id', 'DESC']
+            ]
         });
         if (!product) {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy sản phẩm.', null);
@@ -232,9 +255,9 @@ const updateProduct = async (productId, data, files) => {
         })
         await handleDeleteImages(deletedImages.map(item => item.image_url));
 
-        // Tải ảnh mới
+        // Tải ảnh mới của sản phẩm (không phải biến thể)
         const uploadImages = [];
-        const imageFiles = files;
+        const imageFiles = files['infoImages'];
         if (imageFiles && imageFiles.length > 0) {
             const newImages = imageFiles.map((file) => ({
                 productId: product.id,
@@ -245,6 +268,91 @@ const updateProduct = async (productId, data, files) => {
 
         if (uploadImages.length > 0) {
             await db.ProductImages.bulkCreate(uploadImages);
+        }
+
+        /**
+         * Biến thể tạo mới luôn ở đầu danh sách cho đến hết danh sách
+         * tương ứng variant image.
+         * Danh sách variants: variant mới - variant cũ
+         */
+        const newVariantProducts = [];
+        const variantImages = files['variantImages'];
+        if (variantImages && variantImages.length > 0) {
+            const temp = variantImages.map((file, index) => ({
+                productId: product.id,
+                colorId: Number(variants[index].colorId),
+                sizeId: Number(variants[index].sizeId),
+                image_url: `product_variants/${file.filename}`,
+                sku: variants[index].sku,
+                stock_quantity: variants[index].stock_quantity
+            })).reverse();
+            newVariantProducts.push(...temp);
+        }
+        if (newVariantProducts.length > 0) {
+            await db.ProductVariant.bulkCreate(newVariantProducts);
+        }
+        const variantUpdateImages = files['variantUpdateImages'];
+        const updatedIds = JSON.parse(data?.updatedIds); // ID của biến thể thay đổi ảnh
+        const deletedIds = JSON.parse(data?.deletedIds);
+        const variantIdsExistDatabase = product.variants.map(variant => variant.id);
+
+        const updatedIdsSet = new Set(updatedIds);
+        const deletedIdsSet = new Set(deletedIds);
+        const variantIdsExistDatabaseSet = new Set(variantIdsExistDatabase);
+
+        const listDeletedImageUrlAfterUpdated = [];
+
+        const remainVariants = variants.filter(
+            variant => variantIdsExistDatabaseSet.has(variant.id) && !deletedIdsSet.has(variant.id)
+        );
+        const variantUpdateFileImages = remainVariants.filter(
+            variant => updatedIdsSet.has(variant.id)
+        );
+        const variantNotUpdateFileImages = remainVariants.filter(
+            variant => !updatedIdsSet.has(variant.id)
+        );
+        let updatedFileVariants = variantUpdateFileImages.map((item, index) => {
+            let variant = {};
+            variant.colorId = item.colorId;
+            variant.sizeId = item.sizeId;
+            variant.stock_quantity = item.stock_quantity;
+            const file = variantUpdateImages[index];
+            if (file) {
+                const deletedImageUrl = product.variants.find(v => v.id === item.id)?.image_url;
+                if (deletedImageUrl) {
+                    listDeletedImageUrlAfterUpdated.push(deletedImageUrl);
+                }
+                variant.image_url = `product_variants/${file.filename}`
+            }
+            return db.ProductVariant.update(
+                variant, { where: { id: item.id } }
+            )
+        });
+        let updatedNotFileVariants = variantNotUpdateFileImages.map((item) => {
+            let variant = {};
+            variant.colorId = item.colorId;
+            variant.sizeId = item.sizeId;
+            variant.stock_quantity = item.stock_quantity;
+            return db.ProductVariant.update(variant, {
+                where: { id: item.id }
+            });
+        }).filter(Boolean);
+        await Promise.all([...updatedFileVariants, ...updatedNotFileVariants]);
+        /**
+         * Cập nhật xong biến thể mới và cũ thì đến lượt biến thể xóa
+         */
+        if (deletedIds.length > 0) {
+            await db.ProductVariant.destroy({
+                where: { id: deletedIds }
+            });
+            const deletedImages = product.variants
+                .filter(v => deletedIdsSet.has(v.id))
+                .map(v => v.image_url);
+            listDeletedImageUrlAfterUpdated.push(...deletedImages);
+        }
+        console.log(listDeletedImageUrlAfterUpdated);
+        if (listDeletedImageUrlAfterUpdated.length > 0) {
+            handleDeleteImages(listDeletedImageUrlAfterUpdated);
         }
 
         return ResponseModel.success('Cập nhật thành công', null);

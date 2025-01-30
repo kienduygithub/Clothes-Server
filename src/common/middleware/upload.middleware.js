@@ -12,7 +12,7 @@ const storageProducts = multer.diskStorage({
             );
             cb(null, uploadPath);
 
-        } else if (file.fieldname === 'variantImages') {
+        } else if (file.fieldname === 'variantImages' || file.fieldname === 'variantUpdateImages') {
             const uploadPath = path.resolve(
                 __dirname,
                 "../../assets/product_variants"

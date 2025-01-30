@@ -23,14 +23,18 @@ ProductRouter.post(
     '/product',
     uploadProducts.fields([
         { name: 'infoImages', maxCount: 10 },
-        { name: 'variantImages', maxCount: 30 }
+        { name: 'variantImages', maxCount: 30 },
     ]),
     createNewProduct
 );
 
 ProductRouter.patch(
     '/product/:id',
-    uploadProducts.array('infoImages', 10),
+    uploadProducts.fields([
+        { name: 'infoImages', maxCount: 10 },
+        { name: 'variantImages', maxCount: 30 },
+        { name: 'variantUpdateImages', maxCount: 30 }
+    ]),
     updateProduct
 );
 
