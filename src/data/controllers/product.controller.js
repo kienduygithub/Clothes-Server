@@ -70,10 +70,25 @@ const updateProduct = async (req, res) => {
     }
 }
 
+const deleteProductById = async (req, res) => {
+    try {
+        const productId = req.params.id;
+        const response = await productServices.deleteProductById(productId);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}
+
 module.exports = {
     fetchProductMobileById: fetchProductMobileById,
     fetchProductById: fetchProductById,
     fetchAllProduct: fetchAllProduct,
     createNewProduct: createNewProduct,
-    updateProduct: updateProduct
+    updateProduct: updateProduct,
+    deleteProductById: deleteProductById
 }

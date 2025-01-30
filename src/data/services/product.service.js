@@ -350,9 +350,9 @@ const updateProduct = async (productId, data, files) => {
                 .map(v => v.image_url);
             listDeletedImageUrlAfterUpdated.push(...deletedImages);
         }
-        console.log(listDeletedImageUrlAfterUpdated);
+
         if (listDeletedImageUrlAfterUpdated.length > 0) {
-            handleDeleteImages(listDeletedImageUrlAfterUpdated);
+            await handleDeleteImages(listDeletedImageUrlAfterUpdated);
         }
 
         return ResponseModel.success('Cập nhật thành công', null);
@@ -362,10 +362,55 @@ const updateProduct = async (productId, data, files) => {
     }
 }
 
+const deleteProductById = async (productId) => {
+    try {
+        if (!productId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết.', null);
+        }
+
+        const existProduct = await db.Product.findOne({
+            where: { id: productId },
+            include: [
+                {
+                    model: db.ProductImages,
+                    as: 'product_images'
+                },
+                {
+                    model: db.ProductVariant,
+                    as: 'variants'
+                }
+            ]
+        });
+
+        if (!existProduct) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy sản phẩm.', null);
+        }
+
+        await db.Product.destroy({
+            where: { id: productId }
+        });
+
+        const infoImages = existProduct.product_images.map(
+            product => product.image_url
+        ).filter(url => url !== undefined);
+        const variantImages = existProduct.variants.map(
+            variant => variant.image_url
+        ).filter(url => url !== undefined);
+
+        await handleDeleteImages(infoImages);
+        await handleDeleteImages(variantImages);
+
+        return ResponseModel.success('Xóa sản phẩm thành công.', null);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 module.exports = {
     fetchProductMobileById: fetchProductMobileById,
     fetchProductById: fetchProductById,
     fetchAllProduct: fetchAllProduct,
     createNewProduct: createNewProduct,
-    updateProduct: updateProduct
+    updateProduct: updateProduct,
+    deleteProductById: deleteProductById
 }

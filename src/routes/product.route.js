@@ -7,7 +7,8 @@ import {
     fetchProductById,
     fetchAllProduct,
     createNewProduct,
-    updateProduct
+    updateProduct,
+    deleteProductById
 } from '../data/controllers/product.controller';
 
 
@@ -37,5 +38,10 @@ ProductRouter.patch(
     ]),
     updateProduct
 );
+
+ProductRouter.delete(
+    '/product/:id',
+    deleteProductById
+)
 
 export default ProductRouter;
