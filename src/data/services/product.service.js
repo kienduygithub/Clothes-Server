@@ -110,6 +110,13 @@ const fetchAllProduct = async (shopId) => {
                     attributes: {
                         exclude: ['createdAt', 'updatedAt']
                     }
+                },
+                {
+                    model: db.ProductVariant,
+                    as: 'variants',
+                    attributes: {
+                        exclude: ['createdAt', 'updatedAt']
+                    }
                 }
             ],
             order: [['createdAt', 'DESC']]
