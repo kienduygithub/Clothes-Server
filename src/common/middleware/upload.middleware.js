@@ -49,6 +49,36 @@ export const uploadProducts = multer({
     }
 });
 
+export const storageUser = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadPath = path.resolve(
+            __dirname,
+            "../../assets/admin-owners"
+        );
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        const fileName = `${Date.now()}-${file.originalname}`;
+        cb(null, fileName);
+    }
+});
+
+export const uploadUser = multer({
+    storage: storageUser,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowTypes = ["image/jpeg", "image/png", "image/jpg"];
+        if (!allowTypes.includes(file.mimetype)) {
+            return cb({
+                status: HttpErrors.BAD_REQUEST,
+                message: 'Chỉ hỗ trợ định dạng JPEG, JPG và PNG!',
+                body: null
+            });
+        }
+        cb(null, true);
+    }
+});
+
 export const handleDeleteImages = async (deletedImages) => {
     for (const image of deletedImages) {
         const imagePath = path.join(__dirname, "../../assets/", image);
@@ -59,6 +89,23 @@ export const handleDeleteImages = async (deletedImages) => {
             } else {
                 console.log(`File không tồn tại: ${image}`);
             }
+        } catch (error) {
+            console.log(`Lỗi khi xóa file: ${image}`);
+        }
+    }
+}
+
+export const handleDeleteImageAsFailed = async (file) => {
+    if (file) {
+        const imagePath = path.join(
+            __dirname, "../../assets/", file.filename
+        )
+        console.log(imagePath);
+        try {
+            // if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(file.path);
+            console.log(`Xóa file ${file.filename}`);
+            // }
         } catch (error) {
             console.log(`Lỗi khi xóa file: ${image}`);
         }
