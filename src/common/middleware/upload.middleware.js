@@ -102,10 +102,8 @@ export const handleDeleteImageAsFailed = async (file) => {
         )
         console.log(imagePath);
         try {
-            // if (fs.existsSync(imagePath)) {
             fs.unlinkSync(file.path);
             console.log(`Xóa file ${file.filename}`);
-            // }
         } catch (error) {
             console.log(`Lỗi khi xóa file: ${image}`);
         }
