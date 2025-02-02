@@ -9,10 +9,16 @@ const fetchAllUser = async () => {
         const users = await User.findAll({
             where: {
                 roles: ['Admin', 'Owner']
-            }
+            },
         });
+
+        const dtoUsers = users.map(user => ({
+            ...user.dataValues,
+            shopId: user.dataValues.shopId === null ? 0 : user.dataValues.shopId
+        }));
+
         const payload = {
-            users: users
+            users: dtoUsers
         };
         return ResponseModel.success('Danh sách người dùng', payload);
     } catch (error) {
@@ -37,6 +43,8 @@ const fetchUserById = async (userId) => {
         if (!user) {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại', null);
         }
+
+        user.shopId = user.shopId === null ? 0 : user.shopId;
 
         const payload = {
             user: user
