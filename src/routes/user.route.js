@@ -6,7 +6,8 @@ import {
     fetchAllUser,
     fetchUserById,
     createUserAdmin,
-    deleteUserAdmin
+    deleteUserAdmin,
+    updateUserAdmin
 } from "../data/controllers/user.controller";
 
 const UserRouter = express.Router();
@@ -22,5 +23,11 @@ UserRouter.post(
 );
 
 UserRouter.delete('/user/admin/:id', deleteUserAdmin);
+
+UserRouter.patch(
+    '/user/admin/:id',
+    uploadUser.single('adminOwnerFile'),
+    updateUserAdmin
+);
 
 export default UserRouter;

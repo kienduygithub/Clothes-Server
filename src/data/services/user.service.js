@@ -4,7 +4,7 @@ import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/midd
 import { hashPassword } from "../../common/utils/user.common";
 import { User } from "../models";
 
-const fetchAllUser = async () => {
+export const fetchAllUser = async () => {
     try {
         const users = await User.findAll({
             where: {
@@ -30,7 +30,7 @@ const fetchAllUser = async () => {
     }
 }
 
-const fetchUserById = async (userId) => {
+export const fetchUserById = async (userId) => {
     try {
         if (!userId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
@@ -44,10 +44,11 @@ const fetchUserById = async (userId) => {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại', null);
         }
 
+        user.image_url = user.image_url === null ? '' : user.image_url;
         user.shopId = user.shopId === null ? 0 : user.shopId;
 
         const payload = {
-            user: user
+            users: [user]
         };
         return ResponseModel.success('Chi tiết người dùng.', payload);
     } catch (error) {
@@ -56,12 +57,11 @@ const fetchUserById = async (userId) => {
 }
 
 // Admin tạo người dùng để quản lý shop
-const createUserAdmin = async (info, file) => {
+export const createUserAdmin = async (info, file) => {
     try {
-        if (!info || !file) {
+        if (!info) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
                 info,
-                file
             });
         }
         const {
@@ -109,7 +109,7 @@ const createUserAdmin = async (info, file) => {
 }
 
 // Admin xóa người dùng quản lý shop
-const deleteUserAdmin = async (userId) => {
+export const deleteUserAdmin = async (userId) => {
     try {
         if (!userId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
@@ -140,10 +140,63 @@ const deleteUserAdmin = async (userId) => {
     }
 }
 
-module.exports = {
-    fetchAllUser: fetchAllUser,
-    fetchUserById: fetchUserById,
-    createUserAdmin: createUserAdmin,
-    deleteUserAdmin: deleteUserAdmin
+// Admin cập nhật người dùng quản lý shop
+export const updateUserAdmin = async (userId, info, file) => {
+    try {
+        if (!info || !userId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                info: info,
+                file: file,
+                userId: userId
+            });
+        }
+
+        const {
+            name,
+            email,
+            phone,
+            gender,
+            address,
+            roles,
+            shopId
+        } = JSON.parse(info);
+
+        if (!email || !phone) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                email: email,
+                phone: phone
+            });
+        }
+
+        const user = await User.findOne({
+            where: { id: userId }
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại.', null);
+        }
+
+        if (name) {
+            user.name = name;
+        }
+        if (shopId) {
+            user.shopId = shopId;
+        }
+        if (file) {
+            user.image_url = `admin-owners/${file.filename}`;
+        }
+        user.email = email;
+        user.phone = phone;
+        user.gender = gender;
+        user.address = address;
+        user.roles = roles;
+
+        await user.save();
+
+        return ResponseModel.success('Cập nhật người dùng thành công', null);
+    } catch (error) {
+        handleDeleteImageAsFailed(file);
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
 }
 

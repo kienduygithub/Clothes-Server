@@ -1,6 +1,6 @@
-import userServices from "../services/user.service";
+import * as userServices from "../services/user.service";
 
-const fetchAllUser = async (req, res) => {
+export const fetchAllUser = async (req, res) => {
     try {
         const response = await userServices.fetchAllUser();
         return res.status(response?.status).json(response);
@@ -13,7 +13,7 @@ const fetchAllUser = async (req, res) => {
     }
 }
 
-const fetchUserById = async (req, res) => {
+export const fetchUserById = async (req, res) => {
     try {
         const userId = req.params.id;
         const response = await userServices.fetchUserById(userId);
@@ -28,7 +28,7 @@ const fetchUserById = async (req, res) => {
 }
 
 // Admin tạo người dùng để quản lý shop
-const createUserAdmin = async (req, res) => {
+export const createUserAdmin = async (req, res) => {
     try {
         const response = await userServices.createUserAdmin(req.body.info, req.file);
         return res.status(response?.status).json(response);
@@ -42,7 +42,7 @@ const createUserAdmin = async (req, res) => {
 }
 
 // Admin xóa người dùng quản lý shop
-const deleteUserAdmin = async (req, res) => {
+export const deleteUserAdmin = async (req, res) => {
     try {
         const userId = req.params.id;
         const response = await userServices.deleteUserAdmin(userId);
@@ -56,10 +56,20 @@ const deleteUserAdmin = async (req, res) => {
     }
 }
 
-module.exports = {
-    fetchAllUser: fetchAllUser,
-    fetchUserById: fetchUserById,
-    createUserAdmin: createUserAdmin,
-    deleteUserAdmin: deleteUserAdmin
+// Admin cập nhật người dùng quản lý shop
+export const updateUserAdmin = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const info = req.body.info;
+        const file = req.file;
+        const response = await userServices.updateUserAdmin(userId, info, file);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
 }
 
