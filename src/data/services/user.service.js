@@ -72,7 +72,6 @@ export const createUserAdmin = async (info, file) => {
             gender,
             address,
             roles,
-            shopId
         } = JSON.parse(info);
 
         if (!name || !email || !password || !roles) {
@@ -96,8 +95,7 @@ export const createUserAdmin = async (info, file) => {
             phone: phone,
             gender: gender,
             address: address,
-            image_url: `admin-owners/${file.filename}`,
-            shopId: shopId === null || shopId === undefined ? null : shopId,
+            image_url: file ? `admin-owners/${file.filename}` : null,
             roles: roles
         });
 
@@ -158,7 +156,6 @@ export const updateUserAdmin = async (userId, info, file) => {
             gender,
             address,
             roles,
-            shopId
         } = JSON.parse(info);
 
         if (!email || !phone) {
@@ -178,9 +175,6 @@ export const updateUserAdmin = async (userId, info, file) => {
 
         if (name) {
             user.name = name;
-        }
-        if (shopId) {
-            user.shopId = shopId;
         }
         if (file) {
             user.image_url = `admin-owners/${file.filename}`;
