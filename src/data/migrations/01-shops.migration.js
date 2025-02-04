@@ -15,7 +15,11 @@ module.exports = {
             },
             logo_url: {
                 type: Sequelize.STRING,
-                allowNull: true
+                allowNull: false
+            },
+            background_url: {
+                type: Sequelize.STRING,
+                allowNull: false
             },
             contact_email: {
                 type: Sequelize.STRING,

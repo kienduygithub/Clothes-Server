@@ -19,6 +19,7 @@ module.exports = (sequelize, DataTypes) => {
     Shop.init({
         shop_name: DataTypes.STRING,
         logo_url: DataTypes.STRING,
+        background_url: DataTypes.STRING,
         contact_email: DataTypes.STRING,
         contact_address: DataTypes.STRING,
         description: DataTypes.STRING
