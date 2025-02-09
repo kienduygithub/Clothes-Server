@@ -48,28 +48,43 @@ const fetchAllShop = async (req, res) => {
     }
 }
 
-const createNewShop = async (payload) => {
+const createNewShop = async (shopInfo, files) => {
     try {
+        if (!shopInfo) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                shopInfo: shopInfo
+            });
+        }
+
         const {
             shop_name,
-            logo_url,
             contact_email,
             contact_address,
             description
-        } = payload;
+        } = JSON.parse(shopInfo);
 
-        if (!shop_name) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết');
+        if (!shop_name || !contact_email || !contact_address) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                shop_name: shop_name,
+                contact_email: contact_email,
+                contact_address: contact_address
+            });
         }
+
         await db.Shop.create({
             shop_name: shop_name,
-            logo_url: logo_url ?? '',
+            logo_url: files && files['logoShopFile']
+                ? `shops/${files['logoShopFile'][0].filename}`
+                : null,
+            background_url: files && files['backgroundShopFile']
+                ? `shop-backgrounds/${files['backgroundShopFile'][0].filename}`
+                : null,
             contact_email: contact_email ?? '',
             contact_address: contact_address ?? '',
             description: description ?? ''
         });
 
-        return ResponseModel.success('Tạo cửa hàng thành công.');
+        return ResponseModel.success('Tạo cửa hàng thành công.', null);
     } catch (error) {
         console.log(error);
         ResponseModel.error(error.status, error.message, error?.body);

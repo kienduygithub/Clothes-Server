@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import HttpErrors from "../errors/http-errors";
 
-const storageProducts = multer.diskStorage({
+const storageServer = multer.diskStorage({
     destination: function (req, file, cb) {
         if (file.fieldname === 'infoImages') {
             const uploadPath = path.resolve(
@@ -11,14 +11,30 @@ const storageProducts = multer.diskStorage({
                 "../../assets/products"
             );
             cb(null, uploadPath);
-
         } else if (file.fieldname === 'variantImages' || file.fieldname === 'variantUpdateImages') {
             const uploadPath = path.resolve(
                 __dirname,
                 "../../assets/product_variants"
             );
             cb(null, uploadPath);
-
+        } else if (file.fieldname === 'adminOwnerFile') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/admin-owners"
+            );
+            cb(null, uploadPath);
+        } else if (file.fieldname === 'logoShopFile') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/shops"
+            );
+            cb(null, uploadPath);
+        } else if (file.fieldname === 'backgroundShopFile') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/shop-backgrounds"
+            );
+            cb(null, uploadPath);
         } else {
             cb({
                 status: HttpErrors.NOT_FOUND,
@@ -33,8 +49,8 @@ const storageProducts = multer.diskStorage({
     }
 });
 
-export const uploadProducts = multer({
-    storage: storageProducts,
+export const uploadServer = multer({
+    storage: storageServer,
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowTypes = ["image/jpeg", "image/png", "image/jpg"];
@@ -47,37 +63,7 @@ export const uploadProducts = multer({
         }
         cb(null, true);
     }
-});
-
-export const storageUser = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const uploadPath = path.resolve(
-            __dirname,
-            "../../assets/admin-owners"
-        );
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        const fileName = `${Date.now()}-${file.originalname}`;
-        cb(null, fileName);
-    }
-});
-
-export const uploadUser = multer({
-    storage: storageUser,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        const allowTypes = ["image/jpeg", "image/png", "image/jpg"];
-        if (!allowTypes.includes(file.mimetype)) {
-            return cb({
-                status: HttpErrors.BAD_REQUEST,
-                message: 'Chỉ hỗ trợ định dạng JPEG, JPG và PNG!',
-                body: null
-            });
-        }
-        cb(null, true);
-    }
-});
+})
 
 export const handleDeleteImages = async (deletedImages) => {
     for (const image of deletedImages) {

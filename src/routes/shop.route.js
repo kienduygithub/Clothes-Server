@@ -1,5 +1,8 @@
 import express from 'express';
 import {
+    uploadServer
+} from '../common/middleware/upload.middleware';
+import {
     fetchAllProductsInShop,
     fetchAllShop,
     createNewShop,
@@ -12,10 +15,17 @@ ShopRouter.get('/shop/:id', fetchAllProductsInShop);
 
 ShopRouter.get('/shop', fetchAllShop);
 
-ShopRouter.post('/shop', createNewShop);
+ShopRouter.post(
+    '/shop/admin/create',
+    uploadServer.fields([
+        { name: 'logoShopFile', maxCount: 1 },
+        { name: 'backgroundShopFile', maxCount: 1 }
+    ]),
+    createNewShop
+);
 
-ShopRouter.put('/shop/:id', updateShopById);
+ShopRouter.put('/shop/admin/:id', updateShopById);
 
-ShopRouter.delete('/shop', deleteShopById);
+ShopRouter.delete('/shop/admin/:id', deleteShopById);
 
 export default ShopRouter;

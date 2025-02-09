@@ -9,7 +9,7 @@ const fetchAllProductsInShop = async (req, res) => {
         return res.status(error.status).json({
             status: error.status,
             message: error?.message ?? 'UNKNOWN',
-            data: error?.body
+            body: error?.body
         });
     }
 }
@@ -22,21 +22,22 @@ const fetchAllShop = async (req, res) => {
         return res.status(error?.status).json({
             status: error.status,
             message: error?.message ?? 'UNKNOWN',
-            data: error?.body
+            body: error?.body
         });
     }
 }
 
 const createNewShop = async (req, res) => {
     try {
-        // shop_name, logo_url, description
-        const response = await shopServices.createNewShop(req.body);
+        const shopInfo = req.body.shopInfo;
+        const files = req.files;
+        const response = await shopServices.createNewShop(shopInfo, files);
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error.status).json({
             status: error.status,
             message: error?.message ?? 'UNKNOWN',
-            data: error?.body
+            body: error?.body
         })
     }
 }
@@ -50,7 +51,7 @@ const updateShopById = async (req, res) => {
         return res.status(error.status).json({
             status: error.status,
             message: error?.message ?? 'UNKNOWN',
-            data: error?.body
+            body: error?.body
         })
     }
 }
@@ -64,7 +65,7 @@ const deleteShopById = async (req, res) => {
         return res.status(error?.status).json({
             status: error.status,
             message: error?.message ?? 'UNKNOWN',
-            data: error?.body
+            body: error?.body
         });
     }
 }

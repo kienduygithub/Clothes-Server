@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-    uploadProducts,
+    uploadServer
 } from '../common/middleware/upload.middleware';
 import {
     fetchProductMobileById,
@@ -22,7 +22,7 @@ ProductRouter.get('/product', fetchAllProduct);
 
 ProductRouter.post(
     '/product',
-    uploadProducts.fields([
+    uploadServer.fields([
         { name: 'infoImages', maxCount: 10 },
         { name: 'variantImages', maxCount: 30 },
     ]),
@@ -31,7 +31,7 @@ ProductRouter.post(
 
 ProductRouter.patch(
     '/product/:id',
-    uploadProducts.fields([
+    uploadServer.fields([
         { name: 'infoImages', maxCount: 10 },
         { name: 'variantImages', maxCount: 30 },
         { name: 'variantUpdateImages', maxCount: 30 }

@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-    uploadUser
+    uploadServer
 } from '../common/middleware/upload.middleware';
 import {
     fetchAllUser,
@@ -18,7 +18,7 @@ UserRouter.get('/user/:id', fetchUserById);
 
 UserRouter.post(
     '/user/admin/create',
-    uploadUser.single('adminOwnerFile'),
+    uploadServer.single('adminOwnerFile'),
     createUserAdmin
 );
 
@@ -26,7 +26,7 @@ UserRouter.delete('/user/admin/:id', deleteUserAdmin);
 
 UserRouter.patch(
     '/user/admin/:id',
-    uploadUser.single('adminOwnerFile'),
+    uploadServer.single('adminOwnerFile'),
     updateUserAdmin
 );
 

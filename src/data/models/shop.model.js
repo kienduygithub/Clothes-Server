@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
         background_url: DataTypes.STRING,
         contact_email: DataTypes.STRING,
         contact_address: DataTypes.STRING,
-        description: DataTypes.STRING
+        description: DataTypes.TEXT('medium')
     }, {
         sequelize,
         modelName: 'Shop',
