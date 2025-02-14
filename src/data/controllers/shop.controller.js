@@ -58,7 +58,7 @@ const updateShopById = async (req, res) => {
 
 const deleteShopById = async (req, res) => {
     try {
-        const shopId = req.query.id;
+        const shopId = req.params.id;
         const response = await shopServices.deleteShopById(shopId);
         return res.status(response.status).json(response);
     } catch (error) {

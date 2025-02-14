@@ -11,9 +11,9 @@ import {
 } from '../data/controllers/shop.controller';
 const ShopRouter = express.Router();
 
-ShopRouter.get('/shop/:id', fetchAllProductsInShop);
+ShopRouter.get('/shop/all', fetchAllShop);
 
-ShopRouter.get('/shop', fetchAllShop);
+ShopRouter.get('/shop/:id', fetchAllProductsInShop);
 
 ShopRouter.post(
     '/shop/admin/create',

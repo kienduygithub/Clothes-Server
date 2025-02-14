@@ -1,5 +1,6 @@
 import HttpErrors from '../../common/errors/http-errors';
 import { ResponseModel } from '../../common/errors/response';
+import { handleDeleteImages } from '../../common/middleware/upload.middleware';
 import db from '../models';
 
 const fetchAllProductsInShop = async (shopId) => {
@@ -25,7 +26,7 @@ const fetchAllProductsInShop = async (shopId) => {
     }
 }
 
-const fetchAllShop = async (req, res) => {
+const fetchAllShop = async () => {
     try {
         const response = await db.Shop.findAll({
             include: [
@@ -33,12 +34,26 @@ const fetchAllShop = async (req, res) => {
                     model: db.User,
                     as: 'users',
                     attributes: ['id', 'name', 'email', 'phone', 'address']
+                },
+                {
+                    model: db.Product,
+                    as: 'products',
+                    attributes: ['id', 'product_name', 'sold_quantity'],
+                    include: [
+                        {
+                            model: db.ProductVariant,
+                            as: 'variants',
+                            attributes: ['id', 'stock_quantity']
+                        }
+                    ]
                 }
             ],
             attributes: {
                 exclude: ['updatedAt']
-            }
+            },
+            raw: false
         });
+
         const payload = {
             shops: response
         };
@@ -137,6 +152,8 @@ const deleteShopById = async (shopId) => {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng.');
         }
 
+        const { background_url, logo_url } = existShop;
+        await handleDeleteImages([background_url, logo_url]);
         await db.Shop.destroy({
             where: { id: shopId }
         });
