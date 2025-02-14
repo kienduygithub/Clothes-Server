@@ -1,6 +1,6 @@
 import HttpErrors from '../../common/errors/http-errors';
 import { ResponseModel } from '../../common/errors/response';
-import { handleDeleteImages } from '../../common/middleware/upload.middleware';
+import { handleDeleteImageAsFailed, handleDeleteImages } from '../../common/middleware/upload.middleware';
 import db from '../models';
 
 const fetchAllProductsInShop = async (shopId) => {
@@ -63,6 +63,31 @@ const fetchAllShop = async () => {
     }
 }
 
+const fetchShopById = async (shopId) => {
+    try {
+        if (!shopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                id: shopId
+            });
+        }
+
+        const shop = await db.Shop.findOne({
+            where: { id: shopId }
+        });
+
+        if (!shop) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng');
+        }
+
+        const payload = {
+            shops: [shop]
+        };
+        return ResponseModel.success('Danh sách cửa hàng', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 const createNewShop = async (shopInfo, files) => {
     try {
         if (!shopInfo) {
@@ -106,8 +131,15 @@ const createNewShop = async (shopInfo, files) => {
     }
 }
 
-const updateShopById = async (shopId, payload) => {
+const updateShopById = async (shopId, info, files) => {
     try {
+        if (!shopId || !info) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                shopId: shopId,
+                info: info,
+            })
+        }
+
         const existShop = await db.Shop.findOne({
             where: { id: shopId }
         });
@@ -118,26 +150,40 @@ const updateShopById = async (shopId, payload) => {
 
         const {
             shop_name,
-            logo_url,
             contact_email,
             contact_address,
-            description
-        } = payload;
+            description,
+        } = JSON.parse(info);
 
-        if (!shop_name) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết',);
+        const deleteImageURLs = [];
+
+        if (shop_name) {
+            existShop.shop_name = shop_name;
         };
+        existShop.contact_email = contact_email;
+        existShop.contact_address = contact_address;
+        existShop.description = description;
 
-        await existShop.update({
-            shop_name: shop_name,
-            logo_url: logo_url,
-            contact_email: contact_email,
-            contact_address: contact_address,
-            description: description,
-        });
+        if (files && files['logoShopFile']) {
+            deleteImageURLs.push(existShop.logo_url);
+            existShop.logo_url = `shops/${files['logoShopFile'][0].filename}`;
+        }
+
+        if (files && files['backgroundShopFile']) {
+            deleteImageURLs.push(existShop.background_url);
+            existShop.background_url = `shop-backgrounds/${files['backgroundShopFile'][0].filename}`;
+        }
+
+        if (deleteImageURLs.length > 0) {
+            await handleDeleteImages(deleteImageURLs);
+        }
+
+        await existShop.save();
 
         return ResponseModel.success('Cập nhật thành công');
     } catch (error) {
+        await handleDeleteImageAsFailed(files['logoShopFile'][0]);
+        await handleDeleteImageAsFailed(files['backgroundShopFile'][0]);
         ResponseModel.error(error.status, error?.message);
     }
 }
@@ -167,6 +213,7 @@ const deleteShopById = async (shopId) => {
 module.exports = {
     fetchAllProductsInShop: fetchAllProductsInShop,
     fetchAllShop: fetchAllShop,
+    fetchShopById: fetchShopById,
     createNewShop: createNewShop,
     updateShopById: updateShopById,
     deleteShopById: deleteShopById

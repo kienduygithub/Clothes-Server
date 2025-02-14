@@ -27,6 +27,20 @@ const fetchAllShop = async (req, res) => {
     }
 }
 
+const fetchShopById = async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const response = await shopServices.fetchShopById(shopId);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 const createNewShop = async (req, res) => {
     try {
         const shopInfo = req.body.shopInfo;
@@ -45,7 +59,11 @@ const createNewShop = async (req, res) => {
 const updateShopById = async (req, res) => {
     try {
         const shopId = req.params.id;
-        const response = await shopServices.updateShopById(shopId, req.body);
+        const response = await shopServices.updateShopById(
+            shopId,
+            req.body.shopInfo,
+            req.files
+        );
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error.status).json({
@@ -73,6 +91,7 @@ const deleteShopById = async (req, res) => {
 module.exports = {
     fetchAllProductsInShop: fetchAllProductsInShop,
     fetchAllShop: fetchAllShop,
+    fetchShopById: fetchShopById,
     createNewShop: createNewShop,
     updateShopById: updateShopById,
     deleteShopById: deleteShopById
