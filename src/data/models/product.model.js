@@ -40,6 +40,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         product_name: DataTypes.STRING,
         origin: DataTypes.STRING,
+        gender: DataTypes.ENUM('Male', 'Female', 'Unisex', 'Kids', 'Other'),
         description: DataTypes.STRING,
         sold_quantity: DataTypes.INTEGER,
         unit_price: DataTypes.DECIMAL(10, 2),

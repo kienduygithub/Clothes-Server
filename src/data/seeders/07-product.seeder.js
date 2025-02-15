@@ -7,6 +7,7 @@ module.exports = {
             {
                 shopId: 1,
                 product_name: 'Áo sơ mi nam',
+                gender: 'Male',
                 origin: 'Việt Nam',
                 description: 'Áo sơ mi nam cao cấp, chất liệu thoáng mát.',
                 sold_quantity: 10,
@@ -17,6 +18,7 @@ module.exports = {
             {
                 shopId: 2,
                 product_name: 'Quần tây nam',
+                gender: 'Male',
                 origin: 'Việt Nam',
                 description: 'Quần tây nam lịch lãm, phù hợp đi làm và dự tiệc.',
                 sold_quantity: 5,
@@ -27,13 +29,14 @@ module.exports = {
             {
                 shopId: 1,
                 product_name: 'Áo thun nam',
+                gender: 'Male',
                 origin: 'Việt Nam',
                 description: 'Áo thun nam thoải mái, phù hợp mặc hàng ngày.',
                 sold_quantity: 20,
                 unit_price: 250000,
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            },
+            }
         ]);
 
         await queryInterface.bulkInsert('productimages', [

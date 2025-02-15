@@ -26,6 +26,10 @@ module.exports = {
                 type: Sequelize.STRING,
                 allowNull: true
             },
+            gender: {
+                type: Sequelize.ENUM('Male', 'Female', 'Unisex', 'Kids', 'Other'),
+                allowNull: false
+            },
             description: {
                 type: Sequelize.STRING,
                 allowNull: true
