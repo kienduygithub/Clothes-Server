@@ -16,12 +16,16 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'parent',
                 foreignKey: 'parentId'
             });
-            Category.belongsToMany(models.Product, {
-                through: models.ProductCategory,
+            // Category.belongsToMany(models.Product, {
+            //     through: models.ProductCategory,
+            //     foreignKey: 'categoryId',
+            //     otherKey: 'productId',
+            //     as: 'products'
+            // });
+            Category.hasMany(models.Product, {
                 foreignKey: 'categoryId',
-                otherKey: 'productId',
                 as: 'products'
-            });
+            })
         }
     }
     Category.init({

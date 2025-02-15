@@ -20,11 +20,16 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'reviews',
                 onDelete: 'CASCADE'
             });
-            Product.belongsToMany(models.Category, {
-                through: models.ProductCategory,
-                foreignKey: 'productId',
-                otherKey: 'categoryId',
-                as: 'categories'
+            // Product.belongsToMany(models.Category, {
+            //     through: models.ProductCategory,
+            //     foreignKey: 'productId',
+            //     otherKey: 'categoryId',
+            //     as: 'categories'
+            // });
+            Product.belongsTo(models.Category, {
+                foreignKey: 'categoryId',
+                as: 'category',
+                onDelete: 'SET NULL'
             });
             Product.hasMany(models.ProductImages, {
                 foreignKey: 'productId',
@@ -38,10 +43,14 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: false
         },
+        categoryId: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
         product_name: DataTypes.STRING,
         origin: DataTypes.STRING,
         gender: DataTypes.ENUM('Male', 'Female', 'Unisex', 'Kids', 'Other'),
-        description: DataTypes.STRING,
+        description: DataTypes.TEXT('medium'),
         sold_quantity: DataTypes.INTEGER,
         unit_price: DataTypes.DECIMAL(10, 2),
     }, {

@@ -83,8 +83,11 @@ const fetchProductById = async (productId) => {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy sản phẩm.', []);
         }
 
+        const categories = await product.getCategories();
+
         const payload = {
-            products: [product]
+            products: [product],
+            categorys: categories
         };
         return ResponseModel.success('Tìm thấy sản phẩm', payload);
     } catch (error) {
@@ -137,6 +140,7 @@ const createNewProduct = async (data, files, shopId) => {
         const {
             product_name,
             origin,
+            gender,
             description,
             unit_price,
             variants
@@ -160,6 +164,7 @@ const createNewProduct = async (data, files, shopId) => {
             shopId: shopId,
             product_name: product_name,
             origin: origin,
+            gender: gender,
             description: description,
             unit_price: Number(unit_price)
         });
@@ -205,6 +210,7 @@ const updateProduct = async (productId, data, files) => {
             shopId,
             product_name,
             origin,
+            gender,
             description,
             unit_price,
             image_urls,
@@ -248,6 +254,7 @@ const updateProduct = async (productId, data, files) => {
             product.product_name = product_name;
         }
         product.origin = origin;
+        product.gender = gender;
         product.description = description;
         product.unit_price = Number(unit_price);
 

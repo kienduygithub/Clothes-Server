@@ -18,6 +18,15 @@ module.exports = {
                 },
                 onDelete: 'CASCADE'
             },
+            categoryId: {
+                type: Sequelize.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'categories',
+                    key: 'id'
+                },
+                onDelete: 'SET NULL'
+            },
             product_name: {
                 type: Sequelize.STRING,
                 allowNull: false
@@ -31,7 +40,7 @@ module.exports = {
                 allowNull: false
             },
             description: {
-                type: Sequelize.STRING,
+                type: Sequelize.TEXT('medium'),
                 allowNull: true
             },
             sold_quantity: {
