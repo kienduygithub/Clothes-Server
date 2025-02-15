@@ -35,6 +35,12 @@ const storageServer = multer.diskStorage({
                 "../../assets/shop-backgrounds"
             );
             cb(null, uploadPath);
+        } else if (file.fieldname === 'categoryFile') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/categories"
+            );
+            cb(null, uploadPath);
         } else {
             cb({
                 status: HttpErrors.NOT_FOUND,

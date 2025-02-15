@@ -8,7 +8,8 @@ import initViewEngine from './config/viewEngine';
 import UserRouter from "./routes/user.route";
 import ShopRouter from "./routes/shop.route";
 import ProductRouter from "./routes/product.route";
-import attributeRouter from './routes/attribute.route';
+import AttributeRouter from './routes/attribute.route';
+import CategoryRouter from './routes/category.route';
 
 require('dotenv').config();
 
@@ -44,7 +45,8 @@ app.use(
     UserRouter,
     ShopRouter,
     ProductRouter,
-    attributeRouter
+    AttributeRouter,
+    CategoryRouter
 );
 
 app.listen(port, () => {

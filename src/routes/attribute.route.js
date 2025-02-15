@@ -4,10 +4,10 @@ import {
     fetchAllSizes
 } from "../data/controllers/attribute.controller";
 
-const attributeRouter = express.Router();
+const AttributeRouter = express.Router();
 
-attributeRouter.get('/attr/color', fetchAllColors);
+AttributeRouter.get('/attr/color', fetchAllColors);
 
-attributeRouter.get('/attr/size', fetchAllSizes);
+AttributeRouter.get('/attr/size', fetchAllSizes);
 
-export default attributeRouter;
+export default AttributeRouter;

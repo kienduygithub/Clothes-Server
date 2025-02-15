@@ -4,7 +4,7 @@
 module.exports = {
     async up(queryInterface, Sequelize) {
         const categories = await queryInterface.sequelize.query(
-            `SELECT id, category_name FROM categories WHERE category_name IN ('Áo', 'Quần', 'Váy', 'Đồ thể thao', 'Đồ ngủ', 'Đồ lót');`
+            `SELECT id, category_name FROM categories WHERE category_name IN ('Áo', 'Quần', 'Giày', 'Váy/Đầm', 'Phụ kiện');`
         );
 
         const parentCategories = categories[0];
@@ -23,27 +23,20 @@ module.exports = {
             { category_name: 'Quần jeans', parentId: findParentId('Quần'), createdAt: new Date(), updatedAt: new Date() },
             { category_name: 'Quần short', parentId: findParentId('Quần'), createdAt: new Date(), updatedAt: new Date() },
 
-            // Danh mục con cho Váy
-            { category_name: 'Váy liền', parentId: findParentId('Váy'), createdAt: new Date(), updatedAt: new Date() },
-            { category_name: 'Chân váy', parentId: findParentId('Váy'), createdAt: new Date(), updatedAt: new Date() },
+            // Danh mục con cho Giày
+            { category_name: 'Sneaker', parentId: findParentId('Giày'), createdAt: new Date(), updatedAt: new Date() },
+            { category_name: 'Giày cao gót', parentId: findParentId('Giày'), createdAt: new Date(), updatedAt: new Date() },
+            { category_name: 'Dép, Sandal', parentId: findParentId('Giày'), createdAt: new Date(), updatedAt: new Date() },
 
-            // Danh mục con cho Đồ thể thao
-            { category_name: 'Áo thể thao', parentId: findParentId('Đồ thể thao'), createdAt: new Date(), updatedAt: new Date() },
-            { category_name: 'Quần thể thao', parentId: findParentId('Đồ thể thao'), createdAt: new Date(), updatedAt: new Date() },
-            { category_name: 'Bộ thể thao', parentId: findParentId('Đồ thể thao'), createdAt: new Date(), updatedAt: new Date() },
+            // Danh mục con cho Váy/Đầm
+            { category_name: 'Đầm công sở', parentId: findParentId('Váy/Đầm'), createdAt: new Date(), updatedAt: new Date() },
+            { category_name: 'Đầm dạ hội', parentId: findParentId('Váy/Đầm'), createdAt: new Date(), updatedAt: new Date() },
+            { category_name: 'Chân váy', parentId: findParentId('Váy/Đầm'), createdAt: new Date(), updatedAt: new Date() },
 
-            // Danh mục con cho Đồ ngủ
-            { category_name: 'Bộ đồ ngủ', parentId: findParentId('Đồ ngủ'), createdAt: new Date(), updatedAt: new Date() },
-            { category_name: 'Áo choàng ngủ', parentId: findParentId('Đồ ngủ'), createdAt: new Date(), updatedAt: new Date() },
-
-            // Danh mục con cho Đồ lót
-            { category_name: 'Áo lót', parentId: findParentId('Đồ lót'), createdAt: new Date(), updatedAt: new Date() },
-            { category_name: 'Quần lót', parentId: findParentId('Đồ lót'), createdAt: new Date(), updatedAt: new Date() },
-
-            // Danh mục con cho phụ kiện
+            // Danh mục con cho Phụ kiện
             { category_name: 'Mũ', parentId: findParentId('Phụ kiện'), createdAt: new Date(), updatedAt: new Date() },
             { category_name: 'Túi xách', parentId: findParentId('Phụ kiện'), createdAt: new Date(), updatedAt: new Date() },
-            { category_name: 'Khăn quàng', parentId: findParentId('Phụ kiện'), createdAt: new Date(), updatedAt: new Date() },
+            { category_name: 'Thắt lưng', parentId: findParentId('Phụ kiện'), createdAt: new Date(), updatedAt: new Date() },
         ]);
     },
 
