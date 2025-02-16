@@ -137,7 +137,7 @@ export const editCategory = async (parent_id, categoryInfo, file) => {
         const conflictCategoryName = await Category.findOne({
             where: {
                 category_name: category_name,
-                parent_id: null,
+                parentId: null,
                 id: { [Op.ne]: parent_id }
             }
         });
@@ -224,7 +224,7 @@ export const addNewSubCategoryToParent = async (parent_id, data) => {
 
         const existSubNameCategory = await Category.findOne({
             where: {
-                parent_id: parent_id,
+                parentId: parent_id,
                 category_name: category_name,
             }
         })
