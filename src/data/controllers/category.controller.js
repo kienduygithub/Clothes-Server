@@ -77,8 +77,9 @@ export const addNewSubCategoryToParent = async (req, res) => {
         const parentId = req.params.parent;
         const data = req.body;
         const response = await categoryServices.addNewSubCategoryToParent(parentId, data);
-        return req.status(response?.status).json(response);
+        return res.status(response?.status).json(response);
     } catch (error) {
+        console.log(error);
         return res.status(error?.status).json({
             status: error?.status,
             message: error?.message ?? 'UNKNOWN',
@@ -93,7 +94,7 @@ export const editSubCategory = async (req, res) => {
         const subCategoryId = req.params.subcategory;
         const data = req.body;
         const response = await categoryServices.editSubCategory(parentId, subCategoryId, data);
-        return req.status(response?.status).json(response);
+        return res.status(response?.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status,
@@ -108,7 +109,7 @@ export const deleteSubCategory = async (req, res) => {
         const parentId = req.params.parent;
         const subCategoryId = req.params.subcategory;
         const response = await categoryServices.deleteSubCategory(parentId, subCategoryId);
-        return req.status(response?.status).json(response);
+        return res.status(response?.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status,

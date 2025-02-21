@@ -13,8 +13,16 @@ export const fetchCategories = async () => {
                 as: 'children'
             }
         })
+
         const payload = {
-            categories: categories
+            categories: categories.map((category) => {
+                let data = category.dataValues;
+                return ({
+                    ...data,
+                    description: data?.description === null ? '' : data?.description,
+                    parentId: data?.parentId === null ? 0 : data?.parentId
+                })
+            })
         }
 
         return ResponseModel.success('Danh sách danh mục', payload);
