@@ -47,11 +47,15 @@ export const fetchCategoryByParentId = async (parent_id) => {
                 as: 'children',
                 attributes: {
                     exclude: ['description', 'image_url', 'createdAt', 'updatedAt']
-                }
+                },
+
             },
             attributes: {
                 exclude: ['createdAt', 'updatedAt'],
-            }
+            },
+            order: [
+                [{ model: Category, as: 'children' }, 'createdAt', 'DESC']
+            ]
         });
 
         if (!category) {
