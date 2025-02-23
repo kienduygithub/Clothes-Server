@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
             User.belongsTo(models.Shop, {
                 foreignKey: 'shopId',
                 as: 'shop',
-                onDelete: 'SET NULL'
+                onDelete: 'CASCADE'
             });
             User.hasMany(models.Review, {
                 foreignKey: 'userId',

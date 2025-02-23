@@ -45,7 +45,7 @@ module.exports = {
                     model: 'shops',
                     key: 'id'
                 },
-                onDelete: 'SET NULL'
+                onDelete: 'CASCADE'
             },
             roles: {
                 type: Sequelize.ENUM('Admin', 'Owner', 'Customer'),

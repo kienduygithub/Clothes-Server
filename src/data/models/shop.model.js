@@ -5,10 +5,10 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class Shop extends Model {
         static associate(models) {
-            Shop.hasMany(models.User, {
+            Shop.hasOne(models.User, {
                 foreignKey: 'shopId',
-                as: 'users',
-                onDelete: 'SET NULL'
+                as: 'user',
+                onDelete: 'CASCADE'
             });
             Shop.hasMany(models.Product, {
                 foreignKey: 'shopId',
