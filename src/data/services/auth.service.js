@@ -25,10 +25,11 @@ export const signIn = async (info) => {
         }
 
         // const compared = comparePassword(password);
+        const compared = password === existUser.password;
 
-        // if (!compared) {
-        //     ResponseModel.error(HttpErrors.NOT_FOUND, 'Tên đăng nhập hoặc mật khẩu không chính xác.', null);
-        // }
+        if (!compared) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Tên đăng nhập hoặc mật khẩu không chính xác.', null);
+        }
 
         const payload = {
             id: existUser.id,

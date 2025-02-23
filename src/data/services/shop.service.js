@@ -32,7 +32,7 @@ const fetchAllShop = async () => {
             include: [
                 {
                     model: db.User,
-                    as: 'users',
+                    as: 'user',
                     attributes: ['id', 'name', 'email', 'phone', 'address']
                 },
                 {

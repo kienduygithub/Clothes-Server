@@ -10,6 +10,7 @@ import ShopRouter from "./routes/shop.route";
 import ProductRouter from "./routes/product.route";
 import AttributeRouter from './routes/attribute.route';
 import CategoryRouter from './routes/category.route';
+import AuthRouter from './routes/auth.route';
 
 require('dotenv').config();
 
@@ -46,7 +47,8 @@ app.use(
     ShopRouter,
     ProductRouter,
     AttributeRouter,
-    CategoryRouter
+    CategoryRouter,
+    AuthRouter
 );
 
 app.listen(port, () => {
