@@ -76,3 +76,36 @@ export const signUpMobile = async (info) => {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+export const fetchDetailUser = async (userId) => {
+    try {
+        if (!userId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+        }
+
+        const existUser = await User.findOne({
+            where: {
+                id: userId,
+                [Op.or]: [{ roles: 'Admin' }, { roles: 'Owner' }]
+            },
+            attributes: {
+                exclude: ['createdAt', 'updatedAt']
+            }
+        });
+
+        if (!existUser) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại', null);
+        }
+
+        existUser.shopId = existUser?.shopId === null ? 0 : existUser.shopId;
+        existUser.image_url = existUser?.image_url === null ? '' : existUser.image_url;
+
+        const payload = {
+            users: [existUser]
+        }
+
+        return ResponseModel.success('Chi tiết người dùng', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}

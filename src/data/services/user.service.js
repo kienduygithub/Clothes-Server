@@ -33,7 +33,7 @@ export const fetchAllUser = async () => {
 export const fetchUserById = async (userId) => {
     try {
         if (!userId) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
         }
 
         const user = await User.findOne({
@@ -50,6 +50,7 @@ export const fetchUserById = async (userId) => {
         const payload = {
             users: [user]
         };
+
         return ResponseModel.success('Chi tiết người dùng.', payload);
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
@@ -60,7 +61,7 @@ export const fetchUserById = async (userId) => {
 export const createUserAdmin = async (info, file) => {
     try {
         if (!info) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 info,
             });
         }
@@ -75,7 +76,7 @@ export const createUserAdmin = async (info, file) => {
         } = JSON.parse(info);
 
         if (!name || !email || !password || !roles) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 name, email, password, roles
             })
         }
@@ -110,7 +111,7 @@ export const createUserAdmin = async (info, file) => {
 export const deleteUserAdmin = async (userId) => {
     try {
         if (!userId) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 userId: userId
             });
         }
@@ -142,7 +143,7 @@ export const deleteUserAdmin = async (userId) => {
 export const updateUserAdmin = async (userId, info, file) => {
     try {
         if (!info || !userId) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 info: info,
                 file: file,
                 userId: userId
@@ -159,7 +160,7 @@ export const updateUserAdmin = async (userId, info, file) => {
         } = JSON.parse(info);
 
         if (!email || !phone) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 email: email,
                 phone: phone
             });
