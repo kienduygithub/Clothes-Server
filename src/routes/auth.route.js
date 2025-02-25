@@ -4,8 +4,13 @@ import {
     signInMobile,
     signUp,
     signUpMobile,
-    fetchDetailUser
+    fetchDetailUser,
 } from "../data/controllers/auth.controller";
+import {
+    checkUserAuthentication,
+    refreshTokenWeb
+} from "../common/middleware/jwt.middleware";
+
 const AuthRouter = express.Router();
 
 AuthRouter.post('/auth/sign-in', signIn);
@@ -16,6 +21,8 @@ AuthRouter.post('/auth/sign-in/mobile', signInMobile);
 
 AuthRouter.post('/auth/sign-up/mobile', signUpMobile);
 
-AuthRouter.get('/auth/user-details/:id', fetchDetailUser);
+AuthRouter.post('/auth/refresh', refreshTokenWeb);
+
+AuthRouter.get('/auth/user-details/:id', checkUserAuthentication, fetchDetailUser);
 
 export default AuthRouter;
