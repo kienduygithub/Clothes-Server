@@ -13,6 +13,11 @@ CategoryRouter.get(
 );
 
 CategoryRouter.get(
+    '/category/all/both',
+    CategoryController.fetchCategoryBoth
+)
+
+CategoryRouter.get(
     '/category/:parent',
     checkUserAuthentication,
     CategoryController.fetchCategoryByParentId

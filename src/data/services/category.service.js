@@ -31,6 +31,27 @@ export const fetchCategories = async () => {
     }
 }
 
+export const fetchCategoryBoth = async () => {
+    try {
+        const categories = await Category.findAll();
+
+        const payload = {
+            categories: categories.map((category) => {
+                let data = category.dataValues;
+                return ({
+                    ...data,
+                    description: data?.description === null ? '' : data?.description,
+                    parentId: data?.parentId === null ? 0 : data?.parentId
+                })
+            })
+        }
+
+        return ResponseModel.success('Danh sách danh mục', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const fetchCategoryByParentId = async (parent_id) => {
     try {
         if (!parent_id) {

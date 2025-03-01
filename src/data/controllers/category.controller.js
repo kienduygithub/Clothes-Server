@@ -13,6 +13,19 @@ export const fetchCategories = async (req, res) => {
     }
 }
 
+export const fetchCategoryBoth = async (req, res) => {
+    try {
+        const response = await categoryServices.fetchCategoryBoth();
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const fetchCategoryByParentId = async (req, res) => {
     try {
         const parentId = req.params.parent;

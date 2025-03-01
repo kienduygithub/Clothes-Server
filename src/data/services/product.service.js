@@ -72,6 +72,11 @@ const fetchProductById = async (productId) => {
                     as: 'variants',
                     attributes: { exclude: ['updatedAt'] },
 
+                },
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: { exclude: ['createdAt', 'updatedAt'] }
                 }
             ],
             order: [
@@ -83,11 +88,11 @@ const fetchProductById = async (productId) => {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy sản phẩm.', []);
         }
 
-        const categories = await product.getCategories();
+        // const categories = await product.getCategories();
 
         const payload = {
             products: [product],
-            categorys: categories
+            //categorys: categories
         };
         return ResponseModel.success('Tìm thấy sản phẩm', payload);
     } catch (error) {
@@ -143,10 +148,11 @@ const createNewProduct = async (data, files, shopId) => {
             gender,
             description,
             unit_price,
-            variants
+            variants,
+            categoryId
         } = JSON.parse(data.basicInfo);
 
-        if (!shopId || !variants) {
+        if (!shopId || !variants || !categoryId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
         } else if (isNaN(unit_price)) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Giá thành sai kiểu dữ liệu', null);
@@ -166,7 +172,8 @@ const createNewProduct = async (data, files, shopId) => {
             origin: origin,
             gender: gender,
             description: description,
-            unit_price: Number(unit_price)
+            unit_price: Number(unit_price),
+            categoryId: categoryId
         });
 
         const imageFiles = files['infoImages'];
@@ -214,10 +221,17 @@ const updateProduct = async (productId, data, files) => {
             description,
             unit_price,
             image_urls,
-            variants
+            variants,
+            categoryId
         } = JSON.parse(data.basicInfo);
-        if (!shopId || !productId || !variants || !image_urls) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
+        if (!shopId || !productId || !variants || !image_urls || !categoryId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                shopId,
+                productId,
+                variants,
+                image_urls,
+                categoryId
+            });
         } else if (isNaN(unit_price)) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Giá thành sai kiểu dữ liệu', null);
         }
@@ -257,6 +271,7 @@ const updateProduct = async (productId, data, files) => {
         product.gender = gender;
         product.description = description;
         product.unit_price = Number(unit_price);
+        product.categoryId = categoryId;
 
         await product.save();
 
