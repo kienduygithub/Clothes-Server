@@ -10,12 +10,19 @@ import {
     checkUserAuthentication,
     refreshTokenWeb
 } from "../common/middleware/jwt.middleware";
+import { uploadServer } from "../common/middleware/upload.middleware";
 
 const AuthRouter = express.Router();
 
 AuthRouter.post('/auth/sign-in', signIn);
 
-AuthRouter.post('/auth/sign-up', signUp);
+AuthRouter.post(
+    '/auth/sign-up',
+    uploadServer.fields([
+        { name: 'adminOwnerFile', maxCount: 1 }
+    ])
+    , signUp
+);
 
 AuthRouter.post('/auth/sign-in/mobile', signInMobile);
 

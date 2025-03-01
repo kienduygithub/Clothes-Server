@@ -15,7 +15,10 @@ export const signIn = async (req, res) => {
 
 export const signUp = async (req, res) => {
     try {
-
+        const info = req.body?.info;
+        const files = req.files;
+        const response = await authServices.signUp(info, files);
+        return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status,
