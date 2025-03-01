@@ -35,7 +35,8 @@ export const signIn = async (info) => {
             id: existUser.id,
             name: existUser.name,
             image_url: existUser.image_url !== null ? existUser.image_url : '',
-            roles: existUser.roles
+            roles: existUser.roles,
+            shopId: existUser?.shopId || 0
         };
 
         const access_token = generalAccessToken(payload);
@@ -129,7 +130,7 @@ export const fetchDetailUser = async (userId) => {
                 [Op.or]: [{ roles: 'Admin' }, { roles: 'Owner' }]
             },
             attributes: {
-                exclude: ['createdAt', 'updatedAt']
+                exclude: ['createdAt', 'updatedAt', 'password']
             }
         });
 
