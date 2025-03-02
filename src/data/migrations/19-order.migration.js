@@ -12,7 +12,19 @@ module.exports = {
             userId: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
+                references: {
+                    model: 'users', key: 'id'
+                },
+                onDelete: 'CASCADE'
             },
+            // addressId: {
+            //     type: Sequelize.INTEGER,
+            //     allowNull: true,
+            //     references: {
+            //         model: 'addresses', key: 'id'
+            //     },
+            //     onDelete: 'CASCADE'
+            // },
             shipping_fee: {
                 type: Sequelize.DECIMAL(10, 2),
                 allowNull: true

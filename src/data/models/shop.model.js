@@ -22,7 +22,8 @@ module.exports = (sequelize, DataTypes) => {
         background_url: DataTypes.STRING,
         contact_email: DataTypes.STRING,
         contact_address: DataTypes.STRING,
-        description: DataTypes.TEXT('medium')
+        description: DataTypes.TEXT('medium'),
+        status: DataTypes.ENUM('active', 'inactive', 'pending')
     }, {
         sequelize,
         modelName: 'Shop',

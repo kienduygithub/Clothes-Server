@@ -5,6 +5,7 @@ import { User } from "../models";
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed } from "../../common/middleware/upload.middleware";
+import { sendActivateStoreMailer } from "../../common/mails/mailer.config";
 
 export const signIn = async (info) => {
     try {
@@ -98,11 +99,14 @@ export const signUp = async (
         // });
 
         // return ResponseModel.success('Tạo tài khoản thành công', { user });
-        console.log(userInfo);
-        console.log(shopInfo);
+        sendActivateStoreMailer(
+            "buikienduy2020@gmail.com",
+            "Kiến Duy",
+            "Cửa hàng thời trang",
+        );
         return ResponseModel.success('Tạo tài khoản thành công', {
-            user: JSON.parse(userInfo),
-            shop: JSON.parse(shopInfo)
+            // user: JSON.parse(userInfo),
+            // shop: JSON.parse(shopInfo)
         });
     } catch (error) {
         if (files?.length) {

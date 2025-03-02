@@ -33,6 +33,9 @@ module.exports = {
                 type: Sequelize.TEXT('medium'),
                 allowNull: true,
             },
+            status: {
+                type: Sequelize.ENUM('active', 'inactive', 'pending')
+            },
             createdAt: {
                 allowNull: false,
                 type: Sequelize.DATE

@@ -5,7 +5,19 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class OrderItem extends Model {
         static associate(models) {
+            OrderItem.belongsTo(models.Order, {
+                foreignKey: 'orderId',
+                as: 'order',
+                onDelete: "CASCADE",
+                onUpdate: "CASCADE"
+            });
 
+            // Một OrderItem thuộc về một Product
+            // OrderItem.belongsTo(models.Product, {
+            //     foreignKey: 'productId',
+            //     onDelete: "CASCADE",
+            //     onUpdate: "CASCADE"
+            // });
         }
     }
     OrderItem.init({
