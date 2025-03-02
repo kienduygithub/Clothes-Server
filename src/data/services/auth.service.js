@@ -54,46 +54,56 @@ export const signIn = async (info) => {
     }
 }
 
-export const signUp = async (info, files) => {
+export const signUp = async (
+    userInfo,
+    shopInfo,
+    files
+) => {
     try {
-        if (!info || !files) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
-        }
+        // if (!info || !files) {
+        //     ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+        // }
 
-        const {
-            name,
-            email,
-            password,
-            address,
-            phone,
-            gender
-        } = JSON.parse(info);
+        // const {
+        //     name,
+        //     email,
+        //     password,
+        //     address,
+        //     phone,
+        //     gender
+        // } = JSON.parse(info);
 
-        if (!email || !password) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
-        }
+        // if (!email || !password) {
+        //     ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+        // }
 
-        const existEmail = await User.findOne({
-            where: { email: email }
+        // const existEmail = await User.findOne({
+        //     where: { email: email }
+        // });
+
+        // if (existEmail) {
+        //     ResponseModel.error(HttpErrors.NOT_FOUND, 'Tài khoản đã tồn tại', null);
+        // }
+
+        // const hash = hashPassword(password);
+        // const user = await User.create({
+        //     name: name,
+        //     email: email,
+        //     password: hash,
+        //     address: address,
+        //     phone: phone,
+        //     gender: gender,
+        //     image_url: files['adminOwnerFile'] ? `admin-owners/${files['adminOwnerFile'][0]?.filename}` : '',
+        //     roles: 'Owner'
+        // });
+
+        // return ResponseModel.success('Tạo tài khoản thành công', { user });
+        console.log(userInfo);
+        console.log(shopInfo);
+        return ResponseModel.success('Tạo tài khoản thành công', {
+            user: JSON.parse(userInfo),
+            shop: JSON.parse(shopInfo)
         });
-
-        if (existEmail) {
-            ResponseModel.error(HttpErrors.NOT_FOUND, 'Tài khoản đã tồn tại', null);
-        }
-
-        const hash = hashPassword(password);
-        const user = await User.create({
-            name: name,
-            email: email,
-            password: hash,
-            address: address,
-            phone: phone,
-            gender: gender,
-            image_url: files['adminOwnerFile'] ? `admin-owners/${files['adminOwnerFile'][0]?.filename}` : '',
-            roles: 'Owner'
-        });
-
-        return ResponseModel.success('Tạo tài khoản thành công', { user });
     } catch (error) {
         if (files?.length) {
             await Promise.all(files.map(file => handleDeleteImageAsFailed(file)));
