@@ -19,7 +19,6 @@ module.exports = {
                     model: "cities",
                     key: "id",
                 },
-                onUpdate: "CASCADE",
                 onDelete: "CASCADE",
             },
         });

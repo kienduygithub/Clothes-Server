@@ -5,11 +5,11 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class Order extends Model {
         static associate(models) {
-            // Order.belongsTo(models.Address, {
-            //     foreignKey: 'addressId',
-            //     onDelete: "SET NULL",
-            //     onUpdate: "CASCADE"
-            // });
+            Order.belongsTo(models.Address, {
+                foreignKey: 'address_id',
+                as: 'address',
+                onDelete: "SET NULL",
+            });
 
             Order.belongsTo(models.User, {
                 foreignKey: 'userId',
@@ -35,15 +35,14 @@ module.exports = (sequelize, DataTypes) => {
             onUpdate: 'CASCADE',
             onDelete: 'CASCADE'
         },
-        // addressId: {
-        //     type: DataTypes.INTEGER,
-        //     allowNull: true,
-        //     references: {
-        //         model: 'addresses', key: 'id'
-        //     },
-        //     onUpdate: 'CASCADE',
-        //     onDelete: 'SET NULL',
-        // },
+        address_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'addresses', key: 'id'
+            },
+            onDelete: 'SET NULL',
+        },
         shipping_fee: DataTypes.DECIMAL(10, 2),
         payable_price: DataTypes.DECIMAL(10, 2),
         total_price: DataTypes.DECIMAL(10, 2),

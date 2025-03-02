@@ -7,14 +7,15 @@ module.exports = (sequelize, DataTypes) => {
         static associate(models) {
             City.hasMany(models.District, {
                 foreignKey: "city_id",
-                onDelete: "RESTRICT",
+                as: 'districts',
                 onUpdate: "CASCADE",
+                onDelete: "RESTRICT",
             });
 
             City.hasMany(models.Address, {
                 foreignKey: "city_id",
-                onDelete: "SET NULL",
                 onUpdate: "CASCADE",
+                onDelete: "SET NULL",
             });
         }
     }

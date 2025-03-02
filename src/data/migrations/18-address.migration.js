@@ -16,34 +16,33 @@ module.exports = {
                     model: "users",
                     key: "id"
                 },
-                onUpdate: "CASCADE",
                 onDelete: "CASCADE"
             },
             city_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true,
                 references: {
-                    model: "cities", key: 'id'
+                    model: "cities",
+                    key: "id"
                 },
-                onUpdate: "CASCADE",
                 onDelete: "SET NULL"
             },
             district_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true,
                 references: {
-                    model: "districts", key: "id"
+                    model: "districts",
+                    key: "id"
                 },
-                onUpdate: "CASCADE",
                 onDelete: "SET NULL"
             },
             ward_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false,
+                allowNull: true,
                 references: {
-                    model: "wards", key: "id"
+                    model: "wards",
+                    key: "id"
                 },
-                onUpdate: "CASCADE",
                 onDelete: "SET NULL"
             },
             address_detail: {

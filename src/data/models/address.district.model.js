@@ -7,19 +7,18 @@ module.exports = (sequelize, DataTypes) => {
         static associate(models) {
             District.belongsTo(models.City, {
                 foreignKey: "city_id",
-                onUpdate: "CASCADE",
+                as: 'city',
                 onDelete: "CASCADE"
             });
 
             District.hasMany(models.Ward, {
                 foreignKey: "district_id",
-                onUpdate: "CASCADE",
+                as: 'wards',
                 onDelete: "CASCADE"
             });
 
             District.hasMany(models.Address, {
                 foreignKey: "district_id",
-                onUpdate: "CASCADE",
                 onDelete: "SET NULL"
             });
         }
@@ -33,10 +32,13 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
-        city_id: {
+        cityId: {
             type: DataTypes.INTEGER,
             allowNull: false,
-            references: { model: "cities", key: "id" },
+            references: {
+                model: "cities",
+                key: "id"
+            },
             onDelete: "CASCADE",
         },
     }, {

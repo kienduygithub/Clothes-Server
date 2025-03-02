@@ -17,14 +17,14 @@ module.exports = {
                 },
                 onDelete: 'CASCADE'
             },
-            // addressId: {
-            //     type: Sequelize.INTEGER,
-            //     allowNull: true,
-            //     references: {
-            //         model: 'addresses', key: 'id'
-            //     },
-            //     onDelete: 'CASCADE'
-            // },
+            address_id: {
+                type: Sequelize.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'addresses', key: 'id'
+                },
+                onDelete: 'SET NULL',
+            },
             shipping_fee: {
                 type: Sequelize.DECIMAL(10, 2),
                 allowNull: true

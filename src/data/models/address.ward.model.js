@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
             // Mỗi Ward thuộc một District
             Ward.belongsTo(models.District, {
                 foreignKey: "district_id",
+                as: 'district',
                 onUpdate: "CASCADE",
                 onDelete: "CASCADE",
             });

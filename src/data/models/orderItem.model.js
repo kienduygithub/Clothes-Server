@@ -9,7 +9,6 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'orderId',
                 as: 'order',
                 onDelete: "CASCADE",
-                onUpdate: "CASCADE"
             });
 
             // Một OrderItem thuộc về một Product
@@ -21,7 +20,15 @@ module.exports = (sequelize, DataTypes) => {
         }
     }
     OrderItem.init({
-        orderId: DataTypes.INTEGER,
+        orderId: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'orders',
+                key: 'id'
+            },
+            onDelete: 'CASCADE'
+        },
         productId: DataTypes.INTEGER,
         colorId: DataTypes.INTEGER,
         sizeId: DataTypes.INTEGER,

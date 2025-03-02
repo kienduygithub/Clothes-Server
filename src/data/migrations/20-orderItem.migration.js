@@ -10,7 +10,7 @@ module.exports = {
                 type: Sequelize.INTEGER
             },
             orderId: {
-                type: DataTypes.INTEGER,
+                type: Sequelize.INTEGER,
                 allowNull: false,
                 references: {
                     model: 'orders',
@@ -19,7 +19,7 @@ module.exports = {
                 onDelete: "CASCADE"
             },
             productId: {
-                type: DataTypes.INTEGER,
+                type: Sequelize.INTEGER,
                 allowNull: false,
                 // references: { model: 'products', key: 'id' },
                 // onUpdate: "CASCADE",

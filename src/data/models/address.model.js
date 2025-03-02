@@ -7,33 +7,33 @@ module.exports = (sequelize, DataTypes) => {
         static associate(models) {
             Address.belongsTo(models.User, {
                 foreignKey: 'userId',
-                onUpdate: "CASCADE",
                 onDelete: "CASCADE"
             });
 
             Address.belongsTo(models.City, {
                 foreignKey: "city_id",
-                onUpdate: "CASCADE",
+                as: 'city',
                 onDelete: "SET NULL"
             });
 
             Address.belongsTo(models.District, {
                 foreignKey: "district_id",
-                onUpdate: "CASCADE",
+                as: 'district',
                 onDelete: "SET NULL",
             });
 
             Address.belongsTo(models.Ward, {
                 foreignKey: "ward_id",
-                onUpdate: "CASCADE",
+                as: 'ward',
                 onDelete: "SET NULL",
             });
 
-            // Address.hasMany(models.Order, {
-            //     foreignKey: 'address_id',
-            //     onUpdate: "CASCADE",
-            //     onDelete: "SET NULL",
-            // });
+            Address.hasMany(models.Order, {
+                foreignKey: 'address_id',
+                as: 'orders',
+                onUpdate: "CASCADE",
+                onDelete: "SET NULL",
+            });
         }
     }
 
@@ -45,7 +45,6 @@ module.exports = (sequelize, DataTypes) => {
                 model: 'users',
                 key: 'id'
             },
-            onUpdate: "CASCADE",
             onDelete: "CASCADE"
         },
         city_id: {
@@ -64,7 +63,7 @@ module.exports = (sequelize, DataTypes) => {
                 model: 'districts',
                 key: 'id'
             },
-            onUpdate: "CASCADE",
+            onDelete: "SET NULL"
         },
         ward_id: {
             type: DataTypes.INTEGER,
@@ -73,7 +72,7 @@ module.exports = (sequelize, DataTypes) => {
                 model: 'wards',
                 key: 'id'
             },
-            onUpdate: "CASCADE",
+            onDelete: "SET NULL",
         },
         address_detail: DataTypes.STRING,
         is_default: DataTypes.BOOLEAN
