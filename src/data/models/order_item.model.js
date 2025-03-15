@@ -5,8 +5,8 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class OrderItem extends Model {
         static associate(models) {
-            OrderItem.belongsTo(models.Order, {
-                foreignKey: 'order_id',
+            OrderItem.belongsTo(models.OrderShop, {
+                foreignKey: 'order_shop_id',
                 as: 'order',
                 onDelete: "CASCADE",
             });
@@ -19,11 +19,11 @@ module.exports = (sequelize, DataTypes) => {
         }
     }
     OrderItem.init({
-        order_id: {
+        order_shop_id: {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: 'orders',
+                model: 'ordershops',
                 key: 'id'
             },
             onDelete: 'CASCADE'
@@ -38,7 +38,7 @@ module.exports = (sequelize, DataTypes) => {
             onDelete: 'CASCADE'
         },
         unit_price: DataTypes.DECIMAL(10, 2),
-        order_quantity: DataTypes.INTEGER
+        quantity: DataTypes.INTEGER
     }, {
         sequelize,
         modelName: 'OrderItem',

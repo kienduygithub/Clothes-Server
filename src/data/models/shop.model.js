@@ -5,14 +5,29 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class Shop extends Model {
         static associate(models) {
+            // Shop 1 - 1 User
             Shop.hasOne(models.User, {
                 foreignKey: 'shopId',
                 as: 'user',
                 onDelete: 'CASCADE'
             });
+            // Shop 1 - N Product
             Shop.hasMany(models.Product, {
                 foreignKey: 'shopId',
-                as: 'products'
+                as: 'products',
+                onDelete: 'CASCADE'
+            });
+            // Shop 1 - N Coupon
+            Shop.hasMany(models.Coupon, {
+                foreignKey: 'shop_id',
+                as: 'coupons',
+                onDelete: 'CASCADE'
+            })
+            // Shop 1 - N OrderShop
+            Shop.hasMany(models.OrderShop, {
+                foreignKey: 'order_shop_id',
+                as: 'order_shops',
+                onDelete: 'CASCADE'
             });
         }
     }

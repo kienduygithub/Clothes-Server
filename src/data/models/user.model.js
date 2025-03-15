@@ -32,7 +32,7 @@ module.exports = (sequelize, DataTypes) => {
             // Đơn hàng
             User.hasMany(models.Order, {
                 foreignKey: 'user_id',
-                onUpdate: "CASCADE",
+                as: 'orders',
                 onDelete: "CASCADE"
             });
             // Giỏ hàng
@@ -40,7 +40,13 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'user_id',
                 as: 'carts',
                 onDelete: 'CASCADE'
-            })
+            });
+            // Danh sách coupon được sử dụng
+            User.hasMany(models.UserCoupon, {
+                foreignKey: 'user_id',
+                as: 'used_coupons',
+                onDelete: 'CASCADE'
+            });
         }
     }
     User.init({

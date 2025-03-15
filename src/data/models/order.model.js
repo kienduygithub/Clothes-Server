@@ -14,15 +14,14 @@ module.exports = (sequelize, DataTypes) => {
             // Người dùng
             Order.belongsTo(models.User, {
                 foreignKey: 'user_id',
+                as: 'user',
                 onDelete: "CASCADE",
-                onUpdate: "CASCADE"
             });
-            // Đơn mục đơn hàng
-            Order.hasMany(models.OrderItem, {
-                foreignKey: 'order_id',
-                as: 'items',
-                onDelete: "CASCADE",
-                onUpdate: "CASCADE"
+            // Danh sách Order của từng Shop
+            Order.hasMany(models.OrderShop, {
+                foreignKey: 'order_shop_id',
+                as: 'order_shops',
+                onDelete: 'CASCADE'
             });
         }
     }
@@ -34,7 +33,6 @@ module.exports = (sequelize, DataTypes) => {
                 model: 'users',
                 key: 'id'
             },
-            onUpdate: 'CASCADE',
             onDelete: 'CASCADE'
         },
         address_id: {
@@ -46,10 +44,8 @@ module.exports = (sequelize, DataTypes) => {
             },
             onDelete: 'SET NULL',
         },
-        shipping_fee: DataTypes.DECIMAL(10, 2),
-        payable_price: DataTypes.DECIMAL(10, 2),
         total_price: DataTypes.DECIMAL(10, 2),
-        status: DataTypes.ENUM('pending', 'confirmed', 'shipped', 'delivered', 'canceled'),
+        status: DataTypes.ENUM('pending', 'paid', 'shipped', 'completed', 'canceled'),
         status_changed_at: DataTypes.DATE,
         payment_date: DataTypes.DATE,
     }, {
