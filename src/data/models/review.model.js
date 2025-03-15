@@ -6,23 +6,35 @@ module.exports = (sequelize, DataTypes) => {
     class Review extends Model {
         static associate(models) {
             Review.belongsTo(models.User, {
-                foreignKey: 'userId',
+                foreignKey: 'user_id',
                 as: 'user_review',
+                onDelete: 'CASCADE'
             });
             Review.belongsTo(models.Product, {
-                foreignKey: 'productId',
-                as: 'product_review'
+                foreignKey: 'product_id',
+                as: 'product_review',
+                onDelete: 'CASCADE'
             });
         }
     }
     Review.init({
-        userId: {
+        user_id: {
             type: DataTypes.INTEGER,
-            allowNull: false
+            references: {
+                model: 'users',
+                key: 'id'
+            },
+            allowNull: false,
+            onDelete: 'CASCADE'
         },
-        productId: {
+        product_id: {
             type: DataTypes.INTEGER,
-            allowNull: false
+            references: {
+                model: 'products',
+                key: 'id'
+            },
+            allowNull: false,
+            onDelete: 'CASCADE'
         },
         rating: DataTypes.INTEGER,
         comment: DataTypes.STRING,
