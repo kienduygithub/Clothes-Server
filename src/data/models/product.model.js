@@ -5,32 +5,37 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class Product extends Model {
         static associate(models) {
+            // Cửa hàng
             Product.belongsTo(models.Shop, {
                 foreignKey: 'shopId',
                 as: 'shop',
                 onDelete: 'CASCADE'
             });
+            // Biến thể variant
             Product.hasMany(models.ProductVariant, {
                 foreignKey: 'productId',
                 as: 'variants',
                 onDelete: 'CASCADE'
             });
+            // Review
             Product.hasMany(models.Review, {
                 foreignKey: 'productId',
                 as: 'reviews',
                 onDelete: 'CASCADE'
             });
-            // Product.belongsToMany(models.Category, {
-            //     through: models.ProductCategory,
-            //     foreignKey: 'productId',
-            //     otherKey: 'categoryId',
-            //     as: 'categories'
-            // });
+            // Favorite
+            Product.belongsToMany(models.User, {
+                through: models.Favorite,
+                foreignKey: 'product_id',
+                otherKey: 'user_id',
+            });
+            // Danh mục sản phẩm
             Product.belongsTo(models.Category, {
                 foreignKey: 'categoryId',
                 as: 'category',
                 onDelete: 'SET NULL'
             });
+            // Hình ảnh sản phẩm
             Product.hasMany(models.ProductImages, {
                 foreignKey: 'productId',
                 as: 'product_images',
