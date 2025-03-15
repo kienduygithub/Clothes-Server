@@ -32,7 +32,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
-        cityId: {
+        city_id: {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {

@@ -9,21 +9,23 @@ module.exports = {
                 primaryKey: true,
                 type: Sequelize.INTEGER
             },
-            cartId: {
+            cart_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false
+                references: {
+                    model: 'carts',
+                    key: 'id'
+                },
+                allowNull: false,
+                onDelete: 'CASCADE'
             },
-            productId: {
+            product_variant_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false
-            },
-            colorId: {
-                type: Sequelize.INTEGER,
-                allowNull: false
-            },
-            sizeId: {
-                type: Sequelize.INTEGER,
-                allowNull: false
+                references: {
+                    model: 'productvariants',
+                    key: 'id'
+                },
+                allowNull: false,
+                onDelete: 'CASCADE'
             },
             unit_price: {
                 type: Sequelize.DECIMAL(10, 2),

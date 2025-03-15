@@ -25,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
                 onUpdate: "CASCADE",
                 onDelete: "CASCADE"
             });
+            User.hasMany(models.Cart, {
+                foreignKey: 'user_id',
+                as: 'carts',
+                onDelete: 'CASCADE'
+            })
         }
     }
     User.init({

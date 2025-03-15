@@ -11,6 +11,7 @@ import ProductRouter from "./routes/product.route";
 import AttributeRouter from './routes/attribute.route';
 import CategoryRouter from './routes/category.route';
 import AuthRouter from './routes/auth.route';
+import { verifyMailer } from './common/mails/mailer.config';
 
 require('dotenv').config();
 
@@ -36,6 +37,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 connectDB();
 initViewEngine(app);
+verifyMailer();
 
 app.get('/', (req, res) => {
     res.send('Welcocme to Node babel');

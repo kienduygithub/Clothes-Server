@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kích hoạt cửa hàng thành công</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #0095ff;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #0095ff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>🎉 Cửa hàng của bạn đã được kích hoạt!</h2>
+        <p>
+            Xin chào <strong>
+                <%= shopOwner %>
+            </strong>,
+        </p>
+        <p>Chúc mừng! Cửa hàng <strong>
+                <%= shopName %>
+            </strong> của bạn đã được quản trị viên phê duyệt.</p>
+        <p>Bạn có thể truy cập cửa hàng ngay bây giờ:</p>
+        <p>
+            <a class="btn" href="<%= shopUrl %>" target="_blank">Truy cập cửa hàng</a>
+        </p>
+
+        <hr>
+        <p>📢 <strong>Lưu ý:</strong> Trang quản trị cửa hàng hoạt động tốt nhất trên máy tính. Hãy truy cập bằng
+            **laptop hoặc PC** để có trải nghiệm tốt nhất!</p>
+        <hr>
+
+        <p>Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với đội ngũ hỗ trợ.</p>
+        <p class="footer">Trân trọng,<br>Đội ngũ hỗ trợ</p>
+    </div>
+
+</body>
+
+</html>

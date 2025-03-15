@@ -9,9 +9,14 @@ module.exports = {
                 primaryKey: true,
                 type: Sequelize.INTEGER
             },
-            userId: {
+            user_id: {
                 type: Sequelize.INTEGER,
-                allowNull: false
+                references: {
+                    model: 'users',
+                    key: 'id'
+                },
+                allowNull: false,
+                onDelete: 'CASCADE'
             },
             status: {
                 type: Sequelize.ENUM('active', 'checked_out', 'removed'),
