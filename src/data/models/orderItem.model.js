@@ -6,21 +6,20 @@ module.exports = (sequelize, DataTypes) => {
     class OrderItem extends Model {
         static associate(models) {
             OrderItem.belongsTo(models.Order, {
-                foreignKey: 'orderId',
+                foreignKey: 'order_id',
                 as: 'order',
                 onDelete: "CASCADE",
             });
 
-            // Một OrderItem thuộc về một Product
-            // OrderItem.belongsTo(models.Product, {
-            //     foreignKey: 'productId',
-            //     onDelete: "CASCADE",
-            //     onUpdate: "CASCADE"
-            // });
+            OrderItem.belongsTo(models.ProductVariant, {
+                foreignKey: 'product_variant_id',
+                as: 'product_variant',
+                onDelete: "CASCADE",
+            });
         }
     }
     OrderItem.init({
-        orderId: {
+        order_id: {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
@@ -29,9 +28,15 @@ module.exports = (sequelize, DataTypes) => {
             },
             onDelete: 'CASCADE'
         },
-        productId: DataTypes.INTEGER,
-        colorId: DataTypes.INTEGER,
-        sizeId: DataTypes.INTEGER,
+        product_variant_id: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'productvariants',
+                key: 'id'
+            },
+            onDelete: 'CASCADE'
+        },
         unit_price: DataTypes.DECIMAL(10, 2),
         order_quantity: DataTypes.INTEGER
     }, {

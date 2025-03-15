@@ -31,7 +31,7 @@ module.exports = (sequelize, DataTypes) => {
             });
             // Đơn hàng
             User.hasMany(models.Order, {
-                foreignKey: 'userId',
+                foreignKey: 'user_id',
                 onUpdate: "CASCADE",
                 onDelete: "CASCADE"
             });

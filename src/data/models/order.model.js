@@ -5,20 +5,21 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class Order extends Model {
         static associate(models) {
+            // Địa chỉ Address
             Order.belongsTo(models.Address, {
                 foreignKey: 'address_id',
                 as: 'address',
                 onDelete: "SET NULL",
             });
-
+            // Người dùng
             Order.belongsTo(models.User, {
-                foreignKey: 'userId',
+                foreignKey: 'user_id',
                 onDelete: "CASCADE",
                 onUpdate: "CASCADE"
             });
-
+            // Đơn mục đơn hàng
             Order.hasMany(models.OrderItem, {
-                foreignKey: 'orderId',
+                foreignKey: 'order_id',
                 as: 'items',
                 onDelete: "CASCADE",
                 onUpdate: "CASCADE"
@@ -26,11 +27,12 @@ module.exports = (sequelize, DataTypes) => {
         }
     }
     Order.init({
-        userId: {
+        user_id: {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: 'users', key: 'id'
+                model: 'users',
+                key: 'id'
             },
             onUpdate: 'CASCADE',
             onDelete: 'CASCADE'
@@ -39,7 +41,8 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: true,
             references: {
-                model: 'addresses', key: 'id'
+                model: 'addresses',
+                key: 'id'
             },
             onDelete: 'SET NULL',
         },
