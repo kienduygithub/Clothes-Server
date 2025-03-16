@@ -10,6 +10,8 @@ import {
     createNewShop,
     updateShopById,
     deleteShopById,
+    declineRegisterShopById,
+    acceptRegisterShopById,
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
@@ -56,6 +58,18 @@ ShopRouter.patch(
         { name: 'backgroundShopFile', maxCount: 1 }
     ]),
     updateShopById
+);
+
+ShopRouter.post(
+    '/shop/decline-register/:id',
+    // checkUserAuthentication,
+    declineRegisterShopById
+);
+
+ShopRouter.post(
+    '/shop/accept-register/:id',
+    // checkUserAuthentication,
+    acceptRegisterShopById
 );
 
 ShopRouter.delete(

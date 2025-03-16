@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đơn đăng ký cửa hàng không được xét duyệt</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #ff4d4d;
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>⛔ Đơn đăng ký cửa hàng chưa được xét duyệt</h2>
+        <p>
+            Xin chào <strong>
+                <%= shopOwner %>
+            </strong>,
+        </p>
+        <p>Chúng tôi rất tiếc phải thông báo rằng đơn đăng ký mở cửa hàng <strong>
+                <%= shopName %>
+            </strong> của bạn chưa được phê duyệt.</p>
+
+        <p><strong>Lý do có thể bao gồm:</strong></p>
+        <ul>
+            <li>Thông tin cung cấp chưa đầy đủ hoặc không chính xác.</li>
+            <li>Cửa hàng của bạn không đáp ứng đủ điều kiện hoạt động trên hệ thống.</li>
+        </ul>
+
+        <p>Nếu bạn cần hỗ trợ hoặc muốn gửi lại đơn đăng ký, vui lòng liên hệ với đội ngũ hỗ trợ qua email:
+            <a href="mailto:<%= supportEmail %>">
+                <%= supportEmail %>
+            </a>.
+        </p>
+
+        <hr>
+        <p>📢 <strong>Lưu ý:</strong> Vui lòng kiểm tra lại thông tin trước khi gửi lại đơn đăng ký để đảm bảo đáp ứng
+            yêu cầu.</p>
+        <hr>
+
+        <p class="footer">Trân trọng,<br>Đội ngũ hỗ trợ</p>
+    </div>
+</body>
+
+</html>

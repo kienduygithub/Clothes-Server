@@ -7,6 +7,7 @@ import { generalAccessToken, generalRefreshToken } from "../../common/middleware
 import { handleDeleteImageAsFailed } from "../../common/middleware/upload.middleware";
 import { sendActivateStoreMailer } from "../../common/mails/mailer.config";
 import { ShopStatus } from "../../common/utils/status";
+import { UserRoles } from "../../common/utils/roles";
 
 export const signIn = async (info) => {
     try {
@@ -20,7 +21,12 @@ export const signIn = async (info) => {
             where: {
                 email: email,
                 [Op.or]: [{ roles: 'Admin' }, { roles: 'Owner' }]
-            }
+            },
+            include: [{
+                model: Shop,
+                as: 'shop',
+                attributes: ['id', 'shop_name', 'status']
+            }]
         });
 
         if (!existUser) {
@@ -33,12 +39,19 @@ export const signIn = async (info) => {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Tên đăng nhập hoặc mật khẩu không chính xác.', null);
         }
 
+        const roles = existUser.roles;
+        const shopStatus = existUser.shop?.status ?? '';
+
+        if (roles === UserRoles.OWNER && shopStatus === ShopStatus.PENDING) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản chủ shop chưa được xét duyệt');
+        }
+
         const payload = {
             id: existUser.id,
             name: existUser.name,
             image_url: existUser.image_url !== null ? existUser.image_url : '',
             roles: existUser.roles,
-            shopId: existUser?.shopId || 0
+            shopId: existUser?.shopId || 0,
         };
 
         const access_token = generalAccessToken(payload);

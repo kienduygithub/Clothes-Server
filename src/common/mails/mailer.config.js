@@ -53,9 +53,27 @@ export const sendActivateStoreMailer = async (
     }
 }
 
-// return ResponseModel.success('Tạo tài khoản thành công', { user });
-// sendActivateStoreMailer(
-//     "buikienduy2020@gmail.com",
-//     "Kiến Duy",
-//     "Cửa hàng thời trang",
-// );
+export const sendDeclineStoreMailer = async (
+    targetMailer,
+    shopOwner,
+    shopName,
+    supportEmail,
+) => {
+    try {
+
+        const template = await ejs.renderFile(
+            path.join(__dirname, "../views/decline-store.mailer.ejs"),
+            { shopOwner, shopName, supportEmail }
+        );
+
+        await transporter.sendMail({
+            from: `"Hỗ trợ" <${process.env.MAILER_NAME}>`,
+            to: targetMailer,
+            subject: "⛔ Đơn đăng ký cửa hàng của bạn chưa được xét duyệt",
+            html: template
+        });
+        console.log("✅ Email từ chối đã gửi thành công!");
+    } catch (error) {
+        console.error("❌ Gửi email thất bại:", error);
+    }
+}

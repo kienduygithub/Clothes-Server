@@ -1,5 +1,6 @@
 import HttpErrors from '../../common/errors/http-errors';
 import { ResponseModel } from '../../common/errors/response';
+import { sendActivateStoreMailer, sendDeclineStoreMailer } from '../../common/mails/mailer.config';
 import { handleDeleteImageAsFailed, handleDeleteImages } from '../../common/middleware/upload.middleware';
 import { ShopStatus } from '../../common/utils/status';
 import db from '../models';
@@ -98,7 +99,14 @@ export const fetchShopById = async (shopId) => {
         }
 
         const shop = await db.Shop.findOne({
-            where: { id: shopId }
+            where: { id: shopId },
+            include: [
+                {
+                    model: db.User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'email', 'phone', 'address', 'gender', 'image_url']
+                }
+            ]
         });
 
         if (!shop) {
@@ -231,6 +239,74 @@ export const deleteShopById = async (shopId) => {
         });
 
         return ResponseModel.success('Xóa cửa hàng thành công.');
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const acceptRegisterShopById = async (shopId) => {
+    try {
+        const existShop = await db.Shop.findOne({
+            where: { id: shopId },
+            include: [
+                {
+                    model: db.User,
+                    as: 'user',
+                    attributes: ['id', 'name']
+                }
+            ]
+        });
+
+        if (!existShop) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng.');
+        }
+
+        existShop.status = ShopStatus.ACTIVE;
+        await existShop.save();
+
+        sendActivateStoreMailer(
+            "buikienduy2020@gmail.com",
+            existShop.user?.name ?? '',
+            existShop.shop_name ?? '',
+        );
+
+        return ResponseModel.success('Chấp thuận đơn đăng ký cửa hàng');
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const declineRegisterShopById = async (shopId) => {
+    try {
+        const existShop = await db.Shop.findOne({
+            where: { id: shopId },
+            include: [
+                {
+                    model: db.User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'image_url']
+                }
+            ]
+        });
+
+        if (!existShop) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng.');
+        }
+
+        const { background_url, logo_url, user } = existShop;
+        await handleDeleteImages([background_url, logo_url, user?.image_url ?? '']);
+        await db.Shop.destroy({
+            where: { id: shopId }
+        });
+
+        sendDeclineStoreMailer(
+            "buikienduy2020@gmail.com",
+            existShop.user?.name ?? '',
+            existShop.shop_name ?? '',
+            "buikienduy2020@gmail.com"
+        );
+
+        return ResponseModel.success('Bác bỏ đơn đăng ký cửa hàng');
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }

@@ -100,3 +100,31 @@ export const deleteShopById = async (req, res) => {
         });
     }
 }
+
+export const declineRegisterShopById = async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const response = await shopServices.declineRegisterShopById(shopId);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const acceptRegisterShopById = async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const response = await shopServices.acceptRegisterShopById(shopId);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
