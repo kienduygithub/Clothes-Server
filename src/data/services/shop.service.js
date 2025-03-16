@@ -1,9 +1,10 @@
 import HttpErrors from '../../common/errors/http-errors';
 import { ResponseModel } from '../../common/errors/response';
 import { handleDeleteImageAsFailed, handleDeleteImages } from '../../common/middleware/upload.middleware';
+import { ShopStatus } from '../../common/utils/status';
 import db from '../models';
 
-const fetchAllProductsInShop = async (shopId) => {
+export const fetchAllProductsInShop = async (shopId) => {
     try {
         const shop = await db.Shop.findOne({
             where: { id: shopId },
@@ -26,7 +27,7 @@ const fetchAllProductsInShop = async (shopId) => {
     }
 }
 
-const fetchAllShop = async () => {
+export const fetchAllShop = async () => {
     try {
         const response = await db.Shop.findAll({
             include: [
@@ -63,7 +64,32 @@ const fetchAllShop = async () => {
     }
 }
 
-const fetchShopById = async (shopId) => {
+export const fetchRegisterShops = async () => {
+    try {
+        const response = await db.Shop.findAll({
+            where: { status: ShopStatus.PENDING },
+            attributes: {
+                exclude: ['updatedAt']
+            },
+            include: [
+                {
+                    model: db.User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'email', 'phone', 'address', 'gender']
+                },
+            ],
+        });
+
+        const payload = {
+            shops: response
+        };
+        return ResponseModel.success('Danh sách cửa hàng', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchShopById = async (shopId) => {
     try {
         if (!shopId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
@@ -88,7 +114,7 @@ const fetchShopById = async (shopId) => {
     }
 }
 
-const createNewShop = async (shopInfo, files) => {
+export const createNewShop = async (shopInfo, files) => {
     try {
         if (!shopInfo) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
@@ -115,10 +141,10 @@ const createNewShop = async (shopInfo, files) => {
             shop_name: shop_name,
             logo_url: files && files['logoShopFile']
                 ? `shops/${files['logoShopFile'][0].filename}`
-                : null,
+                : '',
             background_url: files && files['backgroundShopFile']
                 ? `shop-backgrounds/${files['backgroundShopFile'][0].filename}`
-                : null,
+                : '',
             contact_email: contact_email ?? '',
             contact_address: contact_address ?? '',
             description: description ?? ''
@@ -131,7 +157,7 @@ const createNewShop = async (shopInfo, files) => {
     }
 }
 
-const updateShopById = async (shopId, info, files) => {
+export const updateShopById = async (shopId, info, files) => {
     try {
         if (!shopId || !info) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
@@ -188,7 +214,7 @@ const updateShopById = async (shopId, info, files) => {
     }
 }
 
-const deleteShopById = async (shopId) => {
+export const deleteShopById = async (shopId) => {
     try {
         const existShop = await db.Shop.findOne({
             where: { id: shopId }
@@ -208,13 +234,4 @@ const deleteShopById = async (shopId) => {
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
-}
-
-module.exports = {
-    fetchAllProductsInShop: fetchAllProductsInShop,
-    fetchAllShop: fetchAllShop,
-    fetchShopById: fetchShopById,
-    createNewShop: createNewShop,
-    updateShopById: updateShopById,
-    deleteShopById: deleteShopById
 }

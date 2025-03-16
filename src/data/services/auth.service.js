@@ -1,11 +1,12 @@
 import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import { User } from "../models";
+import { User, Shop } from "../models";
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed } from "../../common/middleware/upload.middleware";
 import { sendActivateStoreMailer } from "../../common/mails/mailer.config";
+import { ShopStatus } from "../../common/utils/status";
 
 export const signIn = async (info) => {
     try {
@@ -61,52 +62,78 @@ export const signUp = async (
     files
 ) => {
     try {
-        // if (!info || !files) {
-        //     ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
-        // }
+        if (!userInfo || !shopInfo || !files) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+        }
 
-        // const {
-        //     name,
-        //     email,
-        //     password,
-        //     address,
-        //     phone,
-        //     gender
-        // } = JSON.parse(info);
+        const {
+            name,
+            email,
+            password,
+            address,
+            phone,
+            gender
+        } = JSON.parse(userInfo);
 
-        // if (!email || !password) {
-        //     ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
-        // }
+        if (!email || !password) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+        }
 
-        // const existEmail = await User.findOne({
-        //     where: { email: email }
-        // });
+        const existEmail = await User.findOne({
+            where: { email: email }
+        });
 
-        // if (existEmail) {
-        //     ResponseModel.error(HttpErrors.NOT_FOUND, 'Tài khoản đã tồn tại', null);
-        // }
+        if (existEmail) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản đã tồn tại', null);
+        }
 
-        // const hash = hashPassword(password);
-        // const user = await User.create({
-        //     name: name,
-        //     email: email,
-        //     password: hash,
-        //     address: address,
-        //     phone: phone,
-        //     gender: gender,
-        //     image_url: files['adminOwnerFile'] ? `admin-owners/${files['adminOwnerFile'][0]?.filename}` : '',
-        //     roles: 'Owner'
-        // });
+        // Bước 1: Tạo cửa hàng
+        const {
+            shop_name,
+            contact_email,
+            contact_address,
+            description
+        } = JSON.parse(shopInfo);
 
-        // return ResponseModel.success('Tạo tài khoản thành công', { user });
-        sendActivateStoreMailer(
-            "buikienduy2020@gmail.com",
-            "Kiến Duy",
-            "Cửa hàng thời trang",
-        );
-        return ResponseModel.success('Tạo tài khoản thành công', {
-            // user: JSON.parse(userInfo),
-            // shop: JSON.parse(shopInfo)
+        if (!shop_name || !contact_email || !contact_address) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                shop_name: shop_name ?? '',
+                contact_email: contact_email ?? '',
+                contact_address: contact_address ?? ''
+            });
+        }
+
+        const shop = await Shop.create({
+            shop_name: shop_name,
+            logo_url: files && files['logoShopFile']
+                ? `shops/${files['logoShopFile'][0].filename}`
+                : '',
+            background_url: files && files['backgroundShopFile']
+                ? `shop-backgrounds/${files['backgroundShopFile'][0].filename}`
+                : '',
+            contact_email: contact_email ?? '',
+            contact_address: contact_address ?? '',
+            description: description ?? '',
+            status: ShopStatus.PENDING,
+        });
+
+        // Bước 2: Tạo người dùng
+        const hash = hashPassword(password);
+        const user = await User.create({
+            name: name,
+            email: email,
+            password: hash,
+            address: address,
+            phone: phone,
+            gender: gender,
+            image_url: files['adminOwnerFile'] ? `admin-owners/${files['adminOwnerFile'][0]?.filename}` : '',
+            roles: 'Owner',
+            shopId: shop.id
+        });
+
+        return ResponseModel.success('Đăng ký chủ cửa hàng thành công', {
+            user: user,
+            shop: shop
         });
     } catch (error) {
         if (files?.length) {

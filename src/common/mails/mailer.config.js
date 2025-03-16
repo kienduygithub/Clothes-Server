@@ -52,3 +52,10 @@ export const sendActivateStoreMailer = async (
         console.error("❌ Gửi email thất bại:", error);
     }
 }
+
+// return ResponseModel.success('Tạo tài khoản thành công', { user });
+// sendActivateStoreMailer(
+//     "buikienduy2020@gmail.com",
+//     "Kiến Duy",
+//     "Cửa hàng thời trang",
+// );

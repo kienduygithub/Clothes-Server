@@ -5,10 +5,11 @@ import {
 import {
     fetchAllProductsInShop,
     fetchAllShop,
+    fetchRegisterShops,
     fetchShopById,
     createNewShop,
     updateShopById,
-    deleteShopById
+    deleteShopById,
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
@@ -25,10 +26,17 @@ ShopRouter.get(
 );
 
 ShopRouter.get(
+    '/shop/register-shops',
+    // checkUserAuthentication,
+    fetchRegisterShops
+);
+
+ShopRouter.get(
     '/shop/:id',
     checkUserAuthentication,
     fetchAllProductsInShop
 );
+
 
 ShopRouter.post(
     '/shop/admin/create',

@@ -1,6 +1,6 @@
-import shopServices from "../services/shop.service";
+import * as shopServices from "../services/shop.service";
 
-const fetchAllProductsInShop = async (req, res) => {
+export const fetchAllProductsInShop = async (req, res) => {
     try {
         const shopId = req.params.id;
         const response = await shopServices.fetchAllProductsInShop(shopId);
@@ -14,7 +14,7 @@ const fetchAllProductsInShop = async (req, res) => {
     }
 }
 
-const fetchAllShop = async (req, res) => {
+export const fetchAllShop = async (req, res) => {
     try {
         const response = await shopServices.fetchAllShop();
         return res.status(response.status).json(response);
@@ -27,7 +27,20 @@ const fetchAllShop = async (req, res) => {
     }
 }
 
-const fetchShopById = async (req, res) => {
+export const fetchRegisterShops = async (req, res) => {
+    try {
+        const response = await shopServices.fetchRegisterShops();
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const fetchShopById = async (req, res) => {
     try {
         const shopId = req.params.id;
         const response = await shopServices.fetchShopById(shopId);
@@ -41,7 +54,7 @@ const fetchShopById = async (req, res) => {
     }
 }
 
-const createNewShop = async (req, res) => {
+export const createNewShop = async (req, res) => {
     try {
         const shopInfo = req.body.shopInfo;
         const files = req.files;
@@ -56,7 +69,7 @@ const createNewShop = async (req, res) => {
     }
 }
 
-const updateShopById = async (req, res) => {
+export const updateShopById = async (req, res) => {
     try {
         const shopId = req.params.id;
         const response = await shopServices.updateShopById(
@@ -74,7 +87,7 @@ const updateShopById = async (req, res) => {
     }
 }
 
-const deleteShopById = async (req, res) => {
+export const deleteShopById = async (req, res) => {
     try {
         const shopId = req.params.id;
         const response = await shopServices.deleteShopById(shopId);
@@ -86,13 +99,4 @@ const deleteShopById = async (req, res) => {
             body: error?.body
         });
     }
-}
-
-module.exports = {
-    fetchAllProductsInShop: fetchAllProductsInShop,
-    fetchAllShop: fetchAllShop,
-    fetchShopById: fetchShopById,
-    createNewShop: createNewShop,
-    updateShopById: updateShopById,
-    deleteShopById: deleteShopById
 }
