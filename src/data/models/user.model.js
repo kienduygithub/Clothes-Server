@@ -26,7 +26,7 @@ module.exports = (sequelize, DataTypes) => {
             // Địa chỉ Address
             User.hasMany(models.Address, {
                 foreignKey: 'userId',
-                onUpdate: "CASCADE",
+                as: 'addresses',
                 onDelete: "CASCADE"
             });
             // Đơn hàng
@@ -41,14 +41,15 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'carts',
                 onDelete: 'CASCADE'
             });
-            // Danh sách coupon được sử dụng
-            User.hasMany(models.UserCoupon, {
+            // User 1 - N UserCoupon: Một người dùng có thể lưu nhiều mã -> User N - N Coupon
+            User.belongsToMany(models.Coupon, {
+                through: models.Coupon,
                 foreignKey: 'user_id',
-                as: 'used_coupons',
-                onDelete: 'CASCADE'
+                otherKey: 'coupon_id'
             });
         }
     }
+
     User.init({
         name: DataTypes.STRING,
         email: DataTypes.STRING,

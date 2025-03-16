@@ -36,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             onDelete: 'CASCADE'
         },
-        used_at: DataTypes.DATE,
+        is_used: DataTypes.BOOLEAN
     }, {
         sequelize,
         modelName: 'UserCoupon',

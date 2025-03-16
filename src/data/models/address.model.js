@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         static associate(models) {
             Address.belongsTo(models.User, {
                 foreignKey: 'userId',
+                as: 'user',
                 onDelete: "CASCADE"
             });
 
@@ -31,7 +32,6 @@ module.exports = (sequelize, DataTypes) => {
             Address.hasMany(models.Order, {
                 foreignKey: 'address_id',
                 as: 'orders',
-                onUpdate: "CASCADE",
                 onDelete: "SET NULL",
             });
         }

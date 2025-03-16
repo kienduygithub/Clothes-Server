@@ -11,11 +11,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'shop',
                 onDelete: 'CASCADE'
             });
-            // Coupon 1 - N UserCoupon: Một mã có nhiều người sử dụng
-            Coupon.hasMany(models.UserCoupon, {
+            // Coupon 1 - N UserCoupon: Một mã có nhiều người sử dụng -> Coupon N - N User
+            Coupon.belongsToMany(models.User, {
+                through: models.UserCoupon,
                 foreignKey: 'coupon_id',
-                as: 'user_coupons',
-                onDelete: 'CASCADE'
+                otherKey: 'user_id'
             });
             // Coupon 1 - 1 OrderShop: Một mã chỉ sử dụng trên một đơn hàng cửa hàng
             Coupon.hasOne(models.OrderShop, {
