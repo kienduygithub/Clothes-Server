@@ -60,7 +60,12 @@ module.exports = (sequelize, DataTypes) => {
         image_url: DataTypes.STRING,
         shopId: {
             type: DataTypes.INTEGER,
-            allowNull: true
+            references: {
+                model: 'shops',
+                key: 'id'
+            },
+            allowNull: true,
+            onDelete: 'CASCADE'
         },
         roles: DataTypes.ENUM('Admin', 'Owner', 'Customer'),
     }, {

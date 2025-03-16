@@ -40,11 +40,11 @@ module.exports = {
             },
             shopId: {
                 type: Sequelize.INTEGER,
-                allowNull: true,
                 references: {
                     model: 'shops',
                     key: 'id'
                 },
+                allowNull: true,
                 onDelete: 'CASCADE'
             },
             roles: {

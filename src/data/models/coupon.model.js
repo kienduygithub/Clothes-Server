@@ -45,7 +45,7 @@ module.exports = (sequelize, DataTypes) => {
         max_discount: DataTypes.DECIMAL(10, 2),
         min_order_value: {
             type: DataTypes.DECIMAL(10, 2),
-            allowNull: true
+            allowNull: false
         },
         times_used: {
             type: DataTypes.INTEGER,

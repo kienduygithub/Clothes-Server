@@ -53,7 +53,7 @@ module.exports = (sequelize, DataTypes) => {
         coupon_id: {
             type: DataTypes.INTEGER,
             references: {
-                model: 'shops',
+                model: 'coupons',
                 key: 'id'
             },
             allowNull: true, // Có thể không dùng coupon
