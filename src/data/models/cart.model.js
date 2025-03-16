@@ -10,11 +10,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'user',
                 onDelete: 'CASCADE'
             });
-            Cart.hasMany(models.CartItem, {
-                foreignKey: 'cart_id',
-                as: 'cart_items',
+            Cart.hasMany(models.CartShop, {
+                foreignKey: 'cart_shop_id',
+                as: 'cart_shops',
                 onDelete: 'CASCADE'
-            })
+            });
         }
     }
     Cart.init({
@@ -27,7 +27,6 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             onDelete: 'CASCADE'
         },
-        status: DataTypes.ENUM('active', 'checked_out', 'removed'),
     }, {
         sequelize,
         modelName: 'Cart',

@@ -3,22 +3,21 @@ const {
     Model
 } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-    class CartItem extends Model {
+    class CartShop extends Model {
         static associate(models) {
-            CartItem.belongsTo(models.Cart, {
+            CartShop.belongsTo(models.Cart, {
                 foreignKey: 'cart_id',
                 as: 'cart',
                 onDelete: 'CASCADE'
-            })
-
-            CartItem.belongsTo(models.ProductVariant, {
-                foreignKey: 'product_variant_id',
-                as: 'product_variant',
+            });
+            CartShop.belongsTo(models.Shop, {
+                foreignKey: 'shop_id',
+                as: 'shop',
                 onDelete: 'CASCADE'
-            })
+            });
         }
     }
-    CartItem.init({
+    CartShop.init({
         cart_id: {
             type: DataTypes.INTEGER,
             references: {
@@ -28,20 +27,18 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             onDelete: 'CASCADE'
         },
-        product_variant_id: {
+        shop_id: {
             type: DataTypes.INTEGER,
             references: {
-                model: 'productvariants',
+                model: 'shops',
                 key: 'id'
             },
             allowNull: false,
             onDelete: 'CASCADE'
-        },
-        unit_price: DataTypes.DECIMAL(10, 2),
-        order_quantity: DataTypes.INTEGER
+        }
     }, {
         sequelize,
-        modelName: 'CartItem',
+        modelName: 'CartShop',
     });
-    return CartItem;
+    return CartShop;
 };

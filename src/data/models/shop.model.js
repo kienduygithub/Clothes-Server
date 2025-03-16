@@ -29,6 +29,12 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'order_shops',
                 onDelete: 'CASCADE'
             });
+            // Shop 1 - N CartShop
+            Shop.hasMany(models.CartShop, {
+                foreignKey: 'shop_id',
+                as: 'cart_shops',
+                onDelete: 'CASCADE'
+            });
         }
     }
     Shop.init({

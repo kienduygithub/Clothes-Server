@@ -9,10 +9,10 @@ module.exports = {
                 primaryKey: true,
                 type: Sequelize.INTEGER
             },
-            cart_id: {
+            cart_shop_id: {
                 type: Sequelize.INTEGER,
                 references: {
-                    model: 'carts',
+                    model: 'cartshops',
                     key: 'id'
                 },
                 allowNull: false,
@@ -31,7 +31,7 @@ module.exports = {
                 type: Sequelize.DECIMAL(10, 2),
                 allowNull: false
             },
-            order_quantity: {
+            quantity: {
                 type: Sequelize.INTEGER,
                 allowNull: false
             },
