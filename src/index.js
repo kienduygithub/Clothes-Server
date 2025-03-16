@@ -12,6 +12,7 @@ import AttributeRouter from './routes/attribute.route';
 import CategoryRouter from './routes/category.route';
 import AuthRouter from './routes/auth.route';
 import { verifyMailer } from './common/mails/mailer.config';
+import CouponRouter from './routes/coupon.route';
 
 require('dotenv').config();
 
@@ -49,6 +50,7 @@ app.use(
     ShopRouter,
     ProductRouter,
     AttributeRouter,
+    CouponRouter,
     CategoryRouter,
     AuthRouter
 );
