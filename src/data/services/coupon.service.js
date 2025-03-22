@@ -191,90 +191,114 @@ export const addNewCoupon = async (shop_id, couponInfo) => {
     }
 }
 
-export const editCategory = async (parent_id, categoryInfo, file) => {
+export const editCoupon = async (coupon_id, couponInfo) => {
+    const t = await sequelize.transaction();
     try {
-        if (!parent_id || !categoryInfo) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
+        if (!coupon_id || !couponInfo) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                coupon_id: coupon_id ?? '',
+                couponInfo: couponInfo ?? {}
+            });
         }
 
-        const existCategory = await Category.findOne({
-            where: { id: parent_id, parentId: null }
+        const coupon = await Coupon.findOne({
+            where: { id: coupon_id },
+            transaction: t
         });
 
-        if (!existCategory) {
-            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy danh mục', null);
+        if (!coupon) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Không tìm thấy Coupon', {});
         }
 
         const {
-            category_name,
-            description
-        } = JSON.parse(categoryInfo);
+            name,
+            code,
+            discount_type,
+            discount_value,
+            max_discount,
+            min_order_value,
+            max_usage,
+            valid_from,
+            valid_to
+        } = couponInfo;
 
-        const conflictCategoryName = await Category.findOne({
-            where: {
-                category_name: category_name,
-                parentId: null,
-                id: { [Op.ne]: parent_id }
+        if (coupon.name !== name) {
+            const existNameCoupon = await Coupon.findOne({
+                where: { name: name },
+                transaction: t
+            });
+
+            if (existNameCoupon) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tên Coupon đã tồn tại');
             }
-        });
-
-        if (conflictCategoryName) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tên danh mục đã tồn tại', null);
         }
 
-        existCategory.category_name = category_name;
-        existCategory.description = description;
-        if (file) {
-            const deleteFilename = existCategory.dataValues.image_url;
-            await handleDeleteImages([deleteFilename]);
-            existCategory.image_url = `categories/${file.filename}`;
+        if (coupon.code !== code) {
+            const existCodeCoupon = await Coupon.findOne({
+                where: { code: code },
+                transaction: t
+            });
+
+            if (existCodeCoupon) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Mã Coupon đã tồn tại');
+            }
         }
 
-        await existCategory.save();
+
+        const updatedCoupon = await coupon.update({
+            name: name,
+            code: code,
+            discount_type: discount_type,
+            discount_value: discount_value,
+            max_discount: max_discount,
+            min_order_value: min_order_value,
+            times_used: 0,
+            max_usage: max_usage,
+            valid_from: valid_from === '*' ? null : valid_from,
+            valid_to: valid_to === '*' ? null : valid_to
+        },
+            { transaction: t }
+        );
+
+        await t.commit();
+
         const payload = {
-            categories: [existCategory]
+            coupons: [updatedCoupon]
         }
-        return ResponseModel.success('Chỉnh sửa danh mục thành công', payload);
+
+        return ResponseModel.success("Cập nhật Coupon thành công", payload);
     } catch (error) {
-        handleDeleteImageAsFailed(file);
+        console.log(error);
+        await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
 
-export const deleteCategory = async (parent_id) => {
+export const deleteCoupon = async (coupon_id) => {
+    const t = await sequelize.transaction();
     try {
-        if (!parent_id) {
-            return ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu trường cần thiết", null);
+        if (!coupon_id) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu trường cần thiết", {
+                coupon_id: coupon_id ?? ''
+            });
         }
 
-        const category = await Category.findOne({
-            where: { id: parent_id, parentId: null }
+        const coupon = await Coupon.findOne({
+            where: { id: coupon_id },
+            transaction: t
         });
 
-        if (!category) {
-            return ResponseModel.error(HttpErrors.NOT_FOUND, "Không tìm thấy danh mục", null);
+        if (!coupon) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, "Không tìm thấy Coupon", {});
         }
 
-        const subCategories = await Category.findAll({
-            where: { parentId: parent_id }
-        });
+        await Coupon.destroy({
+            where: { id: coupon_id }
+        }, { transaction: t });
 
-        if (subCategories.length > 0) {
-            return ResponseModel.error(HttpErrors.BAD_REQUEST, "Không thể xóa danh mục cha khi còn danh mục con", null);
-        }
-
-        const deletedFilename = category.dataValues.image_url;
-
-        if (deletedFilename !== '') {
-            await handleDeleteImages([deletedFilename]);
-        }
-
-        await Category.destroy({
-            where: { id: parent_id }
-        });
-
-        return ResponseModel.success("Xóa danh mục thành công", null);
+        return ResponseModel.success("Xóa Coupon thành công", {});
     } catch (error) {
+        await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }

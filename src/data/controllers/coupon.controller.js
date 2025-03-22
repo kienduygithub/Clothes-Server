@@ -58,3 +58,32 @@ export const updateTimesUsedCouponById = async (req, res) => {
         })
     }
 }
+
+export const editCoupon = async (req, res) => {
+    try {
+        const coupon_id = req.params.couponId;
+        const couponInfo = req.body;
+        const response = await CouponService.editCoupon(coupon_id, couponInfo);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}
+
+export const deleteCoupon = async (req, res) => {
+    try {
+        const coupon_id = req.params.couponId;
+        const response = await CouponService.deleteCoupon(coupon_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}

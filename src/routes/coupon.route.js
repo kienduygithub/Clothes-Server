@@ -28,13 +28,15 @@ CouponRouter.put(
 )
 
 CouponRouter.put(
-    '/owner/coupon/:id',
+    '/owner/coupon/:couponId',
     // checkUserAuthentication,
+    CouponController.editCoupon
 );
 
 CouponRouter.delete(
-    '/owner/coupon/:id',
+    '/owner/coupon/:couponId',
     // checkUserAuthentication,
+    CouponController.deleteCoupon
 );
 
 
