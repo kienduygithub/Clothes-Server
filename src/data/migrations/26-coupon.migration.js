@@ -57,11 +57,11 @@ module.exports = {
             },
             valid_from: {
                 type: Sequelize.DATE,
-                allowNull: false
+                allowNull: true
             },
             valid_to: {
                 type: Sequelize.DATE,
-                allowNull: false
+                allowNull: true
             },
             createdAt: {
                 allowNull: false,

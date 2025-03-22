@@ -1,0 +1,60 @@
+import HttpErrors from "../../common/errors/http-errors";
+import * as CouponService from "../services/coupon.service";
+
+export const fetchShopCoupons = async (req, res) => {
+    try {
+        const shopId = req.params.shopId;
+        const response = await CouponService.fetchShopCoupons(shopId);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}
+
+export const fetchCouponById = async (req, res) => {
+    try {
+        const coupon_id = req.params.couponId;
+        const response = await CouponService.fetchCouponById(coupon_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const addNewCoupon = async (req, res) => {
+    try {
+        const shop_id = req.params.shopId;
+        const couponInfo = req.body;
+        const response = await CouponService.addNewCoupon(shop_id, couponInfo);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const updateTimesUsedCouponById = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const coupon_id = req.params.couponId;
+        const response = await CouponService.updateTimesUsedCouponById(user_id, coupon_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}

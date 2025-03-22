@@ -1,30 +1,39 @@
 import express from "express";
 import { checkUserAuthentication } from "../common/middleware/jwt.middleware";
-
+import * as CouponController from "../data/controllers/coupon.controller";
 const CouponRouter = express.Router();
 
 CouponRouter.get(
-    '/coupon/:id',
+    '/owner/coupon/:couponId',
     // checkUserAuthentication,
+    CouponController.fetchCouponById
 );
 
 CouponRouter.get(
-    '/coupon/:shopId/shop',
+    '/owner/coupon/:shopId/shop',
     // checkUserAuthentication,
+    CouponController.fetchShopCoupons
 );
 
 CouponRouter.post(
-    '/coupon/:shopId/shop',
+    '/owner/coupon/:shopId',
     // checkUserAuthentication,
+    CouponController.addNewCoupon
 );
 
 CouponRouter.put(
-    '/coupon/:id',
+    '/owner/coupon/:couponId/used/:userId',
+    // checkUserAuthentication,
+    CouponController.updateTimesUsedCouponById
+)
+
+CouponRouter.put(
+    '/owner/coupon/:id',
     // checkUserAuthentication,
 );
 
 CouponRouter.delete(
-    '/coupon/:id',
+    '/owner/coupon/:id',
     // checkUserAuthentication,
 );
 
