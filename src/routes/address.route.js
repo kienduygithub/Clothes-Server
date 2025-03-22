@@ -20,6 +20,36 @@ AddressRouter.get(
     '/address/wards/:districtId',
     // checkUserAuthentication,
     AddressController.fetchWardsByDistrictId
-)
+);
+
+AddressRouter.get(
+    '/address/:userId',
+    // checkUserAuthentication,
+    AddressController.fetchAddressesByUserId
+);
+
+AddressRouter.get(
+    '/address/details/:addressId',
+    // checkUserAuthentication,
+    AddressController.fetchAddressById
+);
+
+AddressRouter.post(
+    '/address/:userId',
+    // checkUserAuthentication,
+    AddressController.addNewAddressByUser
+);
+
+AddressRouter.put(
+    '/address/:addressId',
+    // checkUserAuthentication,
+    AddressController.editAddressByUser
+);
+
+AddressRouter.delete(
+    '/address/:addressId',
+    // checkUserAuthentication,
+    AddressController.deleteAddressById
+);
 
 export default AddressRouter;
