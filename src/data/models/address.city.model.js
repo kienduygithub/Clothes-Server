@@ -32,6 +32,7 @@ module.exports = (sequelize, DataTypes) => {
     }, {
         sequelize,
         modelName: 'City',
+        timestamps: false // Không createdAt, updatedAt
     });
     return City;
 };

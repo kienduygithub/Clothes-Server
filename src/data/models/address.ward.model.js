@@ -42,6 +42,7 @@ module.exports = (sequelize, DataTypes) => {
     }, {
         sequelize,
         modelName: 'Ward',
+        timestamps: false // Không createdAt, updatedAt
     });
     return Ward;
 };

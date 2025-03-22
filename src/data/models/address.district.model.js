@@ -44,6 +44,7 @@ module.exports = (sequelize, DataTypes) => {
     }, {
         sequelize,
         modelName: 'District',
+        timestamps: false // Không createdAt, updatedAt
     });
     return District;
 };
