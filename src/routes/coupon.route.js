@@ -5,37 +5,37 @@ const CouponRouter = express.Router();
 
 CouponRouter.get(
     '/owner/coupon/:couponId',
-    // checkUserAuthentication,
+    checkUserAuthentication,
     CouponController.fetchCouponById
 );
 
 CouponRouter.get(
     '/owner/coupon/:shopId/shop',
-    // checkUserAuthentication,
+    checkUserAuthentication,
     CouponController.fetchShopCoupons
 );
 
 CouponRouter.post(
     '/owner/coupon/:shopId',
-    // checkUserAuthentication,
+    checkUserAuthentication,
     CouponController.addNewCoupon
 );
 
 CouponRouter.put(
     '/owner/coupon/:couponId/used/:userId',
-    // checkUserAuthentication,
+    checkUserAuthentication,
     CouponController.updateTimesUsedCouponById
 )
 
 CouponRouter.put(
     '/owner/coupon/:couponId',
-    // checkUserAuthentication,
+    checkUserAuthentication,
     CouponController.editCoupon
 );
 
 CouponRouter.delete(
     '/owner/coupon/:couponId',
-    // checkUserAuthentication,
+    checkUserAuthentication,
     CouponController.deleteCoupon
 );
 
