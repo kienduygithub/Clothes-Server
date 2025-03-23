@@ -14,6 +14,7 @@ import AuthRouter from './routes/auth.route';
 import { verifyMailer } from './common/mails/mailer.config';
 import CouponRouter from './routes/coupon.route';
 import AddressRouter from './routes/address.route';
+import ReviewRouter from './routes/review.route';
 
 require('dotenv').config();
 
@@ -54,7 +55,8 @@ app.use(
     CouponRouter,
     CategoryRouter,
     AuthRouter,
-    AddressRouter
+    AddressRouter,
+    ReviewRouter
 );
 
 app.listen(port, () => {
