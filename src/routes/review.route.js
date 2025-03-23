@@ -9,6 +9,12 @@ ReviewRouter.get(
     ReviewController.fetchReviewsByProduct
 );
 
+ReviewRouter.get(
+    '/reviews/product/:productId/user/:userId/review/:reviewId',
+    // checkUserAuthentication,
+    ReviewController.fetchReviewById
+);
+
 ReviewRouter.post(
     '/reviews/product/:productId/user/:userId',
     // checkUserAuthentication,

@@ -14,6 +14,22 @@ export const fetchReviewsByProduct = async (req, res) => {
     }
 }
 
+export const fetchReviewById = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const product_id = req.params.productId;
+        const review_id = req.params.reviewId;
+        const response = await ReviewService.fetchReviewById(user_id, product_id, review_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const reviewProductByUser = async (req, res) => {
     try {
         const user_id = req.params.userId;

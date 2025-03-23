@@ -43,6 +43,39 @@ export const fetchReviewsByProduct = async (product_id) => {
     }
 }
 
+export const fetchReviewById = async (user_id, product_id, review_id) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!user_id || !review_id || !product_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                review_id: review_id ?? '',
+                product_id: product_id ?? ''
+            });
+        }
+
+        const review = await Review.findOne({
+            where: { id: review_id, user_id: user_id, product_id: product_id },
+            transaction: t
+        });
+
+        if (!review) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Review không tồn tại', {});
+        }
+
+        const payload = {
+            reviews: [review]
+        }
+
+        await t.commit();
+
+        return ResponseModel.success(`Chi tiết Review`, payload);
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const reviewProductByUser = async (user_id, product_id, reviewInfo) => {
     const t = await sequelize.transaction();
     try {
@@ -208,7 +241,7 @@ export const editReviewProductByUser = async (user_id, product_id, review_id, re
 export const deleteReviewProductByUser = async (user_id, review_id, product_id) => {
     const t = await sequelize.transaction();
     try {
-        if (!user_id || !review_id) {
+        if (!user_id || !review_id || !product_id) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 user_id: user_id ?? '',
                 review_id: review_id ?? '',
