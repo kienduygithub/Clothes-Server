@@ -1,6 +1,6 @@
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response"
-import { Product, Review, User, sequelize } from "../models";
+import { Product, Review, sequelize } from "../models";
 
 export const fetchReviewsByProduct = async (product_id) => {
     const t = await sequelize.transaction();
