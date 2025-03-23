@@ -12,10 +12,14 @@ module.exports = (sequelize, DataTypes) => {
                 onDelete: 'CASCADE'
             });
             // Review
-            User.belongsToMany(models.Product, {
-                through: models.Review,
+            // User.belongsToMany(models.Product, {
+            //     through: models.Review,
+            //     foreignKey: 'user_id',
+            //     otherKey: 'product_id'
+            // });
+            User.hasMany(models.Review, {
                 foreignKey: 'user_id',
-                otherKey: 'product_id'
+                as: 'reviews'
             });
             // Favorite
             User.belongsToMany(models.Product, {

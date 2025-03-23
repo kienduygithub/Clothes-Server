@@ -22,7 +22,7 @@ ReviewRouter.put(
 );
 
 ReviewRouter.delete(
-    '/reviews/user/:userId/review/:reviewId',
+    '/reviews/product/:productId/user/:userId/review/:reviewId',
     // checkUserAuthentication,
     ReviewController.deleteReviewProductByUser
 );

@@ -50,8 +50,9 @@ export const editReviewProductByUser = async (req, res) => {
 export const deleteReviewProductByUser = async (req, res) => {
     try {
         const user_id = req.params.userId;
+        const product_id = req.params.productId;
         const review_id = req.params.reviewId;
-        const response = await ReviewService.deleteReviewProductByUser(user_id, review_id);
+        const response = await ReviewService.deleteReviewProductByUser(user_id, review_id, product_id);
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({

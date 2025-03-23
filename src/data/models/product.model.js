@@ -18,10 +18,14 @@ module.exports = (sequelize, DataTypes) => {
                 onDelete: 'CASCADE'
             });
             // Review
-            Product.belongsToMany(models.User, {
-                through: models.Review,
+            // Product.belongsToMany(models.User, {
+            //     through: models.Review,
+            //     foreignKey: 'product_id',
+            //     otherKey: 'user_id'
+            // });
+            Product.hasMany(models.Review, {
                 foreignKey: 'product_id',
-                otherKey: 'user_id'
+                as: 'reviews'
             });
             // Favorite
             Product.belongsToMany(models.User, {
@@ -58,6 +62,11 @@ module.exports = (sequelize, DataTypes) => {
         description: DataTypes.TEXT('medium'),
         sold_quantity: DataTypes.INTEGER,
         unit_price: DataTypes.DECIMAL(10, 2),
+        // avgRating: {
+        //     type: DataTypes.DECIMAL(10, 2),
+        //     allowNull: false,
+        //     defaultValue: 0
+        // }
     }, {
         sequelize,
         modelName: 'Product',
