@@ -75,7 +75,27 @@ module.exports = (sequelize, DataTypes) => {
             onDelete: "SET NULL",
         },
         address_detail: DataTypes.STRING,
-        is_default: DataTypes.BOOLEAN
+        is_default: DataTypes.BOOLEAN,
+
+        // Helper
+        city_name: {
+            type: DataTypes.VIRTUAL,
+            get() {
+                return this.city ? this.city.name : '';
+            }
+        },
+        district_name: {
+            type: DataTypes.VIRTUAL,
+            get() {
+                return this.district ? this.district.name : '';
+            }
+        },
+        ward_name: {
+            type: DataTypes.VIRTUAL,
+            get() {
+                return this.ward ? this.ward.name : '';
+            }
+        }
     }, {
         sequelize,
         modelName: 'Address',

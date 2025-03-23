@@ -62,6 +62,24 @@ export const fetchAddressesByUserId = async (user_id) => {
 
         const addresses = await Address.findAll({
             where: { userId: user_id },
+            include: [
+                {
+                    model: City,
+                    as: 'city',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: District,
+                    as: 'district',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Ward,
+                    as: 'ward',
+                    attributes: ['id', 'name']
+                }
+            ],
+            attributes: { exclude: ['updatedAt'] },
             transaction: t
         });
 
@@ -88,12 +106,34 @@ export const fetchAddressById = async (address_id) => {
         }
         const address = await Address.findOne({
             where: { id: address_id },
+            include: [
+                {
+                    model: City,
+                    as: 'city',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: District,
+                    as: 'district',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Ward,
+                    as: 'ward',
+                    attributes: ['id', 'name']
+                }
+            ],
+            attributes: { exclude: ['updatedAt'] },
             transaction: t
         });
 
         if (!address) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Địa chỉ không tồn tại', {});
         }
+
+        delete address.dataValues.city_id;
+        delete address.dataValues.district_id;
+        delete address.dataValues.ward_id;
 
         const payload = {
             addresses: [address]
@@ -111,17 +151,90 @@ export const fetchAddressById = async (address_id) => {
 export const addNewAddressByUser = async (user_id, addressInfo) => {
     const t = await sequelize.transaction();
     try {
+        if (!user_id || !addressInfo) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                addressInfo: addressInfo ?? {}
+            });
+        }
 
+        const user = await User.findOne({
+            where: { id: user_id },
+            transaction: t
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại', {});
+        }
+
+        const {
+            city_id,
+            district_id,
+            ward_id,
+            address_detail,
+        } = addressInfo;
+
+        const createdAddress = await Address.create({
+            userId: user_id,
+            city_id: city_id,
+            district_id: district_id,
+            ward_id: ward_id,
+            address_detail: address_detail,
+            is_default: false
+        }, { transaction: t });
+
+        await t.commit();
+
+        const payload = {
+            addresses: [createdAddress]
+        }
+        return ResponseModel.success('Tạo địa chỉ thành công', payload);
     } catch (error) {
         await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
 
-export const editAddressByUser = async (user_id, addressInfo) => {
+export const editAddressByUser = async (address_id, addressInfo) => {
     const t = await sequelize.transaction();
     try {
+        if (!address_id || !addressInfo) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                address_id: address_id ?? '',
+                addressInfo: addressInfo ?? {}
+            });
+        }
 
+        const address = await Address.findOne({
+            where: { id: address_id },
+            transaction: t
+        });
+
+        if (!address) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Địa chỉ không tồn tại', {});
+        }
+
+        const {
+            city_id,
+            district_id,
+            ward_id,
+            address_detail,
+        } = addressInfo;
+
+        const updatedAddress = await address.update({
+            city_id: city_id,
+            district_id: district_id,
+            ward_id: ward_id,
+            address_detail: address_detail
+        }, { transaction: t });
+
+        await t.commit();
+
+        const payload = {
+            addresses: [updatedAddress]
+        }
+
+        return ResponseModel.success(`Cập nhật địa chỉ thành công`, payload);
     } catch (error) {
         await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
@@ -151,6 +264,58 @@ export const deleteAddressById = async (address_id) => {
         await t.commit();
 
         return ResponseModel.success(`Xóa địa chỉ ${address.id} thành công`, {});
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const updateAddressAsDefault = async (user_id, address_id) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!user_id || !address_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                address_id: address_id ?? ''
+            });
+        }
+
+        const user = await User.findOne({
+            where: { id: user_id },
+            transaction: t
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại', {});
+        }
+
+        const address = await Address.findOne({
+            where: { id: address_id, userId: user_id },
+            transaction: t
+        });
+
+        if (!address) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Địa chỉ không tồn tại', {});
+        }
+
+        await Address.update(
+            { is_default: false },
+            {
+                where: {
+                    userId: user_id,
+                    is_default: true
+                },
+                transaction: t
+            }
+        );
+
+        await address.update({
+            is_default: true
+        }, { transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success(`Đặt địa chỉ ${address.id} làm địa chỉ mặc định thành công`, {});
     } catch (error) {
         await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);

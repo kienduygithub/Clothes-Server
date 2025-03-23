@@ -46,7 +46,7 @@ export const fetchWardsByDistrictId = async (req, res) => {
 export const fetchAddressesByUserId = async (req, res) => {
     try {
         const user_id = req.params.userId;
-        const response = await AddressService.fetchAddessesByUserId(user_id);
+        const response = await AddressService.fetchAddressesByUserId(user_id);
         return res.status(response?.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
@@ -105,6 +105,21 @@ export const deleteAddressById = async (req, res) => {
     try {
         const address_id = req.params.addressId;
         const response = await AddressService.deleteAddressById(address_id);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const updateAddressAsDefault = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const address_id = req.params.addressId;
+        const response = await AddressService.updateAddressAsDefault(user_id, address_id);
         return res.status(response?.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({

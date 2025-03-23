@@ -52,4 +52,10 @@ AddressRouter.delete(
     AddressController.deleteAddressById
 );
 
+AddressRouter.patch(
+    '/address/:addressId/user/:userId',
+    // checkUserAuthentication,
+    AddressController.updateAddressAsDefault
+);
+
 export default AddressRouter;
