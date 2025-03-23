@@ -15,6 +15,8 @@ import { verifyMailer } from './common/mails/mailer.config';
 import CouponRouter from './routes/coupon.route';
 import AddressRouter from './routes/address.route';
 import ReviewRouter from './routes/review.route';
+import { initWebSocket } from './common/utils/socket.service';
+import SocketIORouter from './routes/socket-io.route';
 
 require('dotenv').config();
 
@@ -56,9 +58,12 @@ app.use(
     CategoryRouter,
     AuthRouter,
     AddressRouter,
-    ReviewRouter
+    ReviewRouter,
+    SocketIORouter
 );
 
 app.listen(port, () => {
     console.log(`>>> Welcome to clothes server: http://localhost:${port}`);
 })
+
+initWebSocket();
