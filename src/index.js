@@ -17,6 +17,7 @@ import AddressRouter from './routes/address.route';
 import ReviewRouter from './routes/review.route';
 import { initWebSocket } from './common/utils/socket.service';
 import SocketIORouter from './routes/socket-io.route';
+import FavoriteRouter from './routes/favorite.route';
 
 require('dotenv').config();
 
@@ -59,6 +60,7 @@ app.use(
     AuthRouter,
     AddressRouter,
     ReviewRouter,
+    FavoriteRouter,
     SocketIORouter
 );
 
