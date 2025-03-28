@@ -23,6 +23,12 @@ const storageServer = multer.diskStorage({
                 "../../assets/admin-owners"
             );
             cb(null, uploadPath);
+        } else if (file.fieldname === 'userFile') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/users"
+            );
+            cb(null, uploadPath);
         } else if (file.fieldname === 'logoShopFile') {
             const uploadPath = path.resolve(
                 __dirname,

@@ -26,10 +26,9 @@ AuthRouter.post(
 
 AuthRouter.post('/auth/sign-in', signIn);
 
-
 AuthRouter.post('/auth/sign-in/mobile', signInMobile);
 
-AuthRouter.post('/auth/sign-up/mobile', signUpMobile);
+AuthRouter.post('/auth/sign-up/mobile', uploadServer.single('userFile'), signUpMobile);
 
 AuthRouter.post('/auth/refresh', refreshTokenWeb);
 

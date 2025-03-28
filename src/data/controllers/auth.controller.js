@@ -35,7 +35,9 @@ export const signUp = async (req, res) => {
 
 export const signInMobile = async (req, res) => {
     try {
-
+        const userInfo = req.body;
+        const response = await authServices.signInMobile(userInfo);
+        return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status,
@@ -47,7 +49,13 @@ export const signInMobile = async (req, res) => {
 
 export const signUpMobile = async (req, res) => {
     try {
-
+        const userInfo = req.body.userInfo;
+        const file = req.file;
+        const response = await authServices.signUpMobile(
+            userInfo,
+            file
+        );
+        return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status,

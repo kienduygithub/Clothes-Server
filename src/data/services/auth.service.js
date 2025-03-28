@@ -1,7 +1,7 @@
 import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import { User, Shop } from "../models";
+import { User, Shop, sequelize } from "../models";
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed } from "../../common/middleware/upload.middleware";
@@ -16,11 +16,10 @@ export const signIn = async (info) => {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
         }
 
-
         const existUser = await User.findOne({
             where: {
                 email: email,
-                [Op.or]: [{ roles: 'Admin' }, { roles: 'Owner' }]
+                [Op.or]: [{ roles: UserRoles.ADMIN }, { roles: UserRoles.OWNER }]
             },
             include: [{
                 model: Shop,
@@ -158,16 +157,110 @@ export const signUp = async (
 
 export const signInMobile = async (info) => {
     try {
+        const { email, password } = info;
+        if (!email || !password) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                email: email ?? '',
+                password: password ?? ''
+            });
+        }
 
+        const user = await User.findOne({
+            where: {
+                [Op.or]: [{ roles: UserRoles.CUSTOMER }, { roles: UserRoles.OWNER }],
+                email: email
+            }
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại', {});
+        }
+
+        const compared = comparePassword(password, user.password);
+
+        if (!compared) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thông tin đăng nhập không chính xác', {});
+        }
+
+        const payload = {
+            id: user.id,
+            name: user.name,
+            image_url: user.image_url !== null ? user.image_url : '',
+            roles: user.roles,
+        };
+
+        const access_token = generalAccessToken(payload);
+        const refresh_token = generalRefreshToken(payload);
+
+        const loginInfo = {
+            info: payload,
+            access_token: access_token,
+            refresh_token: refresh_token
+        }
+
+        return ResponseModel.success('Đăng nhập thành công', loginInfo);
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
 
-export const signUpMobile = async (info) => {
+export const signUpMobile = async (info, file) => {
+    const t = await sequelize.transaction();
     try {
+        if (!info || !file) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                info: info ?? {},
+                file: file ?? ''
+            });
+        }
 
+        const {
+            name,
+            email,
+            password,
+            gender,
+            phone,
+            address
+        } = JSON.parse(info);
+
+        if (!name || !email || !password) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                name: name ?? '',
+                email: email ?? '',
+                password: password ?? '',
+            });
+        }
+
+        const existUser = await User.findOne({
+            where: {
+                email: email,
+                [Op.or]: [{ roles: UserRoles.ADMIN }, { roles: UserRoles.CUSTOMER }]
+            },
+            transaction: t
+        });
+
+        if (existUser) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã tồn tại', {});
+        }
+
+        const createdUser = await User.create({
+            name: name,
+            email: email,
+            password: hashPassword(password),
+            gender: gender,
+            phone: phone ?? '',
+            address: address ?? '',
+            image_url: file ? `users/${file.filename}` : '',
+            roles: UserRoles.CUSTOMER
+        }, { transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success('Tạo tài khoản thành công', {});
     } catch (error) {
+        await t.rollback();
+        console.log(file);
+        await handleDeleteImageAsFailed(file);
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
