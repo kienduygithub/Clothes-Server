@@ -1,6 +1,6 @@
-import productServices from "../services/product.service";
+import * as productServices from "../services/product.service";
 
-const fetchProductMobileById = async (req, res) => {
+export const fetchProductMobileById = async (req, res) => {
     try {
         const productId = req.params.id;
         const response = await productServices.fetchProductMobileById(productId);
@@ -14,7 +14,20 @@ const fetchProductMobileById = async (req, res) => {
     }
 }
 
-const fetchProductById = async (req, res) => {
+export const fetchProductMobiles = async (req, res) => {
+    try {
+        const response = await productServices.fetchProductMobiles();
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const fetchProductById = async (req, res) => {
     try {
         const productId = req.params.id;
         const response = await productServices.fetchProductById(productId);
@@ -28,7 +41,7 @@ const fetchProductById = async (req, res) => {
     }
 }
 
-const fetchAllProduct = async (req, res) => {
+export const fetchAllProduct = async (req, res) => {
     try {
         const shopId = req.query.shopId;
         const response = await productServices.fetchAllProduct(shopId);
@@ -42,7 +55,7 @@ const fetchAllProduct = async (req, res) => {
     }
 }
 
-const createNewProduct = async (req, res) => {
+export const createNewProduct = async (req, res) => {
     try {
         const shopId = req.query.shopId;
         const response = await productServices.createNewProduct(req.body, req.files, shopId);
@@ -56,7 +69,7 @@ const createNewProduct = async (req, res) => {
     }
 }
 
-const updateProduct = async (req, res) => {
+export const updateProduct = async (req, res) => {
     try {
         const productId = req.params.id;
         const response = await productServices.updateProduct(productId, req.body, req.files);
@@ -70,7 +83,7 @@ const updateProduct = async (req, res) => {
     }
 }
 
-const deleteProductById = async (req, res) => {
+export const deleteProductById = async (req, res) => {
     try {
         const productId = req.params.id;
         const response = await productServices.deleteProductById(productId);
@@ -82,13 +95,4 @@ const deleteProductById = async (req, res) => {
             body: error?.body
         })
     }
-}
-
-module.exports = {
-    fetchProductMobileById: fetchProductMobileById,
-    fetchProductById: fetchProductById,
-    fetchAllProduct: fetchAllProduct,
-    createNewProduct: createNewProduct,
-    updateProduct: updateProduct,
-    deleteProductById: deleteProductById
 }

@@ -1,9 +1,9 @@
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
 import { handleDeleteImages } from "../../common/middleware/upload.middleware";
-import db from "../models";
+import db, { sequelize } from "../models";
 
-const fetchProductMobileById = async (productId) => {
+export const fetchProductMobileById = async (productId) => {
     try {
         if (!productId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết');
@@ -53,7 +53,61 @@ const fetchProductMobileById = async (productId) => {
     }
 }
 
-const fetchProductById = async (productId) => {
+export const fetchProductMobiles = async () => {
+    const t = await sequelize.transaction();
+    try {
+        const products = await db.Product.findAll({
+            attributes: {
+                include: [
+                    [sequelize.fn('AVG', sequelize.col('reviews.rating')), 'rating']
+                ]
+            },
+            include: [
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url']
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url']
+                },
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
+                    include: {
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name']
+                    }
+                },
+                {
+                    model: db.Review,
+                    as: 'reviews',
+                    attributes: []
+                },
+            ],
+            group: ['Product.id'], // Bổ sung group theo review.id
+            subQuery: false, // Ngăn việc sinh subquery gây mất dữ liệu
+            transaction: t
+        });
+
+        const payload = {
+            products: products
+        }
+
+        await t.commit();
+
+        return ResponseModel.success('Danh sách Product mobile', payload);
+    } catch (error) {
+        await t.rollback();
+        throw error;
+    }
+}
+
+export const fetchProductById = async (productId) => {
     try {
         if (!productId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
@@ -100,7 +154,7 @@ const fetchProductById = async (productId) => {
     }
 }
 
-const fetchAllProduct = async (shopId) => {
+export const fetchAllProduct = async (shopId) => {
     try {
         if (!shopId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', null);
@@ -139,7 +193,7 @@ const fetchAllProduct = async (shopId) => {
     }
 }
 
-const createNewProduct = async (data, files, shopId) => {
+export const createNewProduct = async (data, files, shopId) => {
     try {
         const uploadImages = [];
         const {
@@ -211,7 +265,7 @@ const createNewProduct = async (data, files, shopId) => {
     }
 }
 
-const updateProduct = async (productId, data, files) => {
+export const updateProduct = async (productId, data, files) => {
     try {
         const {
             shopId,
@@ -391,7 +445,7 @@ const updateProduct = async (productId, data, files) => {
     }
 }
 
-const deleteProductById = async (productId) => {
+export const deleteProductById = async (productId) => {
     try {
         if (!productId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết.', null);
@@ -433,13 +487,4 @@ const deleteProductById = async (productId) => {
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
-}
-
-module.exports = {
-    fetchProductMobileById: fetchProductMobileById,
-    fetchProductById: fetchProductById,
-    fetchAllProduct: fetchAllProduct,
-    createNewProduct: createNewProduct,
-    updateProduct: updateProduct,
-    deleteProductById: deleteProductById
 }
