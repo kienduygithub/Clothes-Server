@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { literal, Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
 import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
@@ -8,6 +8,19 @@ export const fetchCategories = async () => {
     try {
         const categories = await Category.findAll({
             where: { parentId: null },
+            attributes: {
+                include: [
+                    // Đếm tổng số sản phẩm trong tất cả category con
+                    [literal(
+                        `(
+                            SELECT COUNT(*)
+                            FROM products AS p
+                            JOIN categories AS c ON p.categoryId = c.id
+                            WHERE c.parentId = Category.id
+                        )`
+                    ), 'count']
+                ]
+            },
             include: {
                 model: Category,
                 as: 'children'

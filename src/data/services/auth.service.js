@@ -243,7 +243,7 @@ export const signUpMobile = async (info, file) => {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã tồn tại', {});
         }
 
-        const createdUser = await User.create({
+        await User.create({
             name: name,
             email: email,
             password: hashPassword(password),
