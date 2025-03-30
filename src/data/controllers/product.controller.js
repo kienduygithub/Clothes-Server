@@ -14,6 +14,34 @@ export const fetchProductMobileById = async (req, res) => {
     }
 }
 
+export const fetchProductVariantMobileByProductId = async (req, res) => {
+    try {
+        const productId = req.params.id;
+        const response = await productServices.fetchProductVariantMobileByProductId(productId);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const fetchProductMobilesByShopId = async (req, res) => {
+    try {
+        const shop_id = req.params.shopId;
+        const response = await productServices.fetchProductMobilesByShopId(shop_id);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const fetchProductMobiles = async (req, res) => {
     try {
         const response = await productServices.fetchProductMobiles();

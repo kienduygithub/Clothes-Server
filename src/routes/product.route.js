@@ -14,6 +14,16 @@ ProductRouter.get(
 );
 
 ProductRouter.get(
+    '/product/shop/:shopId/mobile',
+    ProductController.fetchProductMobilesByShopId
+);
+
+ProductRouter.get(
+    '/product/:id/variants/mobile',
+    ProductController.fetchProductVariantMobileByProductId
+);
+
+ProductRouter.get(
     '/product/mobile',
     ProductController.fetchProductMobiles
 );

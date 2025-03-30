@@ -4,6 +4,7 @@ import { handleDeleteImages } from "../../common/middleware/upload.middleware";
 import db, { sequelize } from "../models";
 
 export const fetchProductMobileById = async (productId) => {
+    const t = await sequelize.transaction();
     try {
         if (!productId) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết');
@@ -11,44 +12,102 @@ export const fetchProductMobileById = async (productId) => {
 
         const response = await db.Product.findOne({
             where: { id: productId },
+            transaction: t,
             attributes: {
-                exclude: ['createdAt', 'updatedAt']
+                exclude: ['createdAt', 'updatedAt'],
+                include: [
+                    [sequelize.fn('AVG', sequelize.col('reviews.rating')), 'rating']
+                ]
             },
             include: [
                 {
                     model: db.Shop,
                     as: 'shop',
-                    attributes: [
-                        'id', 'shop_name', 'logo_url'
-                    ],
+                    attributes: ['id', 'shop_name', 'logo_url', 'contact_address'],
+                },
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
                     include: {
-                        model: db.Product,
-                        as: 'products',
-                        attributes: ['id', 'product_name'],
-                        include: {
-                            model: db.Review,
-                            as: 'reviews',
-                            attributes: ['id', 'rating']
-                        }
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name']
                     }
                 },
                 {
                     model: db.Review,
                     as: 'reviews',
-                    attributes: ['id', 'rating', 'comment', 'createdAt'],
+                    attributes: []
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url']
+                }
+            ],
+            group: ['product_images.id']
+        });
+
+        const payload = {
+            products: [response]
+        };
+
+        await t.commit();
+
+        return ResponseModel.success('Chi tiết sản phẩm.', payload);
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchProductVariantMobileByProductId = async (product_id) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!product_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                product_id: product_id ?? ''
+            });
+        }
+
+        const variants = await db.ProductVariant.findAll({
+            where: { productId: product_id },
+            transaction: t,
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            include: [
+                {
+                    model: db.Product,
+                    as: 'product',
+                    attributes: ['id', 'product_name'],
                     include: {
-                        model: db.User,
-                        as: 'user_review',
-                        attributes: ['id', 'name', 'image_url']
+                        model: db.Shop,
+                        as: 'shop',
+                        attributes: ['id', 'shop_name']
                     }
+                },
+                {
+                    model: db.Color,
+                    as: 'color',
+                    attributes: ['id', 'color_name']
+                },
+                {
+                    model: db.Size,
+                    as: 'size',
+                    attributes: ['id', 'size_code']
                 }
             ]
         });
+
         const payload = {
-            product: response
-        };
-        return ResponseModel.success('Chi tiết sản phẩm.', payload);
+            variants: variants
+        }
+
+        await t.commit();
+
+        return ResponseModel.success('Danh sách biến thể sản phẩm', payload);
     } catch (error) {
+        await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
@@ -101,6 +160,73 @@ export const fetchProductMobiles = async () => {
         await t.commit();
 
         return ResponseModel.success('Danh sách Product mobile', payload);
+    } catch (error) {
+        await t.rollback();
+        throw error;
+    }
+}
+
+export const fetchProductMobilesByShopId = async (shop_id) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shop_id: shop_id ?? ''
+            });
+        }
+
+        const products = await db.Product.findAll({
+            where: { shopId: shop_id },
+            attributes: {
+                include: [
+                    [sequelize.fn('AVG', sequelize.col('reviews.rating')), 'rating']
+                ]
+            },
+            include: [
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url']
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url']
+                },
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
+                    include: {
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name']
+                    }
+                },
+                {
+                    model: db.Review,
+                    as: 'reviews',
+                    attributes: []
+                },
+            ],
+            group: [
+                'Product.id',
+                'shop.id',
+                'product_images.id',
+                'category.id',
+                'category->parent.id'
+            ], // Bổ sung group theo review.id
+            subQuery: false, // Ngăn việc sinh subquery gây mất dữ liệu
+            transaction: t
+        });
+
+        const payload = {
+            products: products
+        }
+
+        await t.commit();
+
+        return ResponseModel.success('Danh sách Product của Shop', payload);
     } catch (error) {
         await t.rollback();
         throw error;
