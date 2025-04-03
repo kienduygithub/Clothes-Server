@@ -15,6 +15,7 @@ CartRouter.get(
 CartRouter.post(
     '/cart/:cardId/add',
     checkUserAuthenticationMobile,
+    CartController.addCartItem
 )
 
 /** Xóa một sản phẩm */

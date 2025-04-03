@@ -18,8 +18,11 @@ export const getCartByUser = async (req, res) => {
 
 export const addCartItem = async (req, res) => {
     try {
-
-
+        const user_id = req.user.id;
+        const cart_id = req.params.cartId;
+        const item_info = req.body;
+        const response = await CartService.addCartItem(user_id, cart_id, item_info);
+        return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
