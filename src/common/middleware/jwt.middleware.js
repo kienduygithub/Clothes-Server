@@ -13,7 +13,7 @@ export const generalAccessToken = (payload) => {
     const accessToken = jwt.sign(
         { ...payload },
         ACCESS_SECRET,
-        { expiresIn: '10s' }
+        { expiresIn: '1h' }
     );
 
     return accessToken;
@@ -97,6 +97,40 @@ export const checkUserAuthentication = (req, res, next) => {
             status: error?.status,
             message: error?.message || 'UNKNOWN',
             body: error?.body
+        });
+    }
+}
+
+export const checkUserAuthenticationMobile = async (req, res, next) => {
+    try {
+        const accessToken = req.headers.authorization?.split(" ")[1];
+        if (!accessToken) {
+            return res.status(HttpErrors.UNAUTHORIZED).json({
+                status: HttpErrors.UNAUTHORIZED,
+                message: 'Không có access token',
+                body: {}
+            });
+        }
+
+        const decoded = jwt.verify(accessToken, ACCESS_SECRET);
+
+        req.user = decoded;
+        next();
+    } catch (error) {
+        let statusCode = HttpErrors.UNAUTHORIZED;
+        let message = 'Token không hợp lệ';
+        if (error.name === 'TokenExpiredError') {
+            message = 'Token đã hết hạn';
+        } else if (error.name === 'JsonWebTokenError') {
+            message = 'Token sai hoặc bị chỉnh sửa';
+        } else if (error.name === 'NotBeforeError') {
+            message = 'Token chưa có hiệu lực';
+        }
+
+        return res.status(statusCode).json({
+            status: statusCode,
+            message,
+            body: {}
         });
     }
 }

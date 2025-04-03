@@ -40,9 +40,9 @@ module.exports = (sequelize, DataTypes) => {
                 onDelete: "CASCADE"
             });
             // Giỏ hàng
-            User.hasMany(models.Cart, {
+            User.hasOne(models.Cart, {
                 foreignKey: 'user_id',
-                as: 'carts',
+                as: 'cart',
                 onDelete: 'CASCADE'
             });
             // User 1 - N UserCoupon: Một người dùng có thể lưu nhiều mã -> User N - N Coupon
