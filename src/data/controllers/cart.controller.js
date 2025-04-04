@@ -34,8 +34,39 @@ export const addCartItem = async (req, res) => {
 
 export const updateCartItem = async (req, res) => {
     try {
+        const user_id = req.user.id;
+        const cart_id = req.params.cartId;
+        const item_id = req.params.itemId;
+        const item_info = req.body;
+        const response = await CartService.updateCartItem(
+            user_id,
+            cart_id,
+            item_id,
+            item_info
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body ?? {}
+        });
+    }
+}
 
-
+export const updateQuantityCartItem = async (req, res) => {
+    try {
+        const user_id = req.user.id;
+        const cart_id = req.params.cartId;
+        const item_id = req.params.itemId;
+        const quantity = req.body;
+        const response = await CartService.updateQuantityCartItem(
+            user_id,
+            cart_id,
+            item_id,
+            quantity
+        )
+        return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
@@ -47,8 +78,15 @@ export const updateCartItem = async (req, res) => {
 
 export const removeCartItem = async (req, res) => {
     try {
-
-
+        const user_id = req.user.id;
+        const cart_id = req.params.cartId;
+        const item_id = req.params.itemId;
+        const response = await CartService.removeCartItem(
+            user_id,
+            cart_id,
+            item_id,
+        );
+        return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
@@ -60,8 +98,15 @@ export const removeCartItem = async (req, res) => {
 
 export const removeCartShop = async (req, res) => {
     try {
-
-
+        const user_id = req.user.id;
+        const cart_id = req.params.cartId;
+        const cart_shop_id = req.params.cartShopId;
+        const response = await CartService.removeCartShop(
+            user_id,
+            cart_id,
+            cart_shop_id,
+        );
+        return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
             status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,

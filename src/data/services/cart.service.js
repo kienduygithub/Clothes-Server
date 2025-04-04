@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response"
 import { Cart, CartShop, CartItem, Shop, Product, ProductVariant, sequelize } from "../models";
@@ -71,6 +72,10 @@ export const addCartItem = async (user_id, cart_id, item_info) => {
                 cart_id: cart_id ?? '',
                 item_info: item_info ?? {}
             });
+        }
+
+        if (quantity <= 0) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Số lượng phải lớn hơn 0', { quantity });
         }
 
         let {
@@ -157,26 +162,251 @@ export const addCartItem = async (user_id, cart_id, item_info) => {
     }
 }
 
-export const updateCartItem = async (user_id, cart_id, item_id, quantity) => {
+export const updateCartItem = async (user_id, cart_id, item_id, item_info) => {
+    const t = await sequelize.transaction();
     try {
+        if (!user_id || !cart_id || !item_id || !item_info) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                cart_id: cart_id ?? '',
+                item_id: item_id ?? '',
+                item_info: item_info ?? {}
+            });
+        }
 
+        const cart_item = await CartItem.findOne({
+            where: { id: item_id },
+            transaction: t,
+            include: {
+                model: CartShop,
+                as: 'cart_shop',
+                include: {
+                    model: Cart,
+                    as: 'cart',
+                    where: {
+                        id: cart_id, user_id: user_id
+                    }
+                }
+            }
+        });
+
+        if (!cart_item) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Sản phẩm của cửa hàng không tồn tại', {});
+        }
+
+        const {
+            shop_id,
+            product_variant_id,
+            quantity
+        } = item_info;
+
+        if (quantity <= 0) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Số lượng phải lớn hơn 0', {});
+        }
+
+        let cart_shop = await CartShop.findOne({
+            where: { cart_id: cart_id, shop_id: shop_id },
+            transaction: t
+        });
+
+        if (!cart_shop) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Giỏ hàng của cửa hàng không tồn tại', {});
+        }
+
+        const product_variant = await ProductVariant.findOne({
+            where: { id: product_variant_id },
+            transaction: t
+        });
+
+        if (!product_variant) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Biến thể sản phẩm không tồn tại', {});
+        }
+
+        if (quantity > product_variant.stock_quantity) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Không đủ hàng tồn kho', {
+                stock_available: product_variant.stock_quantity
+            });
+        }
+
+        const existing_cart_item = await CartItem.findOne({
+            where: {
+                product_variant_id: product_variant_id,
+                cart_shop_id: cart_shop.id,
+                id: {
+                    [Op.ne]: item_id /** Khác Cart Item update */
+                }
+            }
+        });
+
+        if (existing_cart_item) {
+            /** Cộng dồn số lượng và xóa cart item hiện tại */
+            const total_quantity = existing_cart_item.quantity + quantity;
+            if (total_quantity > product_variant.stock_quantity) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Không đủ hàng tồn kho để gộp sản phẩm', {
+                    stock_available: product_variant.stock_quantity
+                });
+            }
+
+            await existing_cart_item.update({
+                quantity: total_quantity
+            }, { transaction: t });
+
+            await cart_item.destroy({ transaction: t });
+
+            await t.commit();
+            return ResponseModel.success('Gộp sản phẩm đã tồn tại trong giỏ hàng của cửa hàng', {});
+        } else {
+            await cart_item.update({
+                product_variant_id: product_variant_id,
+                quantity: quantity
+            }, { transaction: t });
+
+            await t.commit();
+            return ResponseModel.update('Cập nhật sản phẩm thành công', {});
+        }
     } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const updateQuantityCartItem = async (user_id, cart_id, item_id, quantity) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!user_id || !cart_id || !item_id || !quantity) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                cart_id: cart_id ?? '',
+                item_id: item_id ?? '',
+                quantity: quantity ?? 0,
+            })
+        }
+
+        const cart_item = await CartItem.findOne({
+            where: { id: item_id },
+            transaction: t,
+            include: {
+                model: CartShop,
+                as: 'cart_shop',
+                include: {
+                    model: Cart,
+                    as: 'cart',
+                    where: {
+                        id: cart_id, user_id: user_id
+                    }
+                }
+            },
+        });
+
+        if (!cart_item) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Sản phẩm của cửa hàng không tồn tại', {});
+        }
+
+        const product_variant = await ProductVariant.findOne({
+            where: { id: cart_item.product_variant_id },
+            transaction: t
+        })
+
+        if (!product_variant) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Biến thể sản phẩm không tồn tại', {});
+        }
+
+        if (quantity > product_variant.stock_quantity) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Không đủ số lượng hàng tồn kho', {
+                stock_available: product_variant.stock_quantity
+            });
+        }
+
+        await cart_item.update({
+            quantity: quantity
+        }, { transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success('Cập nhật số lượng sản phẩm thành công', {});
+    } catch (error) {
+        await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
 
 export const removeCartItem = async (user_id, cart_id, item_id) => {
+    const t = await sequelize.transaction();
     try {
+        if (!user_id || !cart_id || !item_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                cart_id: cart_id ?? '',
+                item_id: item_id ?? ''
+            })
+        }
 
+        const cartItem = await CartItem.findOne({
+            where: { id: item_id },
+            transaction: t,
+            include: {
+                model: CartShop,
+                as: 'cart_shop',
+                include: {
+                    model: Cart,
+                    as: 'cart',
+                    where: {
+                        id: cart_id,
+                        user_id: user_id
+                    }
+                }
+            }
+        })
+
+        if (!cartItem) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Sản phẩm giỏ hàng không tồn tại', {});
+        }
+
+        await cartItem.destroy({ transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success('Xóa sản phẩm khỏi giỏ hàng thành công', {});
     } catch (error) {
+        await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
 
 export const removeCartShop = async (user_id, cart_id, cart_shop_id) => {
+    const t = await sequelize.transaction();
     try {
+        if (!user_id || !cart_id || !cart_shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                cart_id: cart_id ?? '',
+                cart_shop_id: cart_shop_id ?? ''
+            })
+        }
 
+        const cart_shop = await CartShop.findOne({
+            where: { id: cart_shop_id },
+            transaction: t,
+            include: {
+                model: Cart,
+                as: 'cart',
+                where: {
+                    id: cart_id, user_id: user_id
+                }
+            }
+        });
+
+        if (!cart_shop) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Giỏ hàng cho cửa hàng không tồn tại', {});
+        }
+
+        await cart_shop.destroy({ transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success('Xóa giỏ hàng của cửa hàng thành công', {});
     } catch (error) {
+        await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
