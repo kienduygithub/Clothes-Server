@@ -1,7 +1,7 @@
 import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import { User, Shop, sequelize } from "../models";
+import { User, Shop, Cart, sequelize } from "../models";
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed } from "../../common/middleware/upload.middleware";
@@ -169,6 +169,11 @@ export const signInMobile = async (info) => {
             where: {
                 [Op.or]: [{ roles: UserRoles.CUSTOMER }, { roles: UserRoles.OWNER }],
                 email: email
+            },
+            include: {
+                model: Cart,
+                as: 'cart',
+                attributes: ['id']
             }
         });
 
@@ -186,6 +191,7 @@ export const signInMobile = async (info) => {
             id: user.id,
             name: user.name,
             image_url: user.image_url !== null ? user.image_url : '',
+            cart_id: user?.cart?.id ?? 0,
             roles: user.roles,
         };
 

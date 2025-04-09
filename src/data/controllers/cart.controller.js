@@ -59,7 +59,7 @@ export const updateQuantityCartItem = async (req, res) => {
         const user_id = req.user.id;
         const cart_id = req.params.cartId;
         const item_id = req.params.itemId;
-        const quantity = req.body;
+        const quantity = req.body.quantity;
         const response = await CartService.updateQuantityCartItem(
             user_id,
             cart_id,

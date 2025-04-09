@@ -37,7 +37,6 @@ module.exports = (sequelize, DataTypes) => {
             },
             onDelete: 'CASCADE'
         },
-        unit_price: DataTypes.DECIMAL(10, 2),
         quantity: DataTypes.INTEGER
     }, {
         sequelize,

@@ -1,7 +1,17 @@
 import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response"
-import { Cart, CartShop, CartItem, Shop, Product, ProductVariant, sequelize } from "../models";
+import {
+    Cart,
+    CartShop,
+    CartItem,
+    Shop,
+    Product,
+    ProductVariant,
+    Color,
+    Size,
+    sequelize
+} from "../models";
 
 export const getCartByUser = async (user_id, cart_id) => {
     try {
@@ -34,11 +44,24 @@ export const getCartByUser = async (user_id, cart_id) => {
                                     model: ProductVariant,
                                     as: 'product_variant',
                                     attributes: ['id', 'productId', 'image_url', 'stock_quantity'],
-                                    include: {
-                                        model: Product,
-                                        as: 'product',
-                                        attributes: ['id', 'product_name', 'unit_price']
-                                    }
+                                    include: [
+                                        {
+                                            model: Product,
+                                            as: 'product',
+                                            attributes: ['id', 'product_name', 'unit_price'],
+
+                                        },
+                                        {
+                                            model: Color,
+                                            as: 'color',
+                                            attributes: ['id', 'color_name']
+                                        },
+                                        {
+                                            model: Size,
+                                            as: 'size',
+                                            attributes: ['id', 'size_code']
+                                        }
+                                    ]
                                 }
                             ]
                         }
@@ -106,7 +129,7 @@ export const addCartItem = async (user_id, cart_id, item_info) => {
             cart_shop = await CartShop.create({
                 cart_id: cart_id,
                 shop_id: shop_id
-            });
+            }, { transaction: t });
         }
 
         const product_variant = await ProductVariant.findOne({
@@ -363,6 +386,20 @@ export const removeCartItem = async (user_id, cart_id, item_id) => {
         }
 
         await cartItem.destroy({ transaction: t });
+
+        const cartShopId = cartItem.cart_shop.id;
+
+        const remainingItems = await CartItem.count({
+            where: { cart_shop_id: cartShopId },
+            transaction: t
+        });
+
+        if (remainingItems === 0) {
+            await CartShop.destroy({
+                where: { id: cartShopId },
+                transaction: t
+            });
+        }
 
         await t.commit();
 
