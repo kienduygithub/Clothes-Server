@@ -39,6 +39,13 @@ CouponRouter.delete(
     CouponController.deleteCoupon
 );
 
+/** Danh sách coupon (Có cả người dùng) */
+CouponRouter.get(
+    '/coupon/shop/:shopId/mobile',
+    checkUserAuthentication,
+    CouponController.fetchShopCouponMobile
+)
+
 
 
 export default CouponRouter;

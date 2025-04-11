@@ -1,8 +1,6 @@
-import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
-import { Coupon, UserCoupon, sequelize } from "../models";
+import { Coupon, UserCoupon, User, sequelize } from "../models";
 
 export const fetchShopCoupons = async (shopId) => {
     try {
@@ -71,6 +69,7 @@ export const fetchCouponById = async (coupon_id) => {
     }
 }
 
+/** Sử dụng Coupon */
 export const updateTimesUsedCouponById = async (user_id, coupon_id) => {
     const transaction = await sequelize.transaction();
     try {
@@ -299,6 +298,58 @@ export const deleteCoupon = async (coupon_id) => {
         return ResponseModel.success("Xóa Coupon thành công", {});
     } catch (error) {
         await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchShopCouponMobile = async (userId, shopId) => {
+    try {
+        if (!userId || !shopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                userId: userId ?? '',
+                shopId: shopId ?? ''
+            })
+        }
+
+        const coupons = await Coupon.findAll({
+            where: {
+                shop_id: shopId,
+            },
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            include: [
+                {
+                    model: User,
+                    as: 'user_coupons',
+                    through: {
+                        model: UserCoupon,
+                        attributes: ['is_used'],
+                    },
+                    where: { id: userId },
+                    required: false /** Left join để lấy cả coupon chưa lưu */
+                }
+            ]
+        });
+
+        const formattedCoupons = coupons.map(coupon => ({
+            id: coupon.id,
+            name: coupon.name,
+            code: coupon.code,
+            discount_type: coupon.discount_type,
+            discount_value: parseFloat(coupon.discount_value),
+            max_discount: parseFloat(coupon.max_discount),
+            min_order_value: parseFloat(coupon.min_order_value),
+            valid_from: coupon.valid_from,
+            valid_to: coupon.valid_to,
+            is_saved: !!coupon.user_coupons.length, /** Kiểm tra đã lưu */
+            is_used: coupon.user_coupons.length ? coupon.user_coupons[0].UserCoupon.is_used : false
+        }));
+
+        const payload = {
+            coupons: formattedCoupons
+        }
+
+        return ResponseModel.success('Danh sách KM Mobile', payload);
+    } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }

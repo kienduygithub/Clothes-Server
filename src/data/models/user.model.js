@@ -48,6 +48,7 @@ module.exports = (sequelize, DataTypes) => {
             // User 1 - N UserCoupon: Một người dùng có thể lưu nhiều mã -> User N - N Coupon
             User.belongsToMany(models.Coupon, {
                 through: models.UserCoupon,
+                as: 'user_coupons',
                 foreignKey: 'user_id',
                 otherKey: 'coupon_id'
             });
