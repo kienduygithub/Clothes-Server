@@ -353,3 +353,39 @@ export const fetchShopCouponMobile = async (userId, shopId) => {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+export const saveCouponMobile = async (userId, couponId) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!userId || !couponId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu thông tin cần thiết", {
+                userId: userId ?? '',
+                couponId: couponId ?? ''
+            })
+        }
+
+        const existSaved = await UserCoupon.findOne({
+            where: {
+                user_id: userId,
+                coupon_id: couponId
+            },
+            transaction: t
+        });
+
+        if (existSaved) {
+            return ResponseModel.success('Người dùng đã lưu KM này trước đó', {});
+        }
+
+        await UserCoupon.create({
+            user_id: userId,
+            coupon_id: couponId
+        }, { transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success('Người dùng lưu KM thành công', {});
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}

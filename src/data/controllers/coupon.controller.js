@@ -102,3 +102,18 @@ export const fetchShopCouponMobile = async (req, res) => {
         })
     }
 }
+
+export const saveCouponMobile = async (req, res) => {
+    try {
+        const user_id = req.user.id;
+        const coupon_id = req.params.couponId;
+        const response = await CouponService.saveCouponMobile(user_id, coupon_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}

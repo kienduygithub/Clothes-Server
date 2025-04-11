@@ -46,6 +46,11 @@ CouponRouter.get(
     CouponController.fetchShopCouponMobile
 )
 
+CouponRouter.post(
+    '/coupon/:couponId/mobile',
+    checkUserAuthentication,
+    CouponController.saveCouponMobile
+)
 
 
 export default CouponRouter;
