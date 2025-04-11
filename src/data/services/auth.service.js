@@ -249,7 +249,7 @@ export const signUpMobile = async (info, file) => {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã tồn tại', {});
         }
 
-        await User.create({
+        const user = await User.create({
             name: name,
             email: email,
             password: hashPassword(password),
@@ -260,12 +260,15 @@ export const signUpMobile = async (info, file) => {
             roles: UserRoles.CUSTOMER
         }, { transaction: t });
 
+        await Cart.create({
+            user_id: user.id
+        }, { transaction: t });
+
         await t.commit();
 
         return ResponseModel.success('Tạo tài khoản thành công', {});
     } catch (error) {
         await t.rollback();
-        console.log(file);
         await handleDeleteImageAsFailed(file);
         ResponseModel.error(error?.status, error?.message, error?.body);
     }

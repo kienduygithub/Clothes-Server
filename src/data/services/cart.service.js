@@ -274,8 +274,6 @@ export const updateCartItem = async (user_id, cart_id, item_id, item_info) => {
                 quantity: total_quantity
             }, { transaction: t });
 
-            await cart_item.destroy({ transaction: t });
-
             await t.commit();
             return ResponseModel.success('Gộp sản phẩm đã tồn tại trong giỏ hàng của cửa hàng', {});
         } else {
@@ -285,7 +283,7 @@ export const updateCartItem = async (user_id, cart_id, item_id, item_info) => {
             }, { transaction: t });
 
             await t.commit();
-            return ResponseModel.update('Cập nhật sản phẩm thành công', {});
+            return ResponseModel.success('Cập nhật sản phẩm thành công', {});
         }
     } catch (error) {
         await t.rollback();

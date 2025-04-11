@@ -79,7 +79,7 @@ export const fetchProductVariantMobileByProductId = async (product_id) => {
                 {
                     model: db.Product,
                     as: 'product',
-                    attributes: ['id', 'product_name'],
+                    attributes: ['id', 'product_name', 'unit_price', 'sold_quantity'],
                     include: {
                         model: db.Shop,
                         as: 'shop',
