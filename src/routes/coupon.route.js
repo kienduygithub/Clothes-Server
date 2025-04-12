@@ -1,5 +1,5 @@
 import express from "express";
-import { checkUserAuthentication } from "../common/middleware/jwt.middleware";
+import { checkUserAuthentication, checkUserAuthenticationMobile } from "../common/middleware/jwt.middleware";
 import * as CouponController from "../data/controllers/coupon.controller";
 const CouponRouter = express.Router();
 
@@ -42,13 +42,13 @@ CouponRouter.delete(
 /** Danh sách coupon (Có cả người dùng) */
 CouponRouter.get(
     '/coupon/shop/:shopId/mobile',
-    checkUserAuthentication,
+    checkUserAuthenticationMobile,
     CouponController.fetchShopCouponMobile
 )
 
 CouponRouter.post(
     '/coupon/:couponId/mobile',
-    checkUserAuthentication,
+    checkUserAuthenticationMobile,
     CouponController.saveCouponMobile
 )
 

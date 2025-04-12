@@ -19,6 +19,7 @@ import { initWebSocket } from './common/utils/socket.service';
 import SocketIORouter from './routes/socket-io.route';
 import FavoriteRouter from './routes/favorite.route';
 import CartRouter from './routes/cart.route';
+import OrderRouter from './routes/order.route';
 
 require('dotenv').config();
 
@@ -63,6 +64,7 @@ app.use(
     ReviewRouter,
     FavoriteRouter,
     CartRouter,
+    OrderRouter,
     SocketIORouter
 );
 

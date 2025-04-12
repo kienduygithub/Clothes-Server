@@ -3,3 +3,11 @@ export const ShopStatus = Object.freeze({
     INACTIVE: 'inactive',
     PENDING: 'pending'
 });
+
+export const OrderStatus = Object.freeze({
+    PENDING: 'pending',
+    PAID: 'paid',
+    SHIPPED: 'shipped',
+    COMPLETED: 'completed',
+    CANCELED: 'canceled'
+});
