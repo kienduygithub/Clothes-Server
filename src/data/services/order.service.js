@@ -46,12 +46,14 @@ export const createOrderMobile = async (user_id, cartInfo) => {
         }
 
         /** 2. Tạo Order */
+        const date = new Date();
         const order = await Order.create({
             user_id: user_id,
             address_id: address_id ? address_id : null, /** Tạm thời thế */
             total_price: final_total,
             status: OrderStatus.PAID,
-            status_changed_at: new Date()
+            status_changed_at: date,
+            payment_date: date
         }, { transaction: t });
 
         /** 3. Tạo OrderShop và OrderItem */
@@ -73,7 +75,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                     await t.rollback();
                     ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thông tin sản phẩm không hợp lệ', { item });
                 }
-
+                console.log(item.product_variant.id);
                 const variant = await ProductVariant.findOne({
                     where: { id: item.product_variant.id },
                     transaction: t
@@ -89,7 +91,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
             }
 
             /** Kiểm tra coupon (nếu có) */
-            let finalCouponId = selected_coupon.id;
+            let finalCouponId = selected_coupon ? selected_coupon.id : null;
             let finalDiscountShop = shop_discount;
             let finalTotalShop = shop_final_total;
 
@@ -146,7 +148,6 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                     }
                 }
             }
-
             /** Tạo OrderShop */
             const orderShop = await OrderShop.create({
                 order_id: order.id,

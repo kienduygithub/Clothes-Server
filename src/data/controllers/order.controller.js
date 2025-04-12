@@ -3,7 +3,7 @@ import * as OrderService from "../services/order.service";
 
 export const createOrderMobile = async (req, res) => {
     try {
-        const user_id = req.params.userId;
+        const user_id = req.user.id;
         const cartInfo = req.body;
 
         // Kiểm tra cartInfo
