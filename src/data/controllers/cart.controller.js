@@ -136,6 +136,24 @@ export const applyCouponCartShop = async (req, res) => {
     }
 }
 
+export const removeCouponFromCartShop = async (req, res) => {
+    try {
+        const user_id = req.user.id;
+        const cart_shop_id = req.params.cartShopId;
+        const response = await CartService.removeCouponFromCartShop(
+            user_id,
+            cart_shop_id,
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body ?? {}
+        });
+    }
+}
+
 export const paymentCart = async (req, res) => {
     try {
 

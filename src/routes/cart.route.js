@@ -52,6 +52,13 @@ CartRouter.post(
     CartController.applyCouponCartShop
 )
 
+/** Xóa Coupon đang được CartShop áp dụng */
+CartRouter.put(
+    '/cart/cart-shop/:cartShopId/coupon/mobile',
+    checkUserAuthenticationMobile,
+    CartController.removeCouponFromCartShop
+)
+
 /** Thanh toán giỏ hàng */
 CartRouter.post(
     '/cart/:cartId/payment',

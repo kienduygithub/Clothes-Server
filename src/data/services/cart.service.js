@@ -628,6 +628,45 @@ export const applyCouponCartShop = async (user_id, cart_shop_id, coupon_id) => {
     }
 }
 
+export const removeCouponFromCartShop = async (user_id, cart_shop_id) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!user_id || !cart_shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                cart_shop_id: cart_shop_id ?? ''
+            })
+        }
+
+        /** Kiểm tra CartShop có tồn tại và thuộc người dùng không */
+        const cartShop = await CartShop.findOne({
+            where: { id: cart_shop_id },
+            transaction: t,
+            include: {
+                model: Cart,
+                as: 'cart',
+                where: { user_id: user_id },
+                attributes: []
+            }
+        });
+
+        if (!cartShop) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'CartShop không tồn tại hoặc không thuộc người dùng', {});
+        }
+
+        await cartShop.update({
+            coupon_id: null
+        }, { transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success('Xóa KM khỏi CartShop thành công', {});
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const paymentCart = async (user_id, cart_id) => {
     try {
 
