@@ -27,6 +27,15 @@ module.exports = {
                 allowNull: false,
                 onDelete: 'CASCADE'
             },
+            coupon_id: {
+                type: Sequelize.INTEGER,
+                references: {
+                    model: 'coupons',
+                    key: 'id'
+                },
+                allowNull: true,
+                onDelete: 'SET NULL'
+            },
             createdAt: {
                 allowNull: false,
                 type: Sequelize.DATE

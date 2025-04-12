@@ -18,12 +18,23 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'coupon_id',
                 otherKey: 'user_id'
             });
+            // Quan hệ hasMany với UserCoupon (để truy vấn trực tiếp UserCoupon nếu cần)
+            Coupon.hasMany(models.UserCoupon, {
+                foreignKey: 'coupon_id',
+                as: 'userCoupons', // Phải khớp với alias trong truy vấn
+            });
             // Coupon 1 - 1 OrderShop: Một mã chỉ sử dụng trên một đơn hàng cửa hàng
             Coupon.hasOne(models.OrderShop, {
                 foreignKey: 'coupon_id',
                 as: 'order_shop',
                 onDelete: 'SET NULL'
             });
+            // Coupon 1 - N CartShop: Một mã có thể áp trên nhiều Cart shop
+            Coupon.hasMany(models.CartShop, {
+                foreignKey: 'coupon_id',
+                as: 'cart_shops',
+                onDelete: 'SET NULL'
+            })
         }
     }
     Coupon.init({

@@ -45,6 +45,13 @@ CartRouter.put(
     CartController.updateQuantityCartItem
 )
 
+/** Áp dụng Coupon vào CartShop */
+CartRouter.post(
+    '/cart/cart-shop/:cartShopId/coupon/:couponId/mobile',
+    checkUserAuthenticationMobile,
+    CartController.applyCouponCartShop
+)
+
 /** Thanh toán giỏ hàng */
 CartRouter.post(
     '/cart/:cartId/payment',

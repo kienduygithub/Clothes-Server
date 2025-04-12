@@ -1,6 +1,6 @@
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import { Coupon, UserCoupon, User, sequelize } from "../models";
+import { Coupon, UserCoupon, User, Shop, sequelize } from "../models";
 
 export const fetchShopCoupons = async (shopId) => {
     try {
@@ -326,12 +326,18 @@ export const fetchShopCouponMobile = async (userId, shopId) => {
                     },
                     where: { id: userId },
                     required: false /** Left join để lấy cả coupon chưa lưu */
+                },
+                {
+                    model: Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url']
                 }
             ]
         });
 
         const formattedCoupons = coupons.map(coupon => ({
             id: coupon.id,
+            shop: coupon.shop,
             name: coupon.name,
             code: coupon.code,
             discount_type: coupon.discount_type,

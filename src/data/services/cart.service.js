@@ -5,11 +5,14 @@ import {
     Cart,
     CartShop,
     CartItem,
+    Coupon,
     Shop,
     Product,
     ProductVariant,
     Color,
     Size,
+    User,
+    UserCoupon,
     sequelize
 } from "../models";
 
@@ -64,6 +67,41 @@ export const getCartByUser = async (user_id, cart_id) => {
                                     ]
                                 }
                             ]
+                        },
+                        {
+                            model: Coupon,
+                            as: 'selected_coupon',
+                            attributes: { exclude: ['createdAt', 'updatedAt'] },
+                            where: {
+                                [Op.or]: [
+                                    {
+                                        valid_from: { [Op.eq]: null },
+                                        valid_to: { [Op.eq]: null }
+                                    },
+                                    {
+                                        valid_from: { [Op.lte]: new Date() },
+                                        valid_to: { [Op.gte]: new Date() }
+                                    }
+                                ],
+                                [Op.or]: [
+                                    { max_usage: { [Op.eq]: null } },
+                                    { max_usage: { [Op.eq]: -1 } },
+                                    { times_used: { [Op.lt]: sequelize.col("max_usage") } }
+                                ]
+                            },
+                            required: false,
+                            include: [
+                                {
+                                    model: UserCoupon,
+                                    as: "userCoupons",
+                                    attributes: ["is_used"],
+                                    where: {
+                                        user_id: user_id,
+                                        is_used: false, // Chỉ lấy coupon chưa sử dụng
+                                    },
+                                    required: false, // Cho phép trả về coupon chưa lưu
+                                },
+                            ]
                         }
                     ]
                 }
@@ -76,13 +114,41 @@ export const getCartByUser = async (user_id, cart_id) => {
             });
         }
 
+        const formattedCart = {
+            id: cart.id,
+            user_id: cart.user_id,
+            cart_shops: cart.cart_shops.map((cart_shop) => ({
+                id: cart_shop.id,
+                shop: cart_shop.shop,
+                cart_items: cart_shop.cart_items,
+                selected_coupon: cart_shop.selected_coupon ? formatCoupon(cart_shop.selected_coupon) : null
+            }))
+        }
+
         const payload = {
-            carts: [cart]
+            carts: [formattedCart]
         };
 
         return ResponseModel.success('Giỏ hàng: ', payload);
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+const formatCoupon = (rawData) => {
+    return {
+        id: rawData.id,
+        shop: rawData.shop,
+        name: rawData.name,
+        code: rawData.code,
+        discount_type: rawData.discount_type,
+        discount_value: parseFloat(rawData.discount_value),
+        max_discount: parseFloat(rawData.max_discount),
+        min_order_value: parseFloat(rawData.min_order_value),
+        valid_from: rawData.valid_from,
+        valid_to: rawData.valid_to,
+        is_saved: !!rawData.userCoupons.length, /** Kiểm tra đã lưu */
+        is_used: rawData.userCoupons.length ? rawData.userCoupons[0].is_used : false
     }
 }
 
@@ -440,6 +506,122 @@ export const removeCartShop = async (user_id, cart_id, cart_shop_id) => {
         await t.commit();
 
         return ResponseModel.success('Xóa giỏ hàng của cửa hàng thành công', {});
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const applyCouponCartShop = async (user_id, cart_shop_id, coupon_id) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!user_id || !cart_shop_id || !coupon_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                cart_shop_id: cart_shop_id ?? '',
+                coupon_id: coupon_id ?? ''
+            })
+        }
+
+        const cartShop = await CartShop.findOne({
+            where: { id: cart_shop_id },
+            transaction: t,
+            include: [
+                {
+                    model: Cart,
+                    as: 'cart',
+                    where: { user_id: user_id },
+                    attributes: []
+                },
+                {
+                    model: CartItem,
+                    as: 'cart_items',
+                    attributes: ['id', 'quantity'],
+                    include: [
+                        {
+                            model: ProductVariant,
+                            as: 'product_variant',
+                            attributes: ['id'],
+                            include: [
+                                {
+                                    model: Product,
+                                    as: 'product',
+                                    attributes: ['unit_price']
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        })
+
+        if (!cartShop) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'CartShop không tồn tại hoặc không thuộc người dùng', {});
+        }
+
+        /** Kiểm tra Coupon tồn tại và hợp lệ */
+        const coupon = await Coupon.findOne({
+            where: {
+                id: coupon_id,
+                [Op.or]: [
+                    {
+                        valid_from: { [Op.eq]: null },
+                        valid_to: { [Op.eq]: null }
+                    },
+                    {
+                        valid_from: { [Op.lte]: new Date() },
+                        valid_to: { [Op.gte]: new Date() }
+                    }
+                ],
+                [Op.or]: [
+                    { max_usage: { [Op.eq]: null } },
+                    { max_usage: { [Op.eq]: -1 } },
+                    { times_used: { [Op.lt]: sequelize.col('max_usage') } },
+                ]
+            },
+            include: [
+                {
+                    model: UserCoupon,
+                    as: 'userCoupons',
+                    where: {
+                        user_id: user_id,
+                        is_used: false
+                    },
+                    attributes: ['is_used'],
+                    required: true, /** Coupon phải được lưu bởi người dùng */
+                }
+            ],
+            transaction: t
+        });
+
+        if (!coupon) {
+            ResponseModel.error(
+                HttpErrors.BAD_REQUEST,
+                'Coupon không tồn tại, đã hết hạn, hết lượt dùng, hoặc chưa được lưu',
+                {}
+            )
+        }
+
+        /** Tính tổng giá trị CartShop xem có đủ tối thiểu không */
+        const shopTotal = cartShop.cart_items.reduce((sum, item) => {
+            const unitPrice = item.product_variant?.product?.unit_price || 0;
+            return sum + unitPrice * item.quantity;
+        }, 0);
+        if (shopTotal < coupon.min_order_value) {
+            ResponseModel.error(
+                HttpErrors.BAD_REQUEST,
+                `Tổng giá trị không đủ`,
+                {}
+            )
+        }
+
+        await cartShop.update({
+            coupon_id: coupon_id
+        }, { transaction: t });
+
+        await t.commit();
+
+        return ResponseModel.success('Áp dụng KM cho CartShop thành công', { cartShop });
     } catch (error) {
         await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);

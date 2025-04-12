@@ -20,6 +20,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'cart_items',
                 onDelete: 'CASCADE'
             });
+            CartShop.belongsTo(models.Coupon, {
+                foreignKey: 'coupon_id',
+                as: 'selected_coupon',
+                onDelete: 'SET NULL'
+            })
         }
     }
     CartShop.init({
@@ -40,6 +45,15 @@ module.exports = (sequelize, DataTypes) => {
             },
             allowNull: false,
             onDelete: 'CASCADE'
+        },
+        coupon_id: {
+            type: DataTypes.INTEGER,
+            references: {
+                model: 'coupons',
+                key: 'id'
+            },
+            allowNull: true,
+            onDelete: 'SET NULL'
         }
     }, {
         sequelize,

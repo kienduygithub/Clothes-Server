@@ -52,6 +52,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'user_id',
                 otherKey: 'coupon_id'
             });
+            //         // Quan hệ hasMany với UserCoupon (để truy vấn trực tiếp UserCoupon nếu cần)
+            //   User.hasMany(models.UserCoupon, {
+            //     foreignKey: 'user_id',
+            //     as: 'user_coupons',
+            //   }); Chưa cần
         }
     }
 
