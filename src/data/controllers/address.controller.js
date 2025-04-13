@@ -45,7 +45,7 @@ export const fetchWardsByDistrictId = async (req, res) => {
 
 export const fetchAddressesByUserId = async (req, res) => {
     try {
-        const user_id = req.params.userId;
+        const user_id = req.user.id;
         const response = await AddressService.fetchAddressesByUserId(user_id);
         return res.status(response?.status).json(response);
     } catch (error) {
@@ -73,7 +73,7 @@ export const fetchAddressById = async (req, res) => {
 
 export const addNewAddressByUser = async (req, res) => {
     try {
-        const user_id = req.params.userId;
+        const user_id = req.user.id;
         const addressInfo = req.body;
         const response = await AddressService.addNewAddressByUser(user_id, addressInfo);
         return res.status(response?.status).json(response);
@@ -117,7 +117,7 @@ export const deleteAddressById = async (req, res) => {
 
 export const updateAddressAsDefault = async (req, res) => {
     try {
-        const user_id = req.params.userId;
+        const user_id = req.user.id;
         const address_id = req.params.addressId;
         const response = await AddressService.updateAddressAsDefault(user_id, address_id);
         return res.status(response?.status).json(response);

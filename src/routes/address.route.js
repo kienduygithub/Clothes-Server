@@ -1,60 +1,60 @@
 import express from "express";
-import { checkUserAuthentication } from "../common/middleware/jwt.middleware";
+import { checkUserAuthentication, checkUserAuthenticationMobile } from "../common/middleware/jwt.middleware";
 import * as AddressController from "../data/controllers/address.controller";
 
 const AddressRouter = express.Router();
 
 AddressRouter.get(
     '/address/cities',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     AddressController.fetchCities
 );
 
 AddressRouter.get(
     '/address/districts/:cityId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     AddressController.fetchDistrictsByCityId
 );
 
 AddressRouter.get(
     '/address/wards/:districtId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     AddressController.fetchWardsByDistrictId
 );
 
 AddressRouter.get(
-    '/address/:userId',
-    // checkUserAuthentication,
+    '/address',
+    checkUserAuthenticationMobile,
     AddressController.fetchAddressesByUserId
 );
 
 AddressRouter.get(
     '/address/details/:addressId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     AddressController.fetchAddressById
 );
 
 AddressRouter.post(
-    '/address/:userId',
-    // checkUserAuthentication,
+    '/address',
+    checkUserAuthenticationMobile,
     AddressController.addNewAddressByUser
 );
 
 AddressRouter.put(
     '/address/:addressId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     AddressController.editAddressByUser
 );
 
 AddressRouter.delete(
     '/address/:addressId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     AddressController.deleteAddressById
 );
 
 AddressRouter.patch(
-    '/address/:addressId/user/:userId',
-    // checkUserAuthentication,
+    '/address/:addressId',
+    checkUserAuthenticationMobile,
     AddressController.updateAddressAsDefault
 );
 
