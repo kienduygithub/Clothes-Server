@@ -236,21 +236,24 @@ export const createOrderMobile = async (user_id, cartInfo) => {
         await t.commit();
 
         return ResponseModel.success('Tạo đơn hàng thành công', {
-            order: {
-                id: order.id,
-                user_id: order.user_id,
-                address_id: order.address_id,
-                total_price: order.total_price,
-                status: order.status,
-                order_shops: orderShops.map(shop => ({
-                    id: shop.id,
-                    shop_id: shop.shop_id,
-                    coupon_id: shop.coupon_id,
-                    subtotal: shop.subtotal,
-                    discount: shop.discount,
-                    final_total: shop.final_total,
-                })),
-            },
+            orders: [
+                {
+                    id: order.id,
+                    user_id: order.user_id,
+                    address_id: order.address_id,
+                    total_price: order.total_price,
+                    status: order.status,
+                    order_shops: orderShops.map(shop => ({
+                        id: shop.id,
+                        shop_id: shop.shop_id,
+                        coupon_id: shop.coupon_id,
+                        subtotal: shop.subtotal,
+                        discount: shop.discount,
+                        final_total: shop.final_total,
+                    })),
+                    createdAt: order.createdAt
+                }
+            ],
             subtotal,
             discount,
             final_total,
