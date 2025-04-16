@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
 import { City, District, Ward, User, Address, sequelize } from "../models";
@@ -168,11 +169,24 @@ export const addNewAddressByUser = async (user_id, addressInfo) => {
         }
 
         const {
+            name,
+            phone,
             city_id,
             district_id,
             ward_id,
             address_detail,
+            is_default
         } = addressInfo;
+
+        if (is_default) {
+            await Address.update(
+                { is_default: false },
+                {
+                    where: { userId: user_id },
+                    transaction: t
+                }
+            );
+        }
 
         const createdAddress = await Address.create({
             userId: user_id,
@@ -180,7 +194,9 @@ export const addNewAddressByUser = async (user_id, addressInfo) => {
             district_id: district_id,
             ward_id: ward_id,
             address_detail: address_detail,
-            is_default: false
+            name: name,
+            phone: phone,
+            is_default: is_default
         }, { transaction: t });
 
         await t.commit();

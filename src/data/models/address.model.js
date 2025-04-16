@@ -76,6 +76,8 @@ module.exports = (sequelize, DataTypes) => {
         },
         address_detail: DataTypes.STRING,
         is_default: DataTypes.BOOLEAN,
+        name: DataTypes.STRING,
+        phone: DataTypes.STRING,
 
         // Helper
         city_name: {

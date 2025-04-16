@@ -49,6 +49,12 @@ module.exports = {
                 type: Sequelize.STRING,
                 allowNull: false
             },
+            name: {
+                type: Sequelize.STRING,
+            },
+            phone: {
+                type: Sequelize.STRING,
+            },
             is_default: {
                 type: Sequelize.BOOLEAN,
                 defaultValue: false
