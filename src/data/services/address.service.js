@@ -211,15 +211,17 @@ export const addNewAddressByUser = async (user_id, addressInfo) => {
     }
 }
 
-export const editAddressByUser = async (address_id, addressInfo) => {
+export const editAddressByUser = async (user_id, address_id, addressInfo) => {
     const t = await sequelize.transaction();
     try {
-        if (!address_id || !addressInfo) {
+        if (!user_id || !address_id || !addressInfo) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
                 address_id: address_id ?? '',
                 addressInfo: addressInfo ?? {}
             });
         }
+
 
         const address = await Address.findOne({
             where: { id: address_id },
@@ -231,17 +233,36 @@ export const editAddressByUser = async (address_id, addressInfo) => {
         }
 
         const {
+            name,
+            phone,
             city_id,
             district_id,
             ward_id,
             address_detail,
+            is_default
         } = addressInfo;
 
+        if (is_default) {
+            await Address.update(
+                { is_default: false },
+                {
+                    where: {
+                        userId: user_id,
+                        is_default: true
+                    },
+                    transaction: t
+                }
+            );
+        }
+
         const updatedAddress = await address.update({
+            name: name,
+            phone: phone,
             city_id: city_id,
             district_id: district_id,
             ward_id: ward_id,
-            address_detail: address_detail
+            address_detail: address_detail,
+            is_default: is_default
         }, { transaction: t });
 
         await t.commit();
@@ -257,7 +278,7 @@ export const editAddressByUser = async (address_id, addressInfo) => {
     }
 }
 
-export const deleteAddressById = async (address_id) => {
+export const deleteAddressById = async (user_id, address_id) => {
     const t = await sequelize.transaction();
     try {
         if (!address_id) {
@@ -273,6 +294,24 @@ export const deleteAddressById = async (address_id) => {
 
         if (!address) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Địa chỉ không tồn tại', {});
+        }
+
+        if (address.is_default) {
+            /** Tìm địa chỉ mới nhất của cùng user_id (Không phải địa chỉ đang xóa) */
+            const latestAddress = await Address.findOne({
+                where: {
+                    userId: user_id,
+                    id: { [Op.ne]: address_id } /** Không lấy địa chỉ đang xóa */
+                },
+                order: [['createdAt', 'DESC']],
+                transaction: t
+            });
+
+            if (latestAddress) {
+                await latestAddress.update({
+                    is_default: true
+                }, { transaction: t });
+            }
         }
 
         await address.destroy({ transaction: t });

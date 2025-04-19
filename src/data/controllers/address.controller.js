@@ -88,9 +88,10 @@ export const addNewAddressByUser = async (req, res) => {
 
 export const editAddressByUser = async (req, res) => {
     try {
+        const user_id = req.user.id;
         const address_id = req.params.addressId;
         const addressInfo = req.body;
-        const response = await AddressService.editAddressByUser(address_id, addressInfo);
+        const response = await AddressService.editAddressByUser(user_id, address_id, addressInfo);
         return res.status(response?.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
@@ -103,8 +104,9 @@ export const editAddressByUser = async (req, res) => {
 
 export const deleteAddressById = async (req, res) => {
     try {
+        const user_id = req.user.id;
         const address_id = req.params.addressId;
-        const response = await AddressService.deleteAddressById(address_id);
+        const response = await AddressService.deleteAddressById(user_id, address_id);
         return res.status(response?.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
