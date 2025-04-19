@@ -149,6 +149,64 @@ export const fetchAddressById = async (address_id) => {
     }
 }
 
+export const fetchDefaultAddressUser = async (user_id) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!user_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? ''
+            });
+        }
+        const address = await Address.findOne({
+            where: {
+                userId: user_id,
+                is_default: true
+            },
+            include: [
+                {
+                    model: City,
+                    as: 'city',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: District,
+                    as: 'district',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Ward,
+                    as: 'ward',
+                    attributes: ['id', 'name']
+                }
+            ],
+            attributes: { exclude: ['updatedAt'] },
+            transaction: t
+        });
+
+        if (!address) {
+            const payload = {
+                addresses: []
+            }
+            return ResponseModel.success('Danh sách địa chỉ', payload);
+        }
+
+        delete address.dataValues.city_id;
+        delete address.dataValues.district_id;
+        delete address.dataValues.ward_id;
+
+        const payload = {
+            addresses: [address]
+        }
+
+        await t.commit();
+
+        return ResponseModel.success('Danh sách địa chỉ', payload);
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const addNewAddressByUser = async (user_id, addressInfo) => {
     const t = await sequelize.transaction();
     try {

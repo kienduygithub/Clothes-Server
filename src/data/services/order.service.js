@@ -28,7 +28,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
         }
 
         const {
-            address_id, /** Cần thêm */
+            address_id,
             cart_shops, /** CartShopFinalType[] FE */
             subtotal,
             discount,
@@ -49,9 +49,9 @@ export const createOrderMobile = async (user_id, cartInfo) => {
         const date = new Date();
         const order = await Order.create({
             user_id: user_id,
-            address_id: address_id ? address_id : null, /** Tạm thời thế */
+            address_id: address_id ? address_id : null,
             total_price: final_total,
-            status: OrderStatus.PAID,
+            status: OrderStatus.PENDING,
             status_changed_at: date,
             payment_date: date
         }, { transaction: t });

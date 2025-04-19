@@ -71,6 +71,20 @@ export const fetchAddressById = async (req, res) => {
     }
 }
 
+export const fetchDefaultAddressUser = async (req, res) => {
+    try {
+        const user_id = req.user.id;
+        const response = await AddressService.fetchDefaultAddressUser(user_id);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const addNewAddressByUser = async (req, res) => {
     try {
         const user_id = req.user.id;

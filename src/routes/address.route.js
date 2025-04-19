@@ -34,6 +34,12 @@ AddressRouter.get(
     AddressController.fetchAddressById
 );
 
+AddressRouter.get(
+    '/address/default',
+    checkUserAuthenticationMobile,
+    AddressController.fetchDefaultAddressUser
+);
+
 AddressRouter.post(
     '/address',
     checkUserAuthenticationMobile,
