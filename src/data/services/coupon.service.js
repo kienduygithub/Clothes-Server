@@ -310,7 +310,6 @@ export const fetchShopCouponMobile = async (userId, shopId) => {
                 shopId: shopId ?? ''
             })
         }
-
         const coupons = await Coupon.findAll({
             where: {
                 shop_id: shopId,

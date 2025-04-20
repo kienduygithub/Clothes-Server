@@ -57,6 +57,12 @@ module.exports = (sequelize, DataTypes) => {
             //     foreignKey: 'user_id',
             //     as: 'user_coupons',
             //   }); Chưa cần
+            /** User - Notification: 1 - N */
+            User.hasMany(models.Notification, {
+                foreignKey: 'user_id',
+                as: 'notifications',
+                onDelete: 'CASCADE'
+            })
         }
     }
 

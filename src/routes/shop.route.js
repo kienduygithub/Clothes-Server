@@ -39,7 +39,6 @@ ShopRouter.get(
     fetchAllProductsInShop
 );
 
-
 ShopRouter.post(
     '/shop/admin/create',
     checkUserAuthentication,
@@ -76,6 +75,12 @@ ShopRouter.delete(
     '/shop/admin/:id',
     checkUserAuthentication,
     deleteShopById
+);
+
+/** Mobile */
+ShopRouter.get(
+    '/shop/:id/mobile',
+    fetchShopById
 );
 
 export default ShopRouter;

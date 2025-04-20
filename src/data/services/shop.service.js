@@ -116,6 +116,7 @@ export const fetchShopById = async (shopId) => {
         const payload = {
             shops: [shop]
         };
+
         return ResponseModel.success('Danh sách cửa hàng', payload);
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
