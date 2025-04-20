@@ -650,7 +650,7 @@ export const fetchProductsByParentCategoryInShop = async (
             where: {
                 shopId: shop_id,
                 categoryId: {
-                    [Op.in]: sequelize.literal(`${childCategoryIdsSubquery.getQuery()}`),
+                    [Op.in]: childCategoryIdsSubquery,
                 }
             },
             replacements: { parent_category_id }
@@ -668,7 +668,7 @@ export const fetchProductsByParentCategoryInShop = async (
             where: {
                 shopId: shop_id,
                 categoryId: {
-                    [Op.in]: sequelize.literal(`${childCategoryIdsSubquery.getQuery()}`)
+                    [Op.in]: childCategoryIdsSubquery
                 }
             },
             replacements: { parent_category_id },
