@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import HttpErrors from '../../common/errors/http-errors';
 import { ResponseModel } from '../../common/errors/response';
 import { sendActivateStoreMailer, sendDeclineStoreMailer } from '../../common/mails/mailer.config';
@@ -612,6 +613,106 @@ export const fetchParentCategoriesWithTotalProductByShop = async (
         }
 
         return ResponseModel.success('Danh sách danh mục cha', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchProductsByParentCategoryInShop = async (
+    shop_id,
+    parent_category_id,
+    page = 1,
+    limit = 10
+) => {
+    try {
+        if (!shop_id | !parent_category_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu thông tin cần thiết", {
+                shop_id: shop_id ?? '',
+                parent_category_id: parent_category_id ?? ''
+            });
+        }
+
+        if (page < 1 || limit < 1) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Page và limit phải là số dương', { page, limit });
+        }
+
+        const offset = (page - 1) * limit;
+
+        /** Subquery để lấy danh sách categoryId của danh mục con */
+        const childCategoryIdsSubquery = sequelize.literal(`(
+            SELECT id 
+            FROM Categories
+            WHERE parentId = :parent_category_id    
+        )`);
+
+        /** Đếm tổng số sản phẩm */
+        const totalItems = await db.Product.count({
+            where: {
+                shopId: shop_id,
+                categoryId: {
+                    [Op.in]: sequelize.literal(`${childCategoryIdsSubquery.getQuery()}`),
+                }
+            },
+            replacements: { parent_category_id }
+        });
+
+        /** Subquery để tính rating trung bình */
+        const ratingSubquery = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        /** Lấy danh sách sản phẩm */
+        const products = await db.Product.findAll({
+            where: {
+                shopId: shop_id,
+                categoryId: {
+                    [Op.in]: sequelize.literal(`${childCategoryIdsSubquery.getQuery()}`)
+                }
+            },
+            replacements: { parent_category_id },
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                'description',
+                'gender',
+                'origin',
+                [ratingSubquery, 'rating']
+            ],
+            include: [
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                    required: false
+                },
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url'],
+                },
+            ],
+            limit,
+            offset,
+        });
+
+        const totalPages = Math.ceil(totalItems / limit);
+        const paginate = {
+            currentPage: page,
+            limit: limit,
+            totalItems: totalItems,
+            totalPages: totalPages
+        }
+
+        const payload = {
+            products: products,
+            pagination: paginate
+        }
+
+        return ResponseModel.success('Danh sách sản phẩm thuộc danh mục cha', payload);
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }

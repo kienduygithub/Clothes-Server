@@ -15,7 +15,8 @@ import {
     fetchPopularProductsByShop,
     fetchLatestProductsByShop,
     fetchPriceProductsByShop,
-    fetchParentCategoriesWithTotalProductByShop
+    fetchParentCategoriesWithTotalProductByShop,
+    fetchProductsByParentCategoryInShop
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
@@ -105,6 +106,11 @@ ShopRouter.get(
 ShopRouter.get(
     '/shop/:id/category-products',
     fetchParentCategoriesWithTotalProductByShop
+)
+
+ShopRouter.get(
+    '/shop/:id/category/:categoryId/products',
+    fetchProductsByParentCategoryInShop
 )
 
 export default ShopRouter;
