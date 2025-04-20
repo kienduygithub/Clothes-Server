@@ -178,3 +178,17 @@ export const fetchPriceProductsByShop = async (req, res) => {
         });
     }
 }
+
+export const fetchParentCategoriesWithTotalProductByShop = async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const response = await shopServices.fetchParentCategoriesWithTotalProductByShop(shopId);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}

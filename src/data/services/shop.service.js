@@ -555,3 +555,64 @@ export const fetchPriceProductsByShop = async (shop_id, page = 1, limit = 10, so
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+export const fetchParentCategoriesWithTotalProductByShop = async (
+    shop_id
+) => {
+    try {
+        if (!shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu thông tin cần thiết", {
+                shop_id: shop_id ?? ''
+            });
+        }
+
+        /** Subquery để lấy danh sách categoryId của danh mục con */
+        // const childCategoryIdsSubquery = sequelize.literal(`(
+        //     SELECT id
+        //     FROM Categories AS child
+        //     WHERE child.parentId = Category.id    
+        // )`);
+
+        /** Đếm số sản phẩm thuộc danh mục con của danh mục cha */
+        const productCountSubquery = sequelize.literal(`(
+            SELECT COUNT(*)
+            FROM Products
+            WHERE Products.categoryId IN (
+                SELECT id
+                FROM Categories
+                WHERE Categories.parentId = Category.id
+            )
+            AND Products.shopId = :shop_id    
+        )`);
+
+        const categories = await db.Category.findAll({
+            where: {
+                parentId: null, /** Chỉ lấy danh mục cha */
+            },
+            attributes: [
+                'id',
+                'category_name',
+                'image_url',
+                'description',
+                [productCountSubquery, 'count']
+            ],
+            replacements: { shop_id }, /** Truyền shop_id vào subquery */
+            include: [
+                {
+                    model: db.Category,
+                    as: 'children',
+                    attributes: ['id', 'category_name'], /** Lấy danh mục con (Optional) */
+                    required: false
+                }
+            ],
+        })
+
+        const payload = {
+            categories: categories
+        }
+
+        return ResponseModel.success('Danh sách danh mục cha', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
