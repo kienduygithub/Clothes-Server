@@ -128,3 +128,53 @@ export const acceptRegisterShopById = async (req, res) => {
         });
     }
 }
+
+/** MOBILE */
+export const fetchPopularProductsByShop = async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const page = parseInt(req.query.page) || 10;
+        const limit = parseInt(req.query.limit) || 1;
+        const response = await shopServices.fetchPopularProductsByShop(shopId, page, limit);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const fetchLatestProductsByShop = async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const page = parseInt(req.query.page) || 10;
+        const limit = parseInt(req.query.limit) || 1;
+        const response = await shopServices.fetchLatestProductsByShop(shopId, page, limit);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const fetchPriceProductsByShop = async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const page = parseInt(req.query.page) || 10;
+        const limit = parseInt(req.query.limit) || 1;
+        const sort = req.query.sort;
+        const response = await shopServices.fetchPriceProductsByShop(shopId, page, limit, sort);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}

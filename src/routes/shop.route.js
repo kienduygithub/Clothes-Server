@@ -12,6 +12,9 @@ import {
     deleteShopById,
     declineRegisterShopById,
     acceptRegisterShopById,
+    fetchPopularProductsByShop,
+    fetchLatestProductsByShop,
+    fetchPriceProductsByShop
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
@@ -82,5 +85,20 @@ ShopRouter.get(
     '/shop/:id/mobile',
     fetchShopById
 );
+
+ShopRouter.get(
+    '/shop/:id/product/best-sellers',
+    fetchPopularProductsByShop
+)
+
+ShopRouter.get(
+    '/shop/:id/product/recents',
+    fetchLatestProductsByShop
+)
+
+ShopRouter.get(
+    '/shop/:id/product/prices',
+    fetchPriceProductsByShop
+)
 
 export default ShopRouter;

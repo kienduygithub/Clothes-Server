@@ -62,14 +62,10 @@ module.exports = (sequelize, DataTypes) => {
         description: DataTypes.TEXT('medium'),
         sold_quantity: DataTypes.INTEGER,
         unit_price: DataTypes.DECIMAL(10, 2),
-        // avgRating: {
-        //     type: DataTypes.DECIMAL(10, 2),
-        //     allowNull: false,
-        //     defaultValue: 0
-        // }
     }, {
         sequelize,
         modelName: 'Product',
+        timestamps: true,
     });
     return Product;
 };

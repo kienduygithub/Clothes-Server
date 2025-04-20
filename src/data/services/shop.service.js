@@ -3,7 +3,7 @@ import { ResponseModel } from '../../common/errors/response';
 import { sendActivateStoreMailer, sendDeclineStoreMailer } from '../../common/mails/mailer.config';
 import { handleDeleteImageAsFailed, handleDeleteImages } from '../../common/middleware/upload.middleware';
 import { ShopStatus } from '../../common/utils/status';
-import db from '../models';
+import db, { sequelize } from '../models';
 
 export const fetchAllProductsInShop = async (shopId) => {
     try {
@@ -308,6 +308,249 @@ export const declineRegisterShopById = async (shopId) => {
         );
 
         return ResponseModel.success('Bác bỏ đơn đăng ký cửa hàng');
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+/** MOBILE */
+export const fetchPopularProductsByShop = async (shop_id, page = 1, limit = 10) => {
+    try {
+
+        if (!shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu thông tin cần thiết", {
+                shop_id: shop_id ?? ''
+            });
+        }
+
+        if (page < 1 || limit < 1) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Page và limit phải là số dương', { page, limit });
+        }
+
+        const offset = (page - 1) * limit;
+
+        /** Subquery để tính rating trung bình */
+        const ratingSubquery = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        const { count, rows } = await db.Product.findAndCountAll({
+            where: {
+                shopId: shop_id
+            },
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                [ratingSubquery, 'rating']
+            ],
+            include: [
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
+                    include: {
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name'],
+                    },
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                },
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url'],
+                },
+            ],
+            order: [['sold_quantity', 'DESC']],
+            limit,
+            offset,
+            distinct: true, /** Chỉ tính Product duy nhất -> Tránh tính thêm cái product images -> Sai totalItems */
+        })
+
+        const totalPages = Math.ceil(count / limit);
+
+        const payload = {
+            products: rows,
+            pagination: {
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: count,
+                limit
+            }
+        }
+
+        return ResponseModel.success('Danh sách best seller', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchLatestProductsByShop = async (shop_id, page = 1, limit = 10) => {
+    try {
+
+        if (!shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu thông tin cần thiết", {
+                shop_id: shop_id ?? ''
+            });
+        }
+
+        if (page < 1 || limit < 1) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Page và limit phải là số dương', { page, limit });
+        }
+
+        const offset = (page - 1) * limit;
+
+        /** Subquery để tính rating trung bình */
+        const ratingSubquery = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        const { count, rows } = await db.Product.findAndCountAll({
+            where: {
+                shopId: shop_id
+            },
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                'createdAt', /** Cần để còn order */
+                [ratingSubquery, 'rating']
+            ],
+            include: [
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
+                    include: {
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name'],
+                    },
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                },
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url'],
+                },
+            ],
+            order: [['createdAt', 'DESC']],
+            limit,
+            offset,
+            distinct: true, /** Chỉ tính Product duy nhất -> Tránh tính thêm cái product images -> Sai totalItems */
+        })
+
+        const totalPages = Math.ceil(count / limit);
+
+        const payload = {
+            products: rows,
+            pagination: {
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: count,
+                limit
+            }
+        }
+
+        return ResponseModel.success('Danh sách recents', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchPriceProductsByShop = async (shop_id, page = 1, limit = 10, sort) => {
+    try {
+        if (!shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu thông tin cần thiết", {
+                shop_id: shop_id ?? ''
+            });
+        }
+
+        if (page < 1 || limit < 1) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Page và limit phải là số dương', { page, limit });
+        }
+
+        if (!['ASC', 'DESC'].includes(sort.toUpperCase())) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Sort phải là asc hoặc desc');
+        }
+
+        const offset = (page - 1) * limit;
+        const ratingSubquert = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        const { count, rows } = await db.Product.findAndCountAll({
+            where: { shopId: shop_id },
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                [ratingSubquert, 'rating']
+            ],
+            include: [
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
+                    include: {
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name']
+                    }
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                },
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url'],
+                },
+                {
+                    model: db.ProductVariant,
+                    as: 'variants',
+                    attributes: ['id', 'stock_quantity'],
+                },
+            ],
+            order: [['unit_price', sort.toUpperCase()]],
+            limit,
+            offset,
+            distinct: true
+        });
+
+        const totalPages = Math.ceil(count / limit);
+
+        const payload = {
+            products: rows,
+            pagination: {
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: count,
+                limit
+            }
+        }
+
+        return ResponseModel.success('Danh sách sản phẩm theo giá', payload);
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
