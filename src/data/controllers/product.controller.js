@@ -124,3 +124,24 @@ export const deleteProductById = async (req, res) => {
         })
     }
 }
+
+/** MOBILE */
+export const searchAndFilterProductsMobile = async (req, res) => {
+    try {
+        const { search, page, limit } = req.query;
+        const parseIntPage = parseInt(page);
+        const parseIntLimit = parseInt(limit);
+        const response = await productServices.searchAndFilterProductsMobile(
+            search,
+            parseIntPage,
+            parseIntLimit
+        );
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}

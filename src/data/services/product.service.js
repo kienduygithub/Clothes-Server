@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
 import { handleDeleteImages } from "../../common/middleware/upload.middleware";
@@ -610,6 +611,88 @@ export const deleteProductById = async (productId) => {
         await handleDeleteImages(variantImages);
 
         return ResponseModel.success('Xóa sản phẩm thành công.', null);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+/** MOBILE */
+
+export const searchAndFilterProductsMobile = async (
+    searchValue = '',
+    page = 1,
+    limit = 10
+) => {
+    try {
+
+        if (page < 1 || limit < 1) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Page và limit phải là số dương', { page, limit });
+        }
+
+        const offset = (page - 1) * limit;
+
+        const where = searchValue ? {
+            product_name: {
+                [Op.like]: `%${searchValue}%`
+            }
+        } : {};
+
+        const subQuertRating = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id    
+        )`);
+
+        const { count, rows } = await db.Product.findAndCountAll({
+            where,
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                [subQuertRating, 'rating']
+            ],
+            include: [
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url']
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url']
+                },
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
+                    include: {
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name']
+                    }
+                },
+            ],
+            limit,
+            offset,
+            distinct: 'Product.id', /** true cũng được */
+            order: [['product_name', 'ASC']],
+        });
+
+        const totalPages = Math.ceil(count / limit);
+
+        const payload = {
+            products: rows,
+            paginate: {
+                currentPage: page,
+                limit: limit,
+                totalItems: count,
+                totalPages: totalPages
+            }
+        }
+
+        return ResponseModel.success('Kết quả tìm kiếm', payload);
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }

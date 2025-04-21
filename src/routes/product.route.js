@@ -5,8 +5,13 @@ import {
 import * as ProductController from '../data/controllers/product.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 
-
 const ProductRouter = express.Router();
+
+/** MOBILE */
+ProductRouter.get(
+    '/product/search-and-filter',
+    ProductController.searchAndFilterProductsMobile
+)
 
 ProductRouter.get(
     '/product/:id/mobile',
@@ -64,6 +69,7 @@ ProductRouter.delete(
     '/product/:id',
     checkUserAuthentication,
     ProductController.deleteProductById
-)
+);
+
 
 export default ProductRouter;
