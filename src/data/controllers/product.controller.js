@@ -171,3 +171,51 @@ export const searchAndFilterProductsMobile = async (req, res) => {
         })
     }
 }
+
+export const searchAndFilterProductShopMobile = async (req, res) => {
+    try {
+        const shop_id = req.params.shopId;
+        const {
+            search = '',
+            page = '1',
+            limit = '10',
+            origins = '', /** Chuỗi cách nhau bởi dấu phẩy, Example: "Nước Mỹ,Việt Name" */
+            categoryId = null,
+            sortPrice = 'ASC',
+            minPrice = '0',
+            maxPrice = 'Infinity',
+            minRatings = '', /** Chuỗi cách nhau bởi dấu phẩy, Example: "4,5" */
+        } = req.query;
+        const parseIntPage = parseInt(page);
+        const parseIntLimit = parseInt(limit);
+        const parseOrigins = origins ? origins.split(',').map(origin => origin.trim()) : [];
+        const parseCategoryId = categoryId ? parseInt(categoryId) : null;
+        const parseSortPrice = ['ASC', 'DESC'].includes(sortPrice.toUpperCase()) ? sortPrice.toUpperCase() : 'ASC';
+        const parseMinPrice = parseFloat(minPrice) || 0;
+        const parseMaxPrice = maxPrice === 'Infinity' || !maxPrice ? Infinity : parseFloat(maxPrice);
+        const parseMinRatings = minRatings
+            ? minRatings.split(',').map(item => parseInt(item.trim())).filter(r => [1, 2, 3, 4, 5].includes(r))
+            : [];
+
+        const response = await productServices.searchAndFilterProductShopMobile(
+            search,
+            parseIntPage,
+            parseIntLimit,
+            parseOrigins,
+            parseCategoryId,
+            parseSortPrice,
+            parseMinPrice,
+            parseMaxPrice,
+            parseMinRatings,
+            parseInt(shop_id)
+        );
+
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}

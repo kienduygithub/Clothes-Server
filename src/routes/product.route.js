@@ -14,6 +14,11 @@ ProductRouter.get(
 )
 
 ProductRouter.get(
+    '/product/search-and-filter/shop/:shopId',
+    ProductController.searchAndFilterProductShopMobile
+)
+
+ProductRouter.get(
     '/product/:id/mobile',
     ProductController.fetchProductMobileById
 );
