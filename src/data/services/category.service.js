@@ -46,7 +46,12 @@ export const fetchCategories = async () => {
 
 export const fetchCategoryBoth = async () => {
     try {
-        const categories = await Category.findAll();
+        const categories = await Category.findAll({
+            include: {
+                model: Category,
+                as: 'parent'
+            }
+        });
 
         const payload = {
             categories: categories.map((category) => {
@@ -54,7 +59,7 @@ export const fetchCategoryBoth = async () => {
                 return ({
                     ...data,
                     description: data?.description === null ? '' : data?.description,
-                    parentId: data?.parentId === null ? 0 : data?.parentId
+                    parentId: data?.parentId === null ? 0 : data?.parentId,
                 })
             })
         }
