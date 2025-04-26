@@ -74,6 +74,20 @@ export const updateUserAdmin = async (req, res) => {
 }
 
 /** MOBILE */
+export const fetchUserInfo = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const response = await userServices.fetchUserInfo(userId);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const editUserInfo = async (req, res) => {
     try {
         const userId = req.user.id;

@@ -8,6 +8,7 @@ import {
     createUserAdmin,
     deleteUserAdmin,
     updateUserAdmin,
+    fetchUserInfo,
     editAvatarUser,
     editUserInfo
 } from "../data/controllers/user.controller";
@@ -16,13 +17,20 @@ import {
 } from "../common/middleware/jwt.middleware";
 const UserRouter = express.Router();
 
+/** MOBILE */
+UserRouter.get(
+    '/user/info/mobile',
+    checkUserAuthenticationMobile,
+    fetchUserInfo
+)
+
 UserRouter.patch(
     '/user/info/mobile',
     checkUserAuthenticationMobile,
     editUserInfo
 );
 
-UserRouter.patch(
+UserRouter.post(
     '/user/avatar/mobile',
     checkUserAuthenticationMobile,
     uploadServer.single('userFile'),

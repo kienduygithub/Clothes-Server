@@ -2,7 +2,7 @@ import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
 import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
 import { hashPassword } from "../../common/utils/user.common";
-import { sequelize, User } from "../models";
+import db, { sequelize, User } from "../models";
 
 export const fetchAllUser = async () => {
     try {
@@ -197,6 +197,36 @@ export const updateUserAdmin = async (userId, info, file) => {
 
 
 /** MOBILE */
+export const fetchUserInfo = async (user_id) => {
+    try {
+        if (!user_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? ''
+            });
+        }
+
+        const user = await User.findOne({
+            where: { id: user_id },
+            attributes: ['id', 'name', 'phone', 'gender', 'address', 'image_url'],
+            include: {
+                model: db.Cart,
+                as: 'cart',
+                attributes: ['id']
+            }
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại.', null);
+        }
+
+        return ResponseModel.success('Thông tin người dùng', {
+            users: [user]
+        });
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const editUserInfo = async (user_id, userInfo) => {
     const t = await sequelize.transaction();
     try {
@@ -269,16 +299,22 @@ export const editAvatarUser = async (user_id, file) => {
             ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại.', null);
         }
 
+        let deleteImage = user.image_url || '';
+
         user.image_url = `users/${file.filename}`
 
         await user.save();
 
         await t.commit();
 
-        return ResponseModel.success('Cập nhật ảnh đại diện thành công', {});
+        await handleDeleteImages([deleteImage]);
+
+        return ResponseModel.success('Cập nhật ảnh đại diện thành công', {
+            url: `users/${file.filename}`
+        });
     } catch (error) {
         await t.rollback();
-        handleDeleteImageAsFailed(file);
+        await handleDeleteImageAsFailed(file);
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 } 
