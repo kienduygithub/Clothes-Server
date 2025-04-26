@@ -73,3 +73,33 @@ export const updateUserAdmin = async (req, res) => {
     }
 }
 
+/** MOBILE */
+export const editUserInfo = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const userInfo = req.body;
+        const response = await userServices.editUserInfo(userId, userInfo);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const editAvatarUser = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const file = req.file;
+        const response = await userServices.editAvatarUser(userId, file);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}

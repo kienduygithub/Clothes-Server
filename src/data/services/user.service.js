@@ -2,7 +2,7 @@ import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
 import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
 import { hashPassword } from "../../common/utils/user.common";
-import { User } from "../models";
+import { sequelize, User } from "../models";
 
 export const fetchAllUser = async () => {
     try {
@@ -188,10 +188,97 @@ export const updateUserAdmin = async (userId, info, file) => {
 
         await user.save();
 
-        return ResponseModel.success('Cập nhật người dùng thành công', null);
+        return ResponseModel.success('Cập nhật người dùng thành công', {});
     } catch (error) {
         handleDeleteImageAsFailed(file);
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
 
+
+/** MOBILE */
+export const editUserInfo = async (user_id, userInfo) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!userInfo || !user_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                userInfo: userInfo ?? {},
+                user_id: user_id ?? ''
+            });
+        }
+
+        const {
+            name,
+            phone,
+            gender,
+            address,
+        } = userInfo;
+
+        const user = await User.findOne({
+            where: { id: user_id },
+            transaction: t
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại.', null);
+        }
+
+        if (name) {
+            user.name = name;
+        }
+
+        if (phone) {
+            user.phone = phone;
+        }
+
+        if (gender) {
+            user.gender = gender;
+        }
+
+        if (address) {
+            user.address = address;
+        }
+
+        await user.save();
+
+        await t.commit();
+
+        return ResponseModel.success('Cập nhật người dùng thành công', {});
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const editAvatarUser = async (user_id, file) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!file || !user_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                file: file ?? {},
+                user_id: user_id ?? ''
+            });
+        }
+
+        const user = await User.findOne({
+            where: { id: user_id },
+            transaction: t
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại.', null);
+        }
+
+        user.image_url = `users/${file.filename}`
+
+        await user.save();
+
+        await t.commit();
+
+        return ResponseModel.success('Cập nhật ảnh đại diện thành công', {});
+    } catch (error) {
+        await t.rollback();
+        handleDeleteImageAsFailed(file);
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+} 
