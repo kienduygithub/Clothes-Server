@@ -221,6 +221,8 @@ export const addCartItem = async (user_id, cart_id, item_info) => {
             transaction: t
         });
 
+        let newCartItem = null;
+
         if (existingCartItem) {
             /** Nếu có thì cập nhật số lượng */
             const newQuantity = existingCartItem.quantity + quantity;
@@ -235,7 +237,7 @@ export const addCartItem = async (user_id, cart_id, item_info) => {
             }, { transaction: t });
         } else {
             /** Nếu chưa có, thêm mới vào giỏ hàng */
-            await CartItem.create({
+            newCartItem = await CartItem.create({
                 cart_shop_id: cart_shop.id,
                 product_variant_id: product_variant_id,
                 quantity: quantity
@@ -244,7 +246,11 @@ export const addCartItem = async (user_id, cart_id, item_info) => {
 
         await t.commit();
 
-        return ResponseModel.success('Sản phẩm đã được thêm vào giỏ hàng: ', { cart_id: cart_id });
+        return ResponseModel.success('Sản phẩm đã được thêm vào giỏ hàng: ', {
+            cart_id: cart_id,
+            cart_shop_id: cart_shop.id,
+            cart_item: existingCartItem ? existingCartItem : newCartItem
+        });
     } catch (error) {
         await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
