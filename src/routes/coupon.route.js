@@ -46,6 +46,17 @@ CouponRouter.get(
     CouponController.fetchShopCouponMobile
 )
 
+CouponRouter.get(
+    '/coupon/shop/:shopId/only/mobile',
+    CouponController.fetchShopCouponOnlyMobile
+)
+
+CouponRouter.get(
+    '/coupon/user/mobile',
+    checkUserAuthenticationMobile,
+    CouponController.fetchCouponUserMobile
+)
+
 CouponRouter.post(
     '/coupon/:couponId/mobile',
     checkUserAuthenticationMobile,

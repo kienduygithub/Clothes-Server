@@ -8,6 +8,7 @@ import {
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
+    refreshTokenMobile,
     refreshTokenWeb
 } from "../common/middleware/jwt.middleware";
 import { uploadServer } from "../common/middleware/upload.middleware";
@@ -31,6 +32,8 @@ AuthRouter.post('/auth/sign-in/mobile', signInMobile);
 AuthRouter.post('/auth/sign-up/mobile', uploadServer.single('userFile'), signUpMobile);
 
 AuthRouter.post('/auth/refresh', refreshTokenWeb);
+
+AuthRouter.post('/auth/refresh/mobile', refreshTokenMobile);
 
 AuthRouter.get('/auth/user-details/:id', checkUserAuthentication, fetchDetailUser);
 

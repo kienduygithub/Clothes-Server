@@ -13,7 +13,7 @@ export const generalAccessToken = (payload) => {
     const accessToken = jwt.sign(
         { ...payload },
         ACCESS_SECRET,
-        { expiresIn: '1h' }
+        { expiresIn: ACCESS_EXPIRES }
     );
 
     return accessToken;
@@ -116,6 +116,49 @@ export const checkUserAuthenticationMobile = async (req, res, next) => {
 
         req.user = decoded;
         next();
+    } catch (error) {
+        let statusCode = HttpErrors.UNAUTHORIZED;
+        let message = 'Token không hợp lệ';
+        if (error.name === 'TokenExpiredError') {
+            message = 'Token đã hết hạn';
+        } else if (error.name === 'JsonWebTokenError') {
+            message = 'Token sai hoặc bị chỉnh sửa';
+        } else if (error.name === 'NotBeforeError') {
+            message = 'Token chưa có hiệu lực';
+        }
+
+        return res.status(statusCode).json({
+            status: statusCode,
+            message,
+            body: {}
+        });
+    }
+}
+
+export const refreshTokenMobile = async (req, res) => {
+    try {
+        const token = req.body['refresh-token'];
+        if (!token) {
+            return res.status(401).json({
+                status: HttpErrors.UNAUTHORIZED,
+                message: 'Không có refresh token',
+                body: null
+            });
+        }
+
+        const decoded = jwt.verify(token, REFRESH_SECRET);
+
+        const payload = {
+            id: decoded?.id,
+            name: decoded?.name,
+            image_url: decoded?.image_url,
+            roles: decoded?.roles,
+        }
+
+        const accessToken = generalAccessToken(payload);
+        return res.status(200).json({
+            access_token: accessToken
+        });
     } catch (error) {
         let statusCode = HttpErrors.UNAUTHORIZED;
         let message = 'Token không hợp lệ';

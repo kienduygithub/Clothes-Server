@@ -4,6 +4,12 @@ import { checkUserAuthenticationMobile } from "../common/middleware/jwt.middlewa
 
 const CartRouter = express.Router();
 
+/** Lấy chi tiết giỏ hàng không check authenticate */
+CartRouter.get(
+    '/cart/:cartId/user/:userId',
+    CartController.getCartByUserNonAuthenticate
+)
+
 /** Lấy chi tiết giỏ hàng */
 CartRouter.get(
     '/cart/:cartId',

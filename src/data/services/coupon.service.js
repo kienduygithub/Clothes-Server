@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
 import { Coupon, UserCoupon, User, Shop, sequelize } from "../models";
@@ -302,6 +303,8 @@ export const deleteCoupon = async (coupon_id) => {
     }
 }
 
+/** MOBILE **/
+
 export const fetchShopCouponMobile = async (userId, shopId) => {
     try {
         if (!userId || !shopId) {
@@ -325,6 +328,118 @@ export const fetchShopCouponMobile = async (userId, shopId) => {
                     },
                     where: { id: userId },
                     required: false /** Left join để lấy cả coupon chưa lưu */
+                },
+                {
+                    model: Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url']
+                }
+            ]
+        });
+
+        const formattedCoupons = coupons.map(coupon => ({
+            id: coupon.id,
+            shop: coupon.shop,
+            name: coupon.name,
+            code: coupon.code,
+            discount_type: coupon.discount_type,
+            discount_value: parseFloat(coupon.discount_value),
+            max_discount: parseFloat(coupon.max_discount),
+            min_order_value: parseFloat(coupon.min_order_value),
+            valid_from: coupon.valid_from,
+            valid_to: coupon.valid_to,
+            is_saved: !!coupon.user_coupons.length, /** Kiểm tra đã lưu */
+            is_used: coupon.user_coupons.length ? coupon.user_coupons[0].UserCoupon.is_used : false
+        }));
+
+        const payload = {
+            coupons: formattedCoupons
+        }
+
+        return ResponseModel.success('Danh sách KM Mobile', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchShopCouponOnlyMobile = async (shopId) => {
+    try {
+        if (!shopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shopId: shopId ?? ''
+            })
+        }
+        const coupons = await Coupon.findAll({
+            where: {
+                shop_id: shopId,
+            },
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            include: [
+                {
+                    model: Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url']
+                }
+            ]
+        });
+
+        const formattedCoupons = coupons.map(coupon => ({
+            id: coupon.id,
+            shop: coupon.shop,
+            name: coupon.name,
+            code: coupon.code,
+            discount_type: coupon.discount_type,
+            discount_value: parseFloat(coupon.discount_value),
+            max_discount: parseFloat(coupon.max_discount),
+            min_order_value: parseFloat(coupon.min_order_value),
+            valid_from: coupon.valid_from,
+            valid_to: coupon.valid_to,
+        }));
+
+        const payload = {
+            coupons: formattedCoupons
+        }
+
+        return ResponseModel.success('Danh sách KM Mobile', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchCouponUserMobile = async (userId) => {
+    try {
+        if (!userId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                userId: userId ?? '',
+            })
+        }
+        const coupons = await Coupon.findAll({
+            where: {
+                [Op.or]: [
+                    { valid_from: { [Op.lte]: new Date() } },
+                    { valid_from: null }
+                ],
+                [Op.or]: [
+                    { valid_to: { [Op.gte]: new Date() } },
+                    { valid_to: null }
+                ],
+                [Op.or]: [
+                    { max_usage: -1 },
+                    { max_usage: null },
+                    { max_usage: { [Op.gt]: sequelize.col('times_used') } },
+                ]
+            },
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            include: [
+                {
+                    model: User,
+                    as: 'user_coupons',
+                    through: {
+                        model: UserCoupon,
+                        attributes: ['is_used'],
+                        where: { user_id: userId }
+                    },
+                    where: { id: userId },
                 },
                 {
                     model: Shop,

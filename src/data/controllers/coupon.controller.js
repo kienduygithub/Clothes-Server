@@ -88,11 +88,40 @@ export const deleteCoupon = async (req, res) => {
     }
 }
 
+/** MOBILE **/
 export const fetchShopCouponMobile = async (req, res) => {
     try {
         const user_id = req.user.id;
         const shop_id = req.params.shopId;
         const response = await CouponService.fetchShopCouponMobile(user_id, shop_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}
+
+export const fetchShopCouponOnlyMobile = async (req, res) => {
+    try {
+        const shop_id = req.params.shopId;
+        const response = await CouponService.fetchShopCouponOnlyMobile(shop_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}
+
+export const fetchCouponUserMobile = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const response = await CouponService.fetchCouponUserMobile(userId);
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({
