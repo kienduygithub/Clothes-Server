@@ -831,7 +831,7 @@ export const searchAndFilterProductShopMobile = async (
 
         // Điều kiện lọc theo rating
         const having = minRatings.length > 0
-            ? searchValue.literal(`AVG(rating) IN (${minRatings.join(', ')})`)
+            ? sequelize.literal(`AVG(rating) IN (${minRatings.join(', ')})`)
             : null;
 
         const { count, rows } = await db.Product.findAndCountAll({
@@ -867,6 +867,128 @@ export const searchAndFilterProductShopMobile = async (
                         as: 'parent',
                         attributes: ['id', 'category_name'],
                         required: false,
+                    },
+                },
+                {
+                    model: db.Review,
+                    as: 'reviews',
+                    attributes: [],
+                    required: false,
+                },
+            ],
+            limit,
+            offset,
+            distinct: 'Product.id',
+            order: [['unit_price', sortPrice.toUpperCase()]],
+            group: having ? ['Product.id'] : null,
+            having: having,
+        });
+
+        const totalPages = Math.ceil(count.length ? count.length : count / limit);
+
+        const payload = {
+            products: rows,
+            paginate: {
+                currentPage: page,
+                limit: limit,
+                totalItems: count.length ? count.length : count,
+                totalPages: totalPages,
+            },
+        };
+
+        return ResponseModel.success('Kết quả tìm kiếm', payload);
+    } catch (error) {
+        throw ResponseModel.error(error?.status || HttpErrors.INTERNAL_SERVER_ERROR, error?.message || 'Lỗi không xác định', error?.body || {});
+    }
+}
+
+export const searchAndFilterProductsByParentCategoryMobile = async (
+    parentCategoryId,
+    searchValue = '',
+    page = 1,
+    limit = 10,
+    origins = [],
+    sortPrice = 'ASC',
+    minPrice = 0,
+    maxPrice = Infinity,
+    minRatings = [],
+) => {
+    try {
+        if (page < 1 || limit < 1) {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Page và limit phải là số dương', { page, limit });
+        }
+
+        if (minPrice < 0 || (maxPrice !== Infinity && maxPrice < minPrice)) {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Mức giá tìm kiếm không hợp lệ', {});
+        }
+
+        if (minRatings.length > 0 && minRatings.some(r => ![1, 2, 3, 4, 5].includes(r))) {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Mức sao tìm kiếm không hợp lệ', {});
+        }
+
+        if (parentCategoryId !== null && (typeof parseInt(parentCategoryId) !== 'number' || parseInt(parentCategoryId) <= 0)) {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Parent Id không hợp lệ', {});
+        }
+
+        const offset = (page - 1) * limit;
+
+        const whereClause = {};
+
+        if (searchValue) {
+            whereClause.product_name = {
+                [Op.like]: `%${searchValue}%`,
+            };
+        }
+
+        if (origins.length > 0) {
+            whereClause.origin = {
+                [Op.in]: origins,
+            };
+        }
+
+        // Lọc theo khoảng giá
+        if (minPrice > 0 || maxPrice < Infinity) {
+            const adjustedMaxPrice = maxPrice === Infinity ? Number.MAX_SAFE_INTEGER : maxPrice;
+            whereClause.unit_price = {
+                [Op.between]: [minPrice, adjustedMaxPrice],
+            };
+        }
+
+        // Subquery để tính rating trung bình
+        const subQueryRating = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        // Điều kiện lọc theo rating
+        const having = minRatings.length > 0
+            ? sequelize.literal(`AVG(rating) IN (${minRatings.join(', ')})`)
+            : null;
+
+        const { count, rows } = await db.Product.findAndCountAll({
+            where: whereClause,
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                'origin',
+                [subQueryRating, 'rating'],
+            ],
+            include: [
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                    required: false,
+                },
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name', 'parentId'],
+                    where: {
+                        parentId: parentCategoryId
                     },
                 },
                 {
