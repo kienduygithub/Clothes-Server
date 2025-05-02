@@ -124,27 +124,173 @@ export const sendMessage = async (message, user_id) => {
             /** Làm sạch khoảng trắng thừa **/
             searchQuery = searchQuery.replace(/\s+/g, ' ').trim();
 
+            /** Phân tích yêu cầu để tìm màu sắc, kích cỡ, giá cả **/
+            let colorMentions = [];
+            let sizeMentions = [];
+            let priceRange = null;
+
+            /** Các keyword liên quan màu sắc **/
+            const colorKeywords = ["màu", "color", "màu sắc"];
+            const commonColors = ["đen", "trắng", "đỏ", "xanh", "vàng", "tím", "hồng", "xám", "nâu", "cam", "xanh dương", "xanh lá", "xanh ngọc"];
+
+            /** Kiểm tra các từ khóa màu sắc **/
+            colorKeywords.forEach(keyword => {
+                if (searchQuery.includes(keyword)) {
+                    // Tìm 10 ký tự sau từ khóa màu
+                    const colorPart = searchQuery.substring(searchQuery.indexOf(keyword) + keyword.length).trim().split(' ')[0];
+                    if (colorPart && colorPart.length > 1) {
+                        colorMentions.push(colorPart);
+                    }
+                }
+            })
+
+            /** Kiểm tra các màu phổ biến **/
+            commonColors.forEach(color => {
+                if (searchQuery.includes(color) && !colorMentions.includes(color)) {
+                    colorMentions.push(color);
+                }
+            });
+
+            /** Tìm đề cập đến kích cỡ **/
+            const sizeKeywords = ["size", "cỡ", "kích cỡ", "kích thước"];
+            const commonSizes = ["S", "M", "L", "XL", "XXL"];
+
+            /** Kiểm tra các từ khóa kích cỡ **/
+            sizeKeywords.forEach(keyword => {
+                if (searchQuery.includes(keyword)) {
+                    // Tìm 5 ký tự sau từ khóa kích cỡ
+                    const sizePart = searchQuery.substring(searchQuery.indexOf(keyword) + keyword.length).trim().split(' ')[0];
+                    if (sizePart && sizePart.length >= 1) {
+                        sizeMentions.push(sizePart.toUpperCase());
+                    }
+                }
+            });
+
+            /** Kiểm tra các kích cỡ phổ biến **/
+            commonSizes.forEach(size => {
+                if (searchQuery.includes(size.toLowerCase()) || searchQuery.includes(size)) {
+                    if (!sizeMentions.includes(size)) {
+                        sizeMentions.push(size);
+                    }
+                }
+            });
+
+            /** Tìm đề cập đến giá cả **/
+            const priceKeywords = ["giá", "giá tiền", "giá cả", "đồng", "vnđ", "vnd", "tiền", "nghìn", "triệu", "k"];
+            const pricePattern = /(\d+)\s*(k|nghìn|ngàn|triệu|tr|đồng|d|vnđ|vnd)/gi;
+
+            const priceMatches = [...searchQuery.matchAll(pricePattern)];
+            if (priceMatches.length > 0) {
+                let minPrice = 0;
+                let maxPrice = Number.MAX_SAFE_INTEGER;
+
+                // Tìm giá cụ thể (ví dụ: 100k, 2 triệu)
+                for (const match of priceMatches) {
+                    let price = parseInt(match[1]);
+                    const unit = match[2].toLowerCase();
+
+                    // Chuyển đổi đơn vị tiền tệ
+                    if (unit.includes('k') || unit.includes('nghìn') || unit.includes('ngàn')) {
+                        price *= 1000;
+                    } else if (unit.includes('tr') || unit.includes('triệu')) {
+                        price *= 1000000;
+                    }
+
+                    // Xác định khoảng giá
+                    if (searchQuery.includes('dưới') || searchQuery.includes('ít hơn') ||
+                        searchQuery.includes('không quá') || searchQuery.includes('tối đa')) {
+                        maxPrice = price;
+                    } else if (searchQuery.includes('trên') || searchQuery.includes('hơn') ||
+                        searchQuery.includes('tối thiểu') || searchQuery.includes('ít nhất')) {
+                        minPrice = price;
+                    } else {
+                        // Mặc định là khoảng giá xung quanh giá trị này
+                        minPrice = Math.max(0, price * 0.8);
+                        maxPrice = price * 1.2;
+                    }
+                }
+
+                priceRange = { min: minPrice, max: maxPrice };
+            }
+
+
             if (searchQuery) {
-                /** Tìm kiếm thêm với nhiều điều kiện **/
-                const products = await Product.findAll({
-                    where: {
-                        [Op.or]: [
-                            { product_name: { [Op.like]: `%${searchQuery}%` } },
-                            { description: { [Op.like]: `${searchQuery}` } }
-                        ]
+                /** Tìm kiếm thêm với nhiều tiêu chí **/
+                const productWhereClause = {
+                    [Op.or]: [
+                        { product_name: { [Op.like]: `%${searchQuery}%` } },
+                        { description: { [Op.like]: `%${searchQuery}%` } }
+                    ]
+                };
+
+                if (priceRange) {
+                    productWhereClause.unit_price = {
+                        [Op.between]: [priceRange.min, priceRange.max]
+                    };
+                }
+
+                /** Chuẩn bị include các mối quan hệ **/
+                const includeRelations = [
+                    {
+                        model: ProductImages,
+                        as: 'product_images',
+                        attributes: ['image_url']
                     },
-                    include: [
-                        {
-                            model: ProductImages,
-                            as: 'product_images',
-                            attributes: ['image_url']
-                        },
-                        {
-                            model: Category,
-                            as: 'category',
-                            attributes: ['id', 'category_name']
-                        }
-                    ],
+                    {
+                        model: Category,
+                        as: 'category',
+                        attributes: ['id', 'category_name']
+                    }
+                ];
+
+                /** Thêm tiêu chí cho variants (màu sắc và kích cỡ) **/
+                if (colorMentions.length > 0 || sizeMentions.length > 0) {
+                    const variantWhere = {};
+
+                    // Chuẩn bị include Color và Size (nếu cần)
+                    const variantInclude = [];
+
+                    if (colorMentions.length > 0) {
+                        variantInclude.push({
+                            model: Color,
+                            as: 'color',
+                            where: {
+                                color_name: {
+                                    [Op.or]: colorMentions.map(
+                                        color => ({ [Op.like]: `%${color}%` })
+                                    )
+                                }
+                            },
+                            attributes: ['id', 'color_name', 'color_code']
+                        });
+                    }
+
+                    if (sizeMentions.length > 0) {
+                        variantInclude.push({
+                            model: Size,
+                            as: 'size',
+                            where: {
+                                size_code: {
+                                    [Op.in]: sizeMentions
+                                }
+                            },
+                            attributes: ['id', 'size_code']
+                        })
+                    }
+
+                    includeRelations.push({
+                        model: ProductVariant,
+                        as: 'variants',
+                        // where: variantWhere, thêm vào là lỗi, không cần thêm
+                        include: variantInclude
+                    })
+                }
+
+                /** Tìm kiếm sản phẩm với các tiêu chí đã xây dựng **/
+
+                const products = await Product.findAll({
+                    where: productWhereClause,
+                    include: includeRelations,
                     limit: 5
                 });
 
@@ -158,19 +304,58 @@ export const sendMessage = async (message, user_id) => {
                             .format(product.unit_price)
                             .replace(/\s/g, '');
 
-                        productInfo += `${i + 1}. ${product.product_name}\n`;
+                        productInfo += `${i + 1}. sản phẩm #${product.id}: ${product.product_name}\n`;
                         productInfo += `   - Mô tả: ${product.description || 'Không có mô tả'}\n`;
                         productInfo += `   - Xuất xứ: ${product.origin || 'Không có thông tin xuất xứ'}\n`;
                         productInfo += `   - Giá: ${price}\n`;
                         productInfo += `   - Danh mục: ${product.category?.category_name || 'Không phân loại'}\n`;
 
+                        /** Thêm thông tin về màu sắc và kích cỡ **/
+                        if (product.variants && product.variants.length > 0) {
+                            /** Tập hợp các màu và kích cỡ có sẵn **/
+                            const availableColors = [];
+                            const availableSizes = [];
+
+                            product.variants.forEach(variant => {
+                                if (variant.color && !availableColors.some(c => c.id === variant.color.id)) {
+                                    availableColors.push({
+                                        id: variant.color.id,
+                                        name: variant.color.color_name,
+                                        code: variant.color.color_code
+                                    });
+                                }
+
+                                if (variant.size && !availableSizes.some(s => s.id === variant.size.id)) {
+                                    availableSizes.push({
+                                        id: variant.size.id,
+                                        code: variant.size.size_code
+                                    });
+                                }
+                            });
+
+                            if (availableColors.length > 0) {
+                                productInfo += `   - Màu sắc có sẵn: ${availableColors.map(c => c.name).join(', ')}\n`;
+                            }
+
+                            if (availableSizes.length > 0) {
+                                productInfo += `   - Kích cỡ có sẵn: ${availableSizes.map(s => s.code).join(', ')}\n`;
+                            }
+                        }
                         /** Hiển thị link ảnh **/
                         if (product.product_images && product.product_images.length > 0) {
                             productInfo += `   - Hình ảnh:\n`;
-                            product.product_images.forEach((image, index) => {
-                                productInfo += `     ${index + 1}. ${image.image_url}\n`;
-                            });
+                            // Show up to 3 images per product
+                            const maxImages = Math.min(3, product.product_images.length);
+                            for (let i = 0; i < maxImages; i++) {
+                                // Clean the image URL by removing escaped backslashes
+                                const cleanImageUrl = product.product_images[i].image_url.replace(/\\/g, '');
+                                productInfo += `     ${cleanImageUrl}\n`;
+                            }
                         }
+                        productInfo += `\n`;
+
+                        // Add link to view product details
+                        productInfo += `   - Chi tiết: Bạn có thể xem chi tiết sản phẩm #${product.id} bằng cách nhấn vào sản phẩm #${product.id}\n\n`;
                         productInfo += `\n`;
                     }
 
@@ -201,6 +386,22 @@ export const sendMessage = async (message, user_id) => {
                                         model: Category,
                                         as: 'category',
                                         attributes: ['id', 'category_name']
+                                    },
+                                    {
+                                        model: ProductVariant,
+                                        as: 'variants',
+                                        include: [
+                                            {
+                                                model: Color,
+                                                as: 'color',
+                                                attributes: ['id', 'color_name', 'color_code']
+                                            },
+                                            {
+                                                model: Size,
+                                                as: 'size',
+                                                attributes: ['id', 'size_code']
+                                            }
+                                        ]
                                     }
                                 ],
                                 limit: 5
@@ -224,19 +425,58 @@ export const sendMessage = async (message, user_id) => {
                                 .format(product.unit_price)
                                 .replace(/\s/g, '');
 
-                            productInfo += `${i + 1}. ${product.product_name}\n`;
+                            productInfo += `${i + 1}. sản phẩm #${product.id}: ${product.product_name}\n`;
                             productInfo += `   - Mô tả: ${product.description || 'Không có mô tả'}\n`;
                             productInfo += `   - Xuất xứ: ${product.origin || 'Không có thông tin xuất xứ'}\n`;
                             productInfo += `   - Giá: ${price}\n`;
                             productInfo += `   - Danh mục: ${product.category?.category_name || 'Không phân loại'}\n`;
 
-                            // Hiển thị link ảnh
+                            /** Thêm thông tin về màu sắc và kích cỡ **/
+                            if (product.variants && product.variants.length > 0) {
+                                /** Tập hợp các màu và kích cỡ có sẵn **/
+                                const availableColors = [];
+                                const availableSizes = [];
+
+                                product.variants.forEach(variant => {
+                                    if (variant.color && !availableColors.some(c => c.id === variant.color.id)) {
+                                        availableColors.push({
+                                            id: variant.color.id,
+                                            name: variant.color.color_name,
+                                            code: variant.color.color_code
+                                        });
+                                    }
+
+                                    if (variant.size && !availableSizes.some(s => s.id === variant.size.id)) {
+                                        availableSizes.push({
+                                            id: variant.size.id,
+                                            code: variant.size.size_code
+                                        });
+                                    }
+                                });
+
+                                if (availableColors.length > 0) {
+                                    productInfo += `   - Màu sắc có sẵn: ${availableColors.map(c => c.name).join(', ')}\n`;
+                                }
+
+                                if (availableSizes.length > 0) {
+                                    productInfo += `   - Kích cỡ có sẵn: ${availableSizes.map(s => s.code).join(', ')}\n`;
+                                }
+                            }
+
+                            /** Hiển thị link ảnh **/
                             if (product.product_images && product.product_images.length > 0) {
                                 productInfo += `   - Hình ảnh:\n`;
-                                product.product_images.forEach((image, index) => {
-                                    productInfo += `     ${index + 1}. ${image.image_url}\n`;
-                                });
+                                // Show up to 3 images per product
+                                const maxImages = Math.min(3, product.product_images.length);
+                                for (let i = 0; i < maxImages; i++) {
+                                    // Clean the image URL by removing escaped backslashes
+                                    const cleanImageUrl = product.product_images[i].image_url.replace(/\\/g, '');
+                                    productInfo += `     ${cleanImageUrl}\n`;
+                                }
                             }
+
+                            // Add link to view product details
+                            productInfo += `   - Chi tiết: Bạn có thể xem chi tiết sản phẩm #${product.id} bằng cách nhấn vào sản phẩm #${product.id}\n\n`;
                             productInfo += `\n`;
                         }
 
