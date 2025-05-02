@@ -284,6 +284,7 @@ export const sendMessage = async (message, user_id) => {
                         // where: variantWhere, thêm vào là lỗi, không cần thêm
                         include: variantInclude
                     })
+
                 }
 
                 /** Tìm kiếm sản phẩm với các tiêu chí đã xây dựng **/
@@ -304,8 +305,7 @@ export const sendMessage = async (message, user_id) => {
                             .format(product.unit_price)
                             .replace(/\s/g, '');
 
-                        productInfo += `${i + 1}. sản phẩm #${product.id}: ${product.product_name}\n`;
-                        productInfo += `   - Mô tả: ${product.description || 'Không có mô tả'}\n`;
+                        productInfo += `${i + 1}. Sản phẩm #${product.id}: ${product.product_name}\n`;
                         productInfo += `   - Xuất xứ: ${product.origin || 'Không có thông tin xuất xứ'}\n`;
                         productInfo += `   - Giá: ${price}\n`;
                         productInfo += `   - Danh mục: ${product.category?.category_name || 'Không phân loại'}\n`;
@@ -343,20 +343,18 @@ export const sendMessage = async (message, user_id) => {
                         }
                         /** Hiển thị link ảnh **/
                         if (product.product_images && product.product_images.length > 0) {
-                            productInfo += `   - Hình ảnh:\n`;
                             // Show up to 3 images per product
                             const maxImages = Math.min(3, product.product_images.length);
                             for (let i = 0; i < maxImages; i++) {
-                                // Clean the image URL by removing escaped backslashes
                                 const cleanImageUrl = product.product_images[i].image_url.replace(/\\/g, '');
-                                productInfo += `     ${cleanImageUrl}\n`;
+                                productInfo += `   [IMAGE:products/${cleanImageUrl}]\n`;
                             }
                         }
-                        productInfo += `\n`;
 
-                        // Add link to view product details
-                        productInfo += `   - Chi tiết: Bạn có thể xem chi tiết sản phẩm #${product.id} bằng cách nhấn vào sản phẩm #${product.id}\n\n`;
+                        console.log('>>> aaaa if');
                         productInfo += `\n`;
+                        // Add link to view product details with button text
+                        productInfo += `   - [Xem chi tiết sản phẩm #${product.id}]\n\n`;
                     }
 
                     /** Thêm thông tin sản phẩm như một context ngữ cảnh **/
@@ -425,8 +423,7 @@ export const sendMessage = async (message, user_id) => {
                                 .format(product.unit_price)
                                 .replace(/\s/g, '');
 
-                            productInfo += `${i + 1}. sản phẩm #${product.id}: ${product.product_name}\n`;
-                            productInfo += `   - Mô tả: ${product.description || 'Không có mô tả'}\n`;
+                            productInfo += `${i + 1}. Sản phẩm #${product.id}: ${product.product_name}\n`;
                             productInfo += `   - Xuất xứ: ${product.origin || 'Không có thông tin xuất xứ'}\n`;
                             productInfo += `   - Giá: ${price}\n`;
                             productInfo += `   - Danh mục: ${product.category?.category_name || 'Không phân loại'}\n`;
@@ -465,19 +462,18 @@ export const sendMessage = async (message, user_id) => {
 
                             /** Hiển thị link ảnh **/
                             if (product.product_images && product.product_images.length > 0) {
-                                productInfo += `   - Hình ảnh:\n`;
                                 // Show up to 3 images per product
                                 const maxImages = Math.min(3, product.product_images.length);
                                 for (let i = 0; i < maxImages; i++) {
                                     // Clean the image URL by removing escaped backslashes
                                     const cleanImageUrl = product.product_images[i].image_url.replace(/\\/g, '');
-                                    productInfo += `     ${cleanImageUrl}\n`;
+                                    productInfo += `   [IMAGE:products/${cleanImageUrl}]\n`;
                                 }
                             }
-
-                            // Add link to view product details
-                            productInfo += `   - Chi tiết: Bạn có thể xem chi tiết sản phẩm #${product.id} bằng cách nhấn vào sản phẩm #${product.id}\n\n`;
+                            console.log('> aaaa else')
+                            // Add link to view product details with button text
                             productInfo += `\n`;
+                            productInfo += `   - [Xem chi tiết sản phẩm #${product.id}]\n\n`;
                         }
 
                         parts.push({ text: `Thông tin sản phẩm từ cơ sở dữ liệu: ${productInfo}` });
@@ -506,7 +502,7 @@ export const sendMessage = async (message, user_id) => {
         const assistantMessage = result.response.text();
 
         // Append product info if found but not mentioned in response
-        const finalMessage = productInfo && !assistantMessage.includes("sản phẩm") && !assistantMessage.includes("tìm thấy")
+        const finalMessage = productInfo && !assistantMessage.toLowerCase().includes("sản phẩm") && !assistantMessage.includes("tìm thấy")
             ? `${assistantMessage}\n\n${productInfo}`
             : assistantMessage;
 
@@ -522,7 +518,10 @@ export const sendMessage = async (message, user_id) => {
             message: 'MESSAGE_SENT',
             body: {
                 message: finalMessage,
-                history: newHistory
+                history: newHistory,
+                linhtinh: {
+                    message: message
+                }
             }
         };
     } catch (error) {
