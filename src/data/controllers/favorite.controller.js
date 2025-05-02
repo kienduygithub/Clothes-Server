@@ -17,7 +17,7 @@ export const fetchFavoritesByUser = async (req, res) => {
 
 export const favoriteProductByUser = async (req, res) => {
     try {
-        const user_id = req.params.userId;
+        const user_id = req.user.id;
         const product_id = req.params.productId;
         const response = await FavoriteService.favoriteProductByUser(user_id, product_id);
         return res.status(response.status).json(response);
@@ -32,7 +32,7 @@ export const favoriteProductByUser = async (req, res) => {
 
 export const unfavoriteProductByUser = async (req, res) => {
     try {
-        const user_id = req.params.userId;
+        const user_id = req.user.id;
         const product_id = req.params.productId;
         const response = await FavoriteService.unfavoriteProductByUser(user_id, product_id);
         return res.status(response.status).json(response);

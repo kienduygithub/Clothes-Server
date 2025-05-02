@@ -33,6 +33,11 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'product_id',
                 otherKey: 'user_id',
             });
+            Product.hasMany(models.Favorite, {
+                foreignKey: 'product_id',
+                as: 'product_favorites',
+                onDelete: 'CASCADE'
+            });
             // Danh mục sản phẩm
             Product.belongsTo(models.Category, {
                 foreignKey: 'categoryId',

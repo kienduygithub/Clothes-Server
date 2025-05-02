@@ -1,24 +1,23 @@
 import express from "express";
-import { checkUserAuthentication } from "../common/middleware/jwt.middleware";
+import { checkUserAuthenticationMobile } from "../common/middleware/jwt.middleware";
 import * as FavoriteController from "../data/controllers/favorite.controller";
 
 const FavoriteRouter = express.Router();
 
 FavoriteRouter.get(
     '/product-favorite/user/:userId',
-    // checkUserAuthentication,
     FavoriteController.fetchFavoritesByUser
 );
 
 FavoriteRouter.post(
-    '/product-favorite/user/:userId/product/:productId',
-    // checkUserAuthentication,
+    '/product-favorite/product/:productId',
+    checkUserAuthenticationMobile,
     FavoriteController.favoriteProductByUser
 );
 
 FavoriteRouter.post(
-    '/product-favorite/user/:userId/product/:productId/unfavorite',
-    // checkUserAuthentication,
+    '/product-favorite/product/:productId/unfavorite',
+    checkUserAuthenticationMobile,
     FavoriteController.unfavoriteProductByUser
 );
 

@@ -1,6 +1,6 @@
 import HttpErrors from '../../common/errors/http-errors';
 import { ResponseModel } from '../../common/errors/response';
-import { Favorite, Product, User, Category, sequelize } from '../models';
+import { Favorite, Product, ProductImages, User, Category, Review, sequelize } from '../models';
 
 export const fetchFavoritesByUser = async (user_id) => {
     const t = await sequelize.transaction();
@@ -11,41 +11,66 @@ export const fetchFavoritesByUser = async (user_id) => {
             });
         }
 
-        const favorites = await Favorite.findAndCountAll({
-            where: { user_id: user_id },
-            attributes: { exclude: ['createdAt', 'updatedAt'] },
+        // Subquery tính rating trung bình
+        const avgRating = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        const favoriteProducts = await Product.findAndCountAll({
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                'origin',
+                [avgRating, 'rating']
+            ],
             include: [
                 {
-                    model: Product,
-                    as: 'product',
-                    attributes: { exclude: ['createdAt', 'updatedAt'] },
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name'],
                     include: [
                         {
                             model: Category,
-                            as: 'category',
-                            attributes: ['id', 'category_name'],
-                            include: [
-                                {
-                                    model: Category,
-                                    as: 'parent',
-                                    attributes: { exclude: ['description', 'parentId', 'createdAt', 'updatedAt'] },
-                                }
-                            ]
+                            as: 'parent',
+                            attributes: ['id', 'category_name']
                         }
                     ]
                 },
+                {
+                    model: ProductImages,
+                    as: 'product_images',
+                    attributes: ['image_url'],
+                    required: false
+                },
+                {
+                    model: Favorite,
+                    as: 'product_favorites',
+                    where: { user_id: user_id },
+                    attributes: ['user_id'],
+                    required: true
+                },
+                {
+                    model: Review,
+                    as: 'reviews',
+                    attributes: [],
+                    required: false
+                }
             ],
+            distinct: true,
             transaction: t
         });
 
         const payload = {
-            favorites: favorites.rows,
-            count: favorites.count
+            products: favoriteProducts.rows,
         }
 
         await t.commit();
 
-        return ResponseModel.success('Danh sách Favorite người dùng', payload);
+        return ResponseModel.success('Danh sách sản phẩm yêu thích', payload);
     } catch (error) {
         await t.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);

@@ -63,6 +63,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'notifications',
                 onDelete: 'CASCADE'
             })
+            User.hasMany(models.Favorite, {
+                foreignKey: 'user_id',
+                as: 'user_favorites',
+                onDelete: 'CASCADE'
+            })
         }
     }
 
