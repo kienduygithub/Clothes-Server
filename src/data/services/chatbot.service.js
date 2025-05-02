@@ -219,7 +219,7 @@ export const sendMessage = async (message, user_id) => {
                 const productWhereClause = {
                     [Op.or]: [
                         { product_name: { [Op.like]: `%${searchQuery}%` } },
-                        // { description: { [Op.like]: `%${searchQuery}%` } }
+                        { description: { [Op.like]: `%${searchQuery}%` } }
                     ]
                 };
 
@@ -371,7 +371,7 @@ export const sendMessage = async (message, user_id) => {
                                 where: {
                                     [Op.or]: [
                                         { product_name: { [Op.like]: `%${term}%` } },
-                                        // { description: { [Op.like]: `%${term}%` } }
+                                        { description: { [Op.like]: `%${term}%` } }
                                     ]
                                 },
                                 include: [
