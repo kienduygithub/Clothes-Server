@@ -219,7 +219,7 @@ export const sendMessage = async (message, user_id) => {
                 const productWhereClause = {
                     [Op.or]: [
                         { product_name: { [Op.like]: `%${searchQuery}%` } },
-                        { description: { [Op.like]: `%${searchQuery}%` } }
+                        // { description: { [Op.like]: `%${searchQuery}%` } }
                     ]
                 };
 
@@ -371,7 +371,7 @@ export const sendMessage = async (message, user_id) => {
                                 where: {
                                     [Op.or]: [
                                         { product_name: { [Op.like]: `%${term}%` } },
-                                        { description: { [Op.like]: `%${term}%` } }
+                                        // { description: { [Op.like]: `%${term}%` } }
                                     ]
                                 },
                                 include: [
@@ -502,7 +502,7 @@ export const sendMessage = async (message, user_id) => {
         const assistantMessage = result.response.text();
 
         // Append product info if found but not mentioned in response
-        const finalMessage = productInfo && !assistantMessage.toLowerCase().includes("sản phẩm") && !assistantMessage.includes("tìm thấy")
+        const finalMessage = productInfo
             ? `${assistantMessage}\n\n${productInfo}`
             : assistantMessage;
 
