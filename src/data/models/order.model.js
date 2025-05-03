@@ -19,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
             });
             // Danh sách Order của từng Shop
             Order.hasMany(models.OrderShop, {
-                foreignKey: 'order_shop_id',
+                foreignKey: 'order_id',
                 as: 'order_shops',
                 onDelete: 'CASCADE'
             });

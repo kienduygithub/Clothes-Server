@@ -11,3 +11,9 @@ export const OrderStatus = Object.freeze({
     COMPLETED: 'completed',
     CANCELED: 'canceled'
 });
+
+export const NotificationType = Object.freeze({
+    DRAWBACK: "Drawback",
+    ORDER: "Order",
+    PRODUCT: "Product"
+})
