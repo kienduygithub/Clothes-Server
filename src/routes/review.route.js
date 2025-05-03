@@ -1,8 +1,14 @@
 import express from "express";
-import { checkUserAuthentication } from "../common/middleware/jwt.middleware";
+import { checkUserAuthenticationMobile } from "../common/middleware/jwt.middleware";
 import * as ReviewController from "../data/controllers/review.controller";
 
 const ReviewRouter = express.Router();
+
+/** MOBILE */
+ReviewRouter.get(
+    '/review/user/:userId/product/unreview',
+    ReviewController.fetchListUnreviewPurchaseUser
+)
 
 ReviewRouter.get(
     '/reviews/product/:productId',
@@ -11,25 +17,24 @@ ReviewRouter.get(
 
 ReviewRouter.get(
     '/reviews/product/:productId/user/:userId/review/:reviewId',
-    // checkUserAuthentication,
     ReviewController.fetchReviewById
 );
 
 ReviewRouter.post(
     '/reviews/product/:productId/user/:userId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     ReviewController.reviewProductByUser
 );
 
 ReviewRouter.put(
     '/reviews/product/:productId/user/:userId/review/:reviewId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     ReviewController.editReviewProductByUser
 );
 
 ReviewRouter.delete(
     '/reviews/product/:productId/user/:userId/review/:reviewId',
-    // checkUserAuthentication,
+    checkUserAuthenticationMobile,
     ReviewController.deleteReviewProductByUser
 );
 

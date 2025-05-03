@@ -78,3 +78,18 @@ export const deleteReviewProductByUser = async (req, res) => {
         });
     }
 }
+
+/** Sản phẩm đã mua nhưng chưa đánh giá **/
+export const fetchListUnreviewPurchaseUser = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const response = await ReviewService.fetchListUnreviewPurchaseUser(user_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
