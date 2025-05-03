@@ -15,6 +15,13 @@ ReviewRouter.get(
     ReviewController.fetchListReviewedPurchaseUser
 )
 
+ReviewRouter.post(
+    '/review/product/reviewed',
+    checkUserAuthenticationMobile,
+    ReviewController.addReviewPurchaseUser
+)
+
+
 ReviewRouter.get(
     '/reviews/product/:productId',
     ReviewController.fetchReviewsByProduct

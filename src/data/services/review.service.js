@@ -112,12 +112,15 @@ export const fetchListUnreviewPurchaseUser = async (user_id) => {
         ));
 
         const unreviewedPurchases = [];
+        let index = 0;
         for (const order of orders) {
             for (const orderShop of order.order_shops) {
                 for (const orderItem of orderShop.order_shop_items) {
                     const product = orderItem.product_variant.product;
                     if (product && !reviewedProductIds.has(product.id)) {
+                        index += 1;
                         unreviewedPurchases.push({
+                            id: index,
                             user: {
                                 id: user.id,
                                 name: user.name,
@@ -274,6 +277,69 @@ export const fetchListReviewedPurchaseUser = async (user_id) => {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+export const addReviewPurchaseUser = async (user_id, reviewInfo) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!user_id || !reviewInfo) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                reviewInfo: reviewInfo ?? {}
+            });
+        }
+
+        const {
+            product_id,
+            product_variant_id,
+            rating,
+            comment
+        } = reviewInfo;
+
+        if (!rating || !comment || !product_id || !product_variant_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                rating: rating ?? '',
+                comment: comment ?? '',
+                product_variant_id: product_variant_id ?? '',
+                product_id: product_id ?? ''
+            });
+        }
+
+        if (rating > 5) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Rating không lớn hơn 5', {});
+        }
+
+        const review = await Review.create({
+            user_id: user_id,
+            product_id: product_id,
+            product_variant_id: product_variant_id,
+            rating: rating,
+            comment: comment
+        }, { transaction: t });
+
+        const formattedReview = {
+            id: review.id,
+            user_id: user_id,
+            product_id: product_id,
+            product_variant_id: product_variant_id,
+            rating: rating,
+            comment: comment,
+            created_at: review.createdAt,
+        }
+
+        await t.commit();
+
+        return ResponseModel.success('Review sản phẩm thành công', {
+            updatedReviews: [formattedReview]
+        });
+    } catch (error) {
+        await t.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+
+
+
 
 export const fetchReviewsByProduct = async (product_id) => {
     const t = await sequelize.transaction();

@@ -107,3 +107,18 @@ export const fetchListReviewedPurchaseUser = async (req, res) => {
         });
     }
 }
+
+export const addReviewPurchaseUser = async (req, res) => {
+    try {
+        const user_id = req.user.id;
+        const reviewInfo = req.body;
+        const response = await ReviewService.addReviewPurchaseUser(user_id, reviewInfo);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
