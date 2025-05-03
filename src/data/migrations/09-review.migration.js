@@ -27,6 +27,15 @@ module.exports = {
                 },
                 onDelete: 'CASCADE'
             },
+            product_variant_id: {
+                type: Sequelize.INTEGER,
+                references: {
+                    model: 'productvariants',
+                    key: 'id'
+                },
+                allowNull: true,
+                onDelete: 'SET NULL'
+            },
             rating: {
                 type: Sequelize.TINYINT,
                 allowNull: true,

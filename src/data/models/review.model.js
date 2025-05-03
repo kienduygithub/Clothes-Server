@@ -15,6 +15,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'product_review',
                 onDelete: 'CASCADE'
             });
+            Review.belongsTo(models.ProductVariant, {
+                foreignKey: 'product_variant_id',
+                as: 'product_variant',
+                onDelete: 'SET NULL'
+            });
         }
     }
     Review.init({
@@ -35,6 +40,15 @@ module.exports = (sequelize, DataTypes) => {
             },
             allowNull: false,
             onDelete: 'CASCADE'
+        },
+        product_variant_id: {
+            type: DataTypes.INTEGER,
+            references: {
+                model: 'productvariants',
+                key: 'id'
+            },
+            allowNull: true,
+            onDelete: 'SET NULL'
         },
         rating: DataTypes.INTEGER,
         comment: DataTypes.STRING,

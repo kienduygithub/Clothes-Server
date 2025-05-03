@@ -11,6 +11,11 @@ ReviewRouter.get(
 )
 
 ReviewRouter.get(
+    '/review/user/:userId/product/reviewed',
+    ReviewController.fetchListReviewedPurchaseUser
+)
+
+ReviewRouter.get(
     '/reviews/product/:productId',
     ReviewController.fetchReviewsByProduct
 );

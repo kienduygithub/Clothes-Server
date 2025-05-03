@@ -12,6 +12,8 @@ import {
     Shop,
     Category,
     User,
+    Color,
+    Size,
     sequelize
 } from "../models";
 
@@ -31,7 +33,7 @@ export const fetchListUnreviewPurchaseUser = async (user_id) => {
         });
 
         if (!user) {
-            throw ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại', {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại', {
                 user_id
             });
         }
@@ -122,6 +124,7 @@ export const fetchListUnreviewPurchaseUser = async (user_id) => {
                                 image_url: user.image_url
                             },
                             product_id: product.id,
+                            product_variant_id: orderItem.product_variant.id,
                             product_name: product.product_name,
                             image_url: orderItem.product_variant.image_url,
                             purchased_at: order.createdAt
@@ -147,6 +150,130 @@ export const fetchListUnreviewPurchaseUser = async (user_id) => {
     }
 }
 
+export const fetchListReviewedPurchaseUser = async (user_id) => {
+    const transaction = await sequelize.transaction();
+    try {
+        if (!user_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? ''
+            });
+        }
+
+        const user = await User.findOne({
+            where: { id: user_id },
+            attributes: ['id', 'name', 'image_url'],
+            transaction: transaction
+        });
+
+        if (!user) {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại', {
+                user_id
+            });
+        }
+
+        const reviews = await Review.findAll({
+            where: { user_id: user_id },
+            include: [
+                {
+                    model: Product,
+                    as: 'product_review',
+                    attributes: ['id', 'product_name'],
+                    include: [
+                        {
+                            model: ProductImages,
+                            as: 'product_images',
+                            attributes: ['id', 'image_url'],
+                            required: false
+                        },
+                        {
+                            model: Category,
+                            as: 'category',
+                            attributes: ['id', 'category_name', 'parentId'],
+                            include: {
+                                model: Category,
+                                as: 'parent',
+                                attributes: ['id', 'category_name'],
+                                required: false
+                            },
+                            required: false
+                        },
+                        {
+                            model: Shop,
+                            as: 'shop',
+                            attributes: ['id', 'shop_name', 'logo_url'],
+                            required: false
+                        }
+                    ]
+                },
+                {
+                    model: ProductVariant,
+                    as: 'product_variant',
+                    attributes: ['id', 'image_url', 'colorId', 'sizeId'],
+                    include: [
+                        { model: Color, as: 'color', attributes: ['id', 'color_name'], required: false },
+                        { model: Size, as: 'size', attributes: ['id', 'size_code'], required: false }
+                    ],
+                    required: false
+                }
+            ],
+            order: [['createdAt', 'DESC']],
+            transaction: transaction
+        });
+
+        const reviewedPurchases = reviews.map(review => ({
+            user: {
+                id: user.id,
+                name: user.name,
+                image_url: user.image_url
+            },
+            review: {
+                id: review.id,
+                rating: review.rating,
+                comment: review.comment,
+                created_at: review.createdAt
+            },
+            product_id: review.product_review.id,
+            product_variant_id: review.product_variant ? review.product_variant.id : null,
+            product_name: review.product_review.product_name,
+            image_url: review.product_variant?.image_url || (review.product_review.product_images && review.product_review.product_images[0]?.image_url) || null,
+            color: review.product_variant?.color ? {
+                id: review.product_variant.color.id,
+                color_name: review.product_variant.color.color_name
+            } : undefined,
+            size: review.product_variant?.size ? {
+                id: review.product_variant.size.id,
+                size_code: review.product_variant.size.size_code
+            } : undefined,
+            category: review.product_review.category ? {
+                id: review.product_review.category.id,
+                category_name: review.product_review.category.category_name,
+                parent: review.product_review.category.parent ? {
+                    id: review.product_review.category.parent.id,
+                    category_name: review.product_review.category.parent.category_name
+                } : undefined
+            } : undefined,
+            shop: review.product_review.shop ? {
+                id: review.product_review.shop.id,
+                shop_name: review.product_review.shop.shop_name,
+                logo_url: review.product_review.shop.logo_url
+            } : undefined
+        }));
+
+        await transaction.commit();
+
+        return ResponseModel.success('Danh sách Reviewed Purchases', {
+            reviewedPurchases: reviewedPurchases
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Lỗi khi lấy danh sách sản phẩm đã đánh giá:', {
+            error: error.message,
+            user_id,
+            stack: error.stack
+        });
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
 
 export const fetchReviewsByProduct = async (product_id) => {
     const t = await sequelize.transaction();

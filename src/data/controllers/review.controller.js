@@ -93,3 +93,17 @@ export const fetchListUnreviewPurchaseUser = async (req, res) => {
         });
     }
 }
+
+export const fetchListReviewedPurchaseUser = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const response = await ReviewService.fetchListReviewedPurchaseUser(user_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
