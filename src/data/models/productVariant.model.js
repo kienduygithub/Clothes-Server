@@ -34,11 +34,6 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'order_items',
                 onDelete: 'CASCADE'
             });
-            ProductVariant.hasMany(models.Review, {
-                foreignKey: 'product_variant_id',
-                as: 'product_variant_reviews',
-                onDelete: 'SET NULL'
-            });
         }
     }
     ProductVariant.init({

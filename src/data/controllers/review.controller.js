@@ -3,7 +3,13 @@ import * as ReviewService from "../services/review.service";
 export const fetchReviewsByProduct = async (req, res) => {
     try {
         const product_id = req.params.productId;
-        const response = await ReviewService.fetchReviewsByProduct(product_id);
+        const {
+            page = '1',
+            limit = '10',
+        } = req.query;
+        const parseIntPage = parseInt(page);
+        const parseIntLimit = parseInt(limit);
+        const response = await ReviewService.fetchReviewsByProduct(product_id, parseIntPage, parseIntLimit);
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status).json({

@@ -27,10 +27,10 @@ module.exports = {
                 },
                 onDelete: 'CASCADE'
             },
-            product_variant_id: {
+            order_item_id: {
                 type: Sequelize.INTEGER,
                 references: {
-                    model: 'productvariants',
+                    model: 'orderitems',
                     key: 'id'
                 },
                 allowNull: true,
