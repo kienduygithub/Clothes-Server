@@ -189,6 +189,7 @@ export const signInMobile = async (info) => {
 
         const payload = {
             id: user.id,
+            email: user.email,
             name: user.name,
             image_url: user.image_url !== null ? user.image_url : '',
             cart_id: user?.cart?.id ?? 0,
@@ -303,6 +304,94 @@ export const fetchDetailUser = async (userId) => {
 
         return ResponseModel.success('Chi tiết người dùng', payload);
     } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const registerShopMobile = async (
+    userInfo,
+    shopInfo,
+    files
+) => {
+    const transaction = await sequelize.transaction();
+
+    try {
+        if (!userInfo || !shopInfo || !files) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+        }
+
+        const {
+            id,
+            roles
+        } = JSON.parse(userInfo);
+
+        if (!id || !roles) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin người dùng', {
+                id: id ?? '',
+                roles: roles ?? ''
+            });
+        }
+
+        if (roles === UserRoles.OWNER) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã sở hữu hoặc quản lý cửa hàng', {});
+        }
+
+        const user = await User.findOne({
+            where: { id: id }
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản không tồn tại', {});
+        }
+
+        const {
+            shop_name,
+            contact_email,
+            contact_address,
+            description
+        } = JSON.parse(shopInfo);
+
+        if (!shop_name || !contact_email || !contact_address) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                shop_name: shop_name ?? '',
+                contact_email: contact_email ?? '',
+                contact_address: contact_address ?? ''
+            });
+        }
+
+        const shop = await Shop.create({
+            shop_name: shop_name,
+            logo_url: files && files['logoShopFile']
+                ? `shops/${files['logoShopFile'][0].filename}`
+                : '',
+            background_url: files && files['backgroundShopFile']
+                ? `shop-backgrounds/${files['backgroundShopFile'][0].filename}`
+                : '',
+            contact_email: contact_email ?? '',
+            contact_address: contact_address ?? '',
+            description: description ?? '',
+            status: ShopStatus.PENDING,
+        }, { transaction });
+
+        await User.update(
+            {
+                roles: UserRoles.OWNER,
+                shopId: shop.id
+            },
+            {
+                where: { id: id },
+                transaction
+            }
+        );
+
+        await transaction.commit();
+
+        return ResponseModel.success('Đăng ký chủ cửa hàng thành công', {});
+    } catch (error) {
+        await transaction.rollback();
+        if (files?.length) {
+            await Promise.all(files.map(file => handleDeleteImageAsFailed(file)));
+        }
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }

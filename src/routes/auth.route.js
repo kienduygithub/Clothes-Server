@@ -5,9 +5,11 @@ import {
     signUp,
     signUpMobile,
     fetchDetailUser,
+    registerShopMobile,
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
+    checkUserAuthenticationMobile,
     refreshTokenMobile,
     refreshTokenWeb
 } from "../common/middleware/jwt.middleware";
@@ -37,4 +39,13 @@ AuthRouter.post('/auth/refresh/mobile', refreshTokenMobile);
 
 AuthRouter.get('/auth/user-details/:id', checkUserAuthentication, fetchDetailUser);
 
+AuthRouter.post(
+    '/shop/register-shop/mobile',
+    checkUserAuthenticationMobile,
+    uploadServer.fields([
+        { name: 'logoShopFile', maxCount: 1 },
+        { name: 'backgroundShopFile', maxCount: 1 },
+    ]),
+    registerShopMobile
+)
 export default AuthRouter;

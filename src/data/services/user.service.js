@@ -207,7 +207,7 @@ export const fetchUserInfo = async (user_id) => {
 
         const user = await User.findOne({
             where: { id: user_id },
-            attributes: ['id', 'name', 'phone', 'gender', 'address', 'image_url'],
+            attributes: ['id', 'name', 'email', 'phone', 'gender', 'address', 'image_url', 'roles'],
             include: {
                 model: db.Cart,
                 as: 'cart',
