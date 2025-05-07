@@ -6,6 +6,7 @@ import {
     signUpMobile,
     fetchDetailUser,
     registerShopMobile,
+    checkUserForShopRegistration,
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
@@ -47,5 +48,10 @@ AuthRouter.post(
         { name: 'backgroundShopFile', maxCount: 1 },
     ]),
     registerShopMobile
+)
+
+AuthRouter.post(
+    '/shop/register-check',
+    checkUserForShopRegistration
 )
 export default AuthRouter;

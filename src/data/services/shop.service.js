@@ -5,6 +5,7 @@ import { sendActivateStoreMailer, sendDeclineStoreMailer } from '../../common/ma
 import { handleDeleteImageAsFailed, handleDeleteImages } from '../../common/middleware/upload.middleware';
 import { ShopStatus } from '../../common/utils/status';
 import db, { sequelize } from '../models';
+import { UserRoles } from '../../common/utils/roles';
 
 export const fetchAllProductsInShop = async (shopId) => {
     try {
@@ -66,6 +67,36 @@ export const fetchAllShop = async () => {
     }
 }
 
+export const fetchListShopNotPending = async () => {
+    try {
+        const response = await db.Shop.findAll({
+            where: {
+                status: {
+                    [Op.not]: ShopStatus.PENDING
+                }
+            },
+            attributes: {
+                exclude: ['updatedAt']
+            },
+            include: [
+                {
+                    model: db.User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'email', 'phone', 'phone', 'address', 'gender'],
+                    required: false
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        })
+
+        return ResponseModel.success('Danh sách cửa hàng', {
+            shops: response
+        });
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const fetchRegisterShops = async () => {
     try {
         const response = await db.Shop.findAll({
@@ -77,15 +108,16 @@ export const fetchRegisterShops = async () => {
                 {
                     model: db.User,
                     as: 'user',
-                    attributes: ['id', 'name', 'email', 'phone', 'address', 'gender']
+                    attributes: ['id', 'name', 'email', 'phone', 'address', 'gender'],
+                    required: false
                 },
             ],
+            order: [['createdAt', 'DESC']]
         });
 
-        const payload = {
+        return ResponseModel.success('Danh sách cửa hàng', {
             shops: response
-        };
-        return ResponseModel.success('Danh sách cửa hàng', payload);
+        });
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
@@ -247,6 +279,8 @@ export const deleteShopById = async (shopId) => {
 }
 
 export const acceptRegisterShopById = async (shopId) => {
+    const transaction = await sequelize.transaction();
+
     try {
         const existShop = await db.Shop.findOne({
             where: { id: shopId },
@@ -254,7 +288,7 @@ export const acceptRegisterShopById = async (shopId) => {
                 {
                     model: db.User,
                     as: 'user',
-                    attributes: ['id', 'name']
+                    attributes: ['id', 'name', 'roles']
                 }
             ]
         });
@@ -264,7 +298,7 @@ export const acceptRegisterShopById = async (shopId) => {
         }
 
         existShop.status = ShopStatus.ACTIVE;
-        await existShop.save();
+        await existShop.save({ transaction });
 
         sendActivateStoreMailer(
             "buikienduy2020@gmail.com",
@@ -272,13 +306,18 @@ export const acceptRegisterShopById = async (shopId) => {
             existShop.shop_name ?? '',
         );
 
+        await transaction.commit();
+
         return ResponseModel.success('Chấp thuận đơn đăng ký cửa hàng');
     } catch (error) {
+        await transaction.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
 
 export const declineRegisterShopById = async (shopId) => {
+    const transaction = await sequelize.transaction();
+
     try {
         const existShop = await db.Shop.findOne({
             where: { id: shopId },
@@ -286,19 +325,29 @@ export const declineRegisterShopById = async (shopId) => {
                 {
                     model: db.User,
                     as: 'user',
-                    attributes: ['id', 'name', 'image_url']
+                    attributes: ['id', 'name', 'image_url', 'roles']
                 }
             ]
         });
 
         if (!existShop) {
-            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng.');
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng.', {});
+        }
+
+        if (existShop.status !== ShopStatus.PENDING) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Chỉ có thể từ chối đơn đăng ký ở trạng thái pending.', {});
         }
 
         const { background_url, logo_url, user } = existShop;
         await handleDeleteImages([background_url, logo_url, user?.image_url ?? '']);
+
+        await existShop.user.update({
+            roles: UserRoles.CUSTOMER,
+        }, { transaction })
+
         await db.Shop.destroy({
-            where: { id: shopId }
+            where: { id: shopId },
+            transaction
         });
 
         sendDeclineStoreMailer(
@@ -308,8 +357,11 @@ export const declineRegisterShopById = async (shopId) => {
             "buikienduy2020@gmail.com"
         );
 
+        await transaction.commit();
+
         return ResponseModel.success('Bác bỏ đơn đăng ký cửa hàng');
     } catch (error) {
+        await transaction.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }

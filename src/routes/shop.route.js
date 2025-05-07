@@ -16,7 +16,8 @@ import {
     fetchLatestProductsByShop,
     fetchPriceProductsByShop,
     fetchParentCategoriesWithTotalProductByShop,
-    fetchProductsByParentCategoryInShop
+    fetchProductsByParentCategoryInShop,
+    fetchListShopNotPending
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
@@ -24,6 +25,11 @@ const ShopRouter = express.Router();
 ShopRouter.get(
     '/shop/all',
     fetchAllShop
+);
+
+ShopRouter.get(
+    '/shop/active',
+    fetchListShopNotPending
 );
 
 ShopRouter.get(

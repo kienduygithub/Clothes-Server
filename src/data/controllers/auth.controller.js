@@ -18,10 +18,21 @@ export const signUp = async (req, res) => {
         const userInfo = req.body.userInfo;
         const shopInfo = req.body.shopInfo;
         const files = req.files;
+
+        const userId = req.body.userId;
+        let parsedUserId = JSON.parse(userId);
+        let id;
+        if (parsedUserId !== 0) {
+            id = parsedUserId;
+        } else {
+            id = null;
+        }
+
         const response = await authServices.signUp(
             userInfo,
             shopInfo,
-            files
+            files,
+            id
         );
         return res.status(response.status).json(response);
     } catch (error) {
@@ -98,3 +109,21 @@ export const registerShopMobile = async (req, res) => {
         });
     }
 }
+
+export const checkUserForShopRegistration = async (req, res) => {
+    try {
+        const userInfo = req.body;
+        const response = await authServices.checkUserForShopRegistration({
+            email: userInfo.email,
+            password: userInfo.password
+        });
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+

@@ -71,35 +71,61 @@ export const signIn = async (info) => {
 export const signUp = async (
     userInfo,
     shopInfo,
-    files
+    files,
+    userId = null
 ) => {
+    const transaction = await sequelize.transaction();
+
     try {
         if (!userInfo || !shopInfo || !files) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+
+            });
         }
 
-        const {
-            name,
-            email,
-            password,
-            address,
-            phone,
-            gender
-        } = JSON.parse(userInfo);
+        let user;
 
-        if (!email || !password) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', null);
+        if (userId) {
+            user = await db.User.findOne({
+                where: { id: userId },
+                transaction
+            });
+
+            if (!user) {
+                ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại', {});
+            }
+
+            if (user.roles === UserRoles.OWNER || user.shopId) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã là chủ cửa hàng', {});
+            }
+        } else {
+            // Trường hợp tạo tài khoản mới
+            if (!userInfo) {
+                return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin người dùng', null);
+            }
+            const { name, email, password, address, phone, gender } = JSON.parse(userInfo);
+            if (!email || !password) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu email hoặc mật khẩu', null);
+            }
+
+            const existEmail = await db.User.findOne({ where: { email }, transaction });
+            if (existEmail) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản đã tồn tại', {});
+            }
+
+            const hash = hashPassword(password);
+            user = await db.User.create({
+                name,
+                email,
+                password: hash,
+                address,
+                phone,
+                gender,
+                image_url: files['adminOwnerFile'] ? `admin-owners/${files['adminOwnerFile'][0]?.filename}` : '',
+                roles: UserRoles.OWNER
+            }, { transaction });
         }
 
-        const existEmail = await User.findOne({
-            where: { email: email }
-        });
-
-        if (existEmail) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản đã tồn tại', null);
-        }
-
-        // Bước 1: Tạo cửa hàng
         const {
             shop_name,
             contact_email,
@@ -127,27 +153,18 @@ export const signUp = async (
             contact_address: contact_address ?? '',
             description: description ?? '',
             status: ShopStatus.PENDING,
-        });
+        }, { transaction });
 
-        // Bước 2: Tạo người dùng
-        const hash = hashPassword(password);
-        const user = await User.create({
-            name: name,
-            email: email,
-            password: hash,
-            address: address,
-            phone: phone,
-            gender: gender,
-            image_url: files['adminOwnerFile'] ? `admin-owners/${files['adminOwnerFile'][0]?.filename}` : '',
-            roles: 'Owner',
-            shopId: shop.id
-        });
+        await user.update({ shopId: shop.id, roles: UserRoles.OWNER }, { transaction });
+
+        await transaction.commit();
 
         return ResponseModel.success('Đăng ký chủ cửa hàng thành công', {
             user: user,
             shop: shop
         });
     } catch (error) {
+        await transaction.rollback();
         if (files?.length) {
             await Promise.all(files.map(file => handleDeleteImageAsFailed(file)));
         }
@@ -395,3 +412,40 @@ export const registerShopMobile = async (
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+export const checkUserForShopRegistration = async ({ email, password }) => {
+    try {
+        if (!email || !password) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Vui lòng cung cấp email và mật khẩu');
+        }
+
+        const user = await User.findOne({
+            where: { email: email },
+            attributes: ['id', 'email', 'password', 'image_url', 'address', 'name', 'roles', 'shopId']
+        });
+
+        if (!user || user === null) {
+            return ResponseModel.success('Email chưa được đăng ký, có thể tạo tài khoản mới để đăng ký cửa hàng', {
+                canRegister: true,
+                isNewUser: true
+            });
+        }
+
+        const isPasswordValid = comparePassword(password, user.password);
+        if (!isPasswordValid) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thông tin đăng ký không hợp lệ.', {});
+        }
+
+        if (user.roles === UserRoles.OWNER || user.shopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã là chủ cửa hàng hoặc đã liên kết với một cửa hàng', {});
+        }
+
+        return ResponseModel.success('Người dùng có thể đăng ký cửa hàng', {
+            canRegister: true,
+            isNewUser: false,
+            users: [user]
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi kiểm tra người dùng', error?.body);
+    }
+};
