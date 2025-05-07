@@ -87,3 +87,21 @@ export const fetchShopOverview = async (req, res) => {
         })
     }
 }
+
+// Thống kê doanh thu theo thời gian
+export const fetchRevenueOverTime = async (req, res) => {
+    try {
+        const shop_id = req.user.shopId;
+        const response = await OrderService.fetchRevenueOverTime(
+            shop_id,
+            req.body
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}

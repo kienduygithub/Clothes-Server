@@ -786,6 +786,7 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
     }
 }
 
+// Tổng quan cửa hàng 
 export const fetchShopOverview = async (shop_id, { startDate, endDate }) => {
     try {
 
@@ -934,6 +935,71 @@ export const fetchShopOverview = async (shop_id, { startDate, endDate }) => {
             overview: overview
         });
 
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+// Thống kê doanh thu theo thời gian
+export const fetchRevenueOverTime = async (shop_id, { startDate, endDate, groupBy = 'day' }) => {
+    try {
+
+        if (!shop_id || !startDate || !endDate || !['day', 'week', 'month'].includes(groupBy)) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai thông tin', {
+                shop_id: shop_id ?? '',
+                startDate: startDate ?? '',
+                endDate: endDate ?? '',
+                groupBy: groupBy ?? ''
+            });
+        }
+
+        const groupByExpression = {
+            day: Sequelize.fn('DATE', Sequelize.col('OrderShop.createdAt')),
+            week: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%u'), // Năm và tuần
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%m') // Năm và tháng
+        }[groupBy];
+
+        const groupByAlias = {
+            day: Sequelize.fn('DATE', Sequelize.col('OrderShop.createdAt')),
+            week: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%u'),
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%m')
+        }[groupBy];
+
+        const revenueData = await OrderShop.findAll({
+            where: {
+                shop_id: shop_id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate]
+                },
+                '$order.status$': {
+                    [Op.ne]: OrderStatus.CANCELED
+                }
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'status']
+                }
+            ],
+            attributes: [
+                [groupByExpression, 'period'],
+                [Sequelize.fn('SUM', Sequelize.col('final_total')), 'revenue']
+            ],
+            group: [groupByAlias],
+            order: [[Sequelize.col('period'), 'ASC']],
+            raw: true
+        })
+
+        const formattedData = revenueData.map(item => ({
+            period: item.period, // Ví dụ: "2025-05-01" (day), "2025-19" (week), "2025-05" (month)
+            revenue: parseFloat(item.revenue || 0)
+        }));
+
+        return ResponseModel.success('Thống kê doanh thu theo thời gian', {
+            revenues: formattedData,
+            totalRevenue: formattedData.reduce((sum, item) => sum + item.revenue, 0)
+        });
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }

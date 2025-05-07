@@ -36,4 +36,10 @@ OrderRouter.get(
     checkUserAuthentication,
     OrderController.fetchShopOverview
 )
+
+OrderRouter.get(
+    '/overview/stats/by-period',
+    checkUserAuthentication,
+    OrderController.fetchRevenueOverTime
+)
 export default OrderRouter;
