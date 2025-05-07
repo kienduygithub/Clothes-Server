@@ -105,3 +105,21 @@ export const fetchRevenueOverTime = async (req, res) => {
         })
     }
 }
+
+// Thông kê đơn hàng gồm số lượng đơn hàng theo trạng thái hoặc nhóm theo thời gian
+export const fetchOrderStats = async (req, res) => {
+    try {
+        const shop_id = req.user.shopId;
+        const response = await OrderService.fetchOrderStats(
+            shop_id,
+            req.body
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}

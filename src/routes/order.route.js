@@ -42,4 +42,10 @@ OrderRouter.get(
     checkUserAuthentication,
     OrderController.fetchRevenueOverTime
 )
+
+OrderRouter.get(
+    '/overview/stats/order/by-status-or-period',
+    checkUserAuthentication,
+    OrderController.fetchOrderStats
+)
 export default OrderRouter;

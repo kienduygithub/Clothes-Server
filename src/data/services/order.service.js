@@ -1004,3 +1004,80 @@ export const fetchRevenueOverTime = async (shop_id, { startDate, endDate, groupB
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+// Thông kê đơn hàng gồm số lượng đơn hàng theo trạng thái hoặc nhóm theo thời gian
+export const fetchOrderStats = async (shop_id, { startDate, endDate, groupBy = 'day', status = null }) => {
+    try {
+        if (!shop_id || !startDate || !endDate || !['day', 'week', 'month'].includes(groupBy)) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai thông tin', {
+                shop_id: shop_id ?? '',
+                startDate: startDate ?? '',
+                endDate: endDate ?? '',
+                groupBy: groupBy ?? ''
+            });
+        }
+
+        const whereClause = {
+            shop_id: shop_id,
+            createdAt: { [Op.between]: [startDate, endDate] }
+        };
+
+        const orderInclude = {
+            model: Order,
+            as: 'order',
+            attributes: ['id', 'status']
+        };
+        if (status) {
+            orderInclude.where = { status };
+        }
+
+        const groupByExpression = {
+            day: Sequelize.fn('DATE', Sequelize.col('OrderShop.createdAt')),
+            week: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%u'),
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%m')
+        }[groupBy];
+
+        const orderData = await OrderShop.findAll({
+            where: whereClause,
+            include: [orderInclude],
+            attributes: [
+                [groupByExpression, 'period'],
+                [Sequelize.col('order.status'), 'status'],
+                [Sequelize.fn('COUNT', db.Sequelize.col('OrderShop.id')), 'count']
+            ],
+            group: [groupByExpression, 'order.status'],
+            order: [[Sequelize.col('period'), 'ASC']],
+            raw: true
+        });
+
+        const statusCounts = await OrderShop.findAll({
+            where: whereClause,
+            include: [{ model: Order, as: 'order', attributes: ['id', 'status'] }],
+            attributes: [
+                [Sequelize.col('order.status'), 'status'],
+                [Sequelize.fn('COUNT', db.Sequelize.col('OrderShop.id')), 'count']
+            ],
+            group: ['order.status'],
+            raw: true
+        });
+
+        const formattedData = orderData.reduce((acc, item) => {
+            if (!acc[item.period]) {
+                acc[item.period] = { period: item.period, counts: {} };
+            }
+            acc[item.period].counts[item.status] = parseInt(item.count || 0);
+            return acc;
+        }, {});
+
+        return ResponseModel.success('Thống kê đơn hàng', {
+            ordersByPeriod: Object.values(formattedData),
+            statusCounts: statusCounts.reduce((acc, stat) => {
+                acc[stat.status] = parseInt(stat.count || 0);
+                return acc;
+            }, { pending: 0, paid: 0, shipped: 0, completed: 0, canceled: 0 }),
+            totalOrders: statusCounts.reduce((sum, stat) => sum + parseInt(stat.count || 0), 0)
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi lấy thống kê đơn hàng', error?.body);
+    }
+};
