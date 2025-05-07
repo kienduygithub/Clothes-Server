@@ -20,10 +20,12 @@ import {
     Ward,
     Notification,
     User,
-    sequelize
+    sequelize,
+    Sequelize
 } from "../models";
 import { NotificationType, OrderStatus } from "../../common/utils/status";
 import { UserRoles } from "../../common/utils/roles";
+import { raw } from "body-parser";
 
 export const createOrderMobile = async (user_id, cartInfo) => {
     const t = await sequelize.transaction();
@@ -616,6 +618,323 @@ export const cancelOrderUser = async (user_id, order_id) => {
         return ResponseModel.success('Hủy đơn hàng thành công: ', {});
     } catch (error) {
         await transaction.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+/** ADMIN - OWNER **/
+export const fetchListShopOrder = async (shop_id, status = null) => {
+    try {
+        if (!shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shop_id: shop_id ?? ''
+            })
+        }
+
+        /** 1. Điều kiện lọc **/
+        const whereClause = { shop_id: shop_id };
+
+        /** 2. Xây dựng include cho Order với điều kiện status nếu có **/
+        const orderInclude = {
+            model: Order,
+            as: 'order',
+            attributes: ['id', 'user_id', 'total_price', 'status', 'payment_date', 'status_changed_at'],
+            include: [
+                {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'email', 'phone']
+                },
+                {
+                    model: Address,
+                    as: 'address',
+                    attributes: ['id', 'name', 'phone', 'address_detail', 'city_id', 'district_id', 'ward_id'],
+                    required: false,
+                    include: [
+                        { model: City, as: 'city', attributes: ['name'] },
+                        { model: District, as: 'district', attributes: ['name'] },
+                        { model: Ward, as: 'ward', attributes: ['name'] }
+                    ]
+                }
+            ]
+        };
+        if (status) {
+            orderInclude.where = {
+                status: status
+            }
+        }
+
+        const orderShops = await OrderShop.findAll({
+            where: whereClause,
+            include: [
+                orderInclude,
+                {
+                    model: Coupon,
+                    as: 'coupon',
+                    attributes: [
+                        'id', 'name', 'code', 'discount_type',
+                        'discount_value', 'max_discount',
+                    ],
+                    required: false
+                },
+                {
+                    model: OrderItem,
+                    as: 'order_shop_items',
+                    attributes: ['id', 'order_shop_id', 'quantity'],
+                    include: [
+                        {
+                            model: ProductVariant,
+                            as: 'product_variant',
+                            attributes: ['id', 'sku', 'image_url', 'stock_quantity'],
+                            include: [
+                                {
+                                    model: Product,
+                                    as: 'product',
+                                    attributes: ['id', 'product_name', 'unit_price'],
+                                },
+                                {
+                                    model: Color,
+                                    as: 'color',
+                                    attributes: ['id', 'color_name', 'color_code'],
+                                    required: false
+                                },
+                                {
+                                    model: Size,
+                                    as: 'size',
+                                    attributes: ['id', 'size_code'],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            attributes: [
+                'id', 'subtotal', 'discount', 'final_total', 'createdAt'
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        /** 2. Định dạng dữ liệu trả về **/
+        const formatedOrders = orderShops.map(orderShop => ({
+            id: orderShop.order.id,
+            order_shop_id: orderShop.id,
+            user: {
+                id: orderShop.order.user.id,
+                name: orderShop.order.user.name,
+                email: orderShop.order.user.email,
+                phone: orderShop.order.user.phone
+            },
+            address: orderShop.order.address ? {
+                id: orderShop.order.address.id,
+                name: orderShop.order.address.name,
+                phone: orderShop.order.address.phone,
+                address_detail: orderShop.order.address.address_detail,
+                city: orderShop.order.address?.city ? orderShop.order.address.city : undefined,
+                district: orderShop.order.address?.district ? orderShop.order.address.district : undefined,
+                ward: orderShop.order.address?.ward ? orderShop.order.address.ward : undefined,
+            } : undefined,
+            subtotal: parseFloat(orderShop.subtotal),
+            discount: parseFloat(orderShop.discount),
+            final_total: parseFloat(orderShop.final_total),
+            status: orderShop.order.status,
+            payment_date: orderShop.order.payment_date,
+            status_changed_at: orderShop.order.status_changed_at,
+            created_at: orderShop.createdAt,
+            coupon: orderShop.coupon ? {
+                id: orderShop.coupon.id,
+                name: orderShop.coupon.name,
+                code: orderShop.coupon.code,
+                discountType: orderShop.coupon.discount_type,
+                discountValue: parseFloat(orderShop.coupon.discount_value),
+                maxDiscount: parseFloat(orderShop.coupon.max_discount)
+            } : undefined,
+            order_items: orderShop.order_shop_items.map(item => ({
+                id: item.id,
+                order_shop: {
+                    id: orderShop.id
+                },
+                quantity: item.quantity,
+                productVariant: {
+                    id: item.product_variant.id,
+                    sku: item.product_variant.sku,
+                    imageUrl: item.product_variant.image_url,
+                    stockQuantity: item.product_variant.stock_quantity,
+                    product: {
+                        id: item.product_variant.product.id,
+                        name: item.product_variant.product.product_name,
+                        unitPrice: parseFloat(item.product_variant.product.unit_price)
+                    },
+                    color: item.product_variant.color ? {
+                        id: item.product_variant.color.id,
+                        color_name: item.product_variant.color.color_name,
+                        color_code: item.product_variant.color.color_code
+                    } : undefined,
+                    size: item.product_variant.size ? {
+                        id: item.product_variant.size.id,
+                        size_code: item.product_variant.size.size_code
+                    } : undefined
+                }
+            }))
+        }))
+
+        return ResponseModel.success('Danh sách đơn hàng của cửa hàng: ', {
+            orders: [formatedOrders]
+        });
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchShopOverview = async (shop_id, { startDate, endDate }) => {
+    try {
+
+        if (!shop_id || !startDate || !endDate) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shop_id: shop_id ?? '',
+                startDate: startDate ?? '',
+                endDate: endDate ?? ''
+            });
+        }
+
+        /** 1. Truy vấn tổng doanh thu và số đơn hàng **/
+        const orderShopStats = await OrderShop.findAll({
+            where: {
+                shop_id: shop_id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate]
+                },
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'status'],
+                    where: {
+                        status: {
+                            [Op.ne]: OrderStatus.CANCELED
+                        }
+                    }
+                }
+            ],
+            attributes: [
+                [Sequelize.fn('SUM', Sequelize.col('final_total')), 'totalRevenue'],
+                [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'totalOrders']
+            ],
+            raw: true
+        })
+
+        console.log('aaaa');
+
+        /** 2. Truy vấn số đơn hàng theo trạng thái **/
+        const statusStats = await OrderShop.findAll({
+            where: {
+                shop_id: shop_id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate]
+                }
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'status'],
+                }
+            ],
+            attributes: [
+                [Sequelize.col('order.status'), 'status'],
+                [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
+            ],
+            group: ['order.status'],
+            raw: true
+        })
+
+        /** 3. Truy vấn tổng số sản phẩm bán ra **/
+        const productStats = await OrderItem.findAll({
+            where: {
+                '$order_shop.shop_id$': shop_id,
+                '$order_shop.createdAt$': {
+                    [Op.between]: [startDate, endDate]
+                },
+                '$order_shop.order.status$': {
+                    [Op.ne]: OrderStatus.CANCELED
+                }
+            },
+            include: [
+                {
+                    model: OrderShop,
+                    as: 'order_shop',
+                    attributes: ['shop_id', 'createdAt'],
+                    include: [
+                        {
+                            model: Order,
+                            as: 'order',
+                            attributes: ['status']
+                        }
+                    ]
+                }
+            ],
+            attributes: [
+                [Sequelize.fn('SUM', Sequelize.col('quantity')), 'totalSoldProducts'],
+            ],
+            raw: true
+        })
+
+        /** 4. Truy vấn số khách hàng **/
+        const customerStats = await OrderShop.findAll({
+            where: {
+                shop_id: shop_id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate]
+                },
+                '$order.status$': {
+                    [Op.ne]: OrderStatus.CANCELED
+                }
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'status', 'user_id']
+                }
+            ],
+            attributes: [
+                [
+                    Sequelize.fn(
+                        'COUNT',
+                        Sequelize.fn(
+                            'DISTINCT',
+                            Sequelize.col('order.user_id')
+                        )
+                    ), 'totalCustomers'
+                ]
+            ],
+            raw: true
+        })
+
+        /** 5. Định dạng dữ liệu trả về **/
+        const overview = {
+            totalRevenue: parseFloat(orderShopStats[0]?.totalRevenue || 0),
+            totalOrders: parseInt(orderShopStats[0]?.totalOrders || 0),
+            totalSoldProducts: parseInt(productStats[0]?.totalSoldProducts || 0),
+            totalCustomers: parseInt(customerStats[0]?.totalCustomers || 0),
+            orderStatusCounts: statusStats.reduce((acc, stat) => {
+                acc[stat.status] = parseInt(stat.count || 0);
+                return acc;
+            }, {
+                [OrderStatus.PENDING]: 0,
+                [OrderStatus.PAID]: 0,
+                [OrderStatus.SHIPPED]: 0,
+                [OrderStatus.COMPLETED]: 0,
+                [OrderStatus.CANCELED]: 0
+            })
+        }
+
+        return ResponseModel.success('Thống kê tổng quan cửa hàng', {
+            overview: overview
+        });
+
+    } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }

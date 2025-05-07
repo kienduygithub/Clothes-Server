@@ -54,3 +54,36 @@ export const cancelOrderUser = async (req, res) => {
         })
     }
 }
+
+/** ADMIN - OWNER **/
+export const fetchListShopOrder = async (req, res) => {
+    try {
+        const shop_id = req.user.shopId;
+        const status = req.query.status;
+        const response = await OrderService.fetchListShopOrder(shop_id, status);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}
+
+export const fetchShopOverview = async (req, res) => {
+    try {
+        const shop_id = req.user.shopId;
+        const response = await OrderService.fetchShopOverview(
+            shop_id,
+            req.body
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}

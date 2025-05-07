@@ -23,4 +23,17 @@ OrderRouter.post(
     checkUserAuthenticationMobile,
     OrderController.cancelOrderUser
 )
+
+/** ADMIN - OWNER **/
+OrderRouter.get(
+    '/order/shop',
+    checkUserAuthentication,
+    OrderController.fetchListShopOrder
+)
+
+OrderRouter.get(
+    '/overview/stats',
+    checkUserAuthentication,
+    OrderController.fetchShopOverview
+)
 export default OrderRouter;
