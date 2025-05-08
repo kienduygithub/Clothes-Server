@@ -1078,7 +1078,7 @@ export const fetchOrderStats = async (shop_id, { startDate, endDate, groupBy = '
             totalOrders: statusCounts.reduce((sum, stat) => sum + parseInt(stat.count || 0), 0)
         });
     } catch (error) {
-        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi lấy thống kê đơn hàng', error?.body);
+        return ResponseModel.error(error?.status, error?.message, error?.body);
     }
 };
 
@@ -1190,6 +1190,99 @@ export const fetchTopSellingProducts = async (shop_id, { startDate, endDate, lim
             products: formattedProducts
         });
     } catch (error) {
-        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi lấy thống kê đơn hàng', error?.body);
+        return ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+};
+
+// Thống kê khách hàng gồm tổng số khách hàng và top khách hàng chi tiêu cao
+export const fetchCustomerStats = async (shop_id, { startDate, endDate, limit = 5 }) => {
+    try {
+        if (!shop_id || !startDate || !endDate) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shop_id: shop_id ?? '',
+                startDate: startDate ?? '',
+                endDate: endDate ?? '',
+            });
+        }
+
+        /** 1. Tổng số khách hàng **/
+        const totalCustomers = await OrderShop.findAll({
+            where: {
+                shop_id: shop_id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate]
+                },
+                '$order.status$': {
+                    [Op.ne]: OrderStatus.CANCELED
+                },
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'status', 'user_id']
+                }
+            ],
+            attributes: [
+                [Sequelize.fn('COUNT', Sequelize.fn('DISTINCT', Sequelize.col('order.user_id'))), 'totalCustomers']
+            ],
+            raw: true
+        })
+
+        /** 2. Top khách hàng chi tiêu cao **/
+        const topCustomers = await OrderShop.findAll({
+            where: {
+                shop_id: shop_id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate],
+                },
+                '$order.status$': {
+                    [Op.ne]: OrderStatus.CANCELED
+                }
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'status', 'user_id'],
+                    include: [
+                        {
+                            model: User,
+                            as: 'user',
+                            attributes: ['id', 'name', 'email']
+                        }
+                    ]
+                }
+            ],
+            attributes: [
+                [Sequelize.col('order.user_id'), 'userId'],
+                [Sequelize.col('order->user.name'), 'name'],
+                [Sequelize.col('order->user.email'), 'email'],
+                [Sequelize.fn('SUM', Sequelize.col('final_total')), 'totalSpent']
+            ],
+            group: [
+                'order.user_id',
+                'order->user.name',
+                'order->user.email'
+            ],
+            order: [[Sequelize.literal('totalSpent'), 'DESC']],
+            limit,
+            raw: true
+        })
+
+        /** 3. Định dạng dữ liệu trả về **/
+        const formattedCustomers = topCustomers.map(customer => ({
+            userId: customer.userId,
+            name: customer.name,
+            email: customer.email,
+            totalSpent: parseFloat(customer.totalSpent || 0)
+        }));
+
+        return ResponseModel.success('Thống kê khách hàng', {
+            totalCustomers: parseInt(totalCustomers[0]?.totalCustomers || 0),
+            topCustomers: formattedCustomers
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status, error?.message, error?.body);
     }
 };

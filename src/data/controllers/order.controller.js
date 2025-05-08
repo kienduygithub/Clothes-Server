@@ -141,3 +141,21 @@ export const fetchTopSellingProducts = async (req, res) => {
         })
     }
 }
+
+// Thống kê khách hàng gồm tổng số khách hàng và top khách hàng chi tiêu cao
+export const fetchCustomerStats = async (req, res) => {
+    try {
+        const shop_id = req.user.shopId;
+        const response = await OrderService.fetchCustomerStats(
+            shop_id,
+            req.body
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}
