@@ -66,4 +66,11 @@ OrderRouter.post(
     checkUserAuthentication,
     OrderController.fetchLowStockProducts
 )
+
+OrderRouter.post(
+    '/overview/stats/order/completion-rate',
+    checkUserAuthentication,
+    OrderController.fetchOrderCompletionStats
+)
+
 export default OrderRouter;

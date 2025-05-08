@@ -1358,3 +1358,77 @@ export const fetchLowStockProducts = async (shop_id, { minStock = 10 }) => {
         return ResponseModel.error(error?.status, error?.message, error?.body);
     }
 };
+
+// Thống kê tỷ lệ hoàn thành đơn hàng
+export const fetchOrderCompletionStats = async (shop_id, { startDate, endDate, groupBy = 'day' }) => {
+    try {
+        if (!shop_id || !startDate || !endDate || !['day', 'week', 'month'].includes(groupBy)) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai thông tin', {
+                shop_id: shop_id ?? '',
+                startDate: startDate ?? '',
+                endDate: endDate ?? '',
+                groupBy: groupBy ?? ''
+            });
+        }
+
+        const groupByExpression = {
+            day: Sequelize.fn('DATE', Sequelize.col('OrderShop.createdAt')),
+            week: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%u'),
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt', '%Y-%m'))
+        }[groupBy];
+
+        const completionData = await OrderShop.findAll({
+            where: {
+                shop_id: shop_id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate]
+                }
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'status'],
+                }
+            ],
+            attributes: [
+                [groupByExpression, 'period'],
+                [Sequelize.col('order.status'), 'status'],
+                [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
+            ],
+            group: [groupByExpression, 'order.status'],
+            order: [[Sequelize.col('period'), 'ASC']],
+            raw: true
+        })
+
+        const formattedData = completionData.reduce((acc, item) => {
+            if (!acc[item.period]) {
+                acc[item.period] = { period: item.period, completed: 0, canceled: 0, total: 0 };
+            }
+            if (item.status === 'completed') {
+                acc[item.period].completed = parseInt(item.count || 0);
+            } else if (item.status === 'canceled') {
+                acc[item.period].canceled = parseInt(item.count || 0);
+            }
+            acc[item.period].total += parseInt(item.count || 0);
+            return acc;
+        }, {});
+
+        const summary = Object.values(formattedData).reduce(
+            (acc, item) => {
+                acc.completed += item.completed;
+                acc.canceled += item.canceled;
+                acc.total += item.total;
+                return acc;
+            },
+            { completed: 0, canceled: 0, total: 0 }
+        );
+
+        return ResponseModel.success('Thống kê tỷ lệ hoàn thành đơn hàng', {
+            byPeriod: Object.values(formattedData),
+            summary
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+};

@@ -160,10 +160,29 @@ export const fetchCustomerStats = async (req, res) => {
     }
 }
 
+// Thống kê các biến thể sản phẩm tồn kho thấp
 export const fetchLowStockProducts = async (req, res) => {
     try {
         const shop_id = req.user.shopId;
         const response = await OrderService.fetchLowStockProducts(
+            shop_id,
+            req.body
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}
+
+// Thống kê tỷ lệ hoàn thành đơn hàng
+export const fetchOrderCompletionStats = async (req, res) => {
+    try {
+        const shop_id = req.user.shopId;
+        const response = await OrderService.fetchOrderCompletionStats(
             shop_id,
             req.body
         );
