@@ -31,33 +31,39 @@ OrderRouter.get(
     OrderController.fetchListShopOrder
 )
 
-OrderRouter.get(
+OrderRouter.post(
     '/overview/stats',
     checkUserAuthentication,
     OrderController.fetchShopOverview
 )
 
-OrderRouter.get(
+OrderRouter.post(
     '/overview/stats/by-period',
     checkUserAuthentication,
     OrderController.fetchRevenueOverTime
 )
 
-OrderRouter.get(
+OrderRouter.post(
     '/overview/stats/order/by-status-or-period',
     checkUserAuthentication,
     OrderController.fetchOrderStats
 )
 
-OrderRouter.get(
+OrderRouter.post(
     '/overview/stats/product/top-selling',
     checkUserAuthentication,
     OrderController.fetchTopSellingProducts
 )
 
-OrderRouter.get(
+OrderRouter.post(
     '/overview/stats/customer/total-and-top-rank',
     checkUserAuthentication,
     OrderController.fetchCustomerStats
+)
+
+OrderRouter.post(
+    '/overview/stats/product/low-stock',
+    checkUserAuthentication,
+    OrderController.fetchLowStockProducts
 )
 export default OrderRouter;

@@ -1286,3 +1286,75 @@ export const fetchCustomerStats = async (shop_id, { startDate, endDate, limit = 
         return ResponseModel.error(error?.status, error?.message, error?.body);
     }
 };
+
+// Thống kê các biến thể sản phẩm tồn kho thấp
+export const fetchLowStockProducts = async (shop_id, { minStock = 10 }) => {
+    try {
+        if (!shop_id) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shop_id: shop_id ?? '',
+            });
+        }
+
+        /** 1. Tổng số khách hàng **/
+        const lowStockProducts = await ProductVariant.findAll({
+            where: {
+                stock_quantity: {
+                    [Op.lte]: minStock
+                },
+                '$product.shopId$': shop_id
+            },
+            include: [
+                {
+                    model: Product,
+                    as: 'product',
+                    attributes: ['id', 'product_name'],
+                    where: { shopId: shop_id }
+                },
+                {
+                    model: Color,
+                    as: 'color',
+                    attributes: ['id', 'color_name', 'color_code'],
+                    required: false
+                },
+                {
+                    model: Size,
+                    as: 'size',
+                    attributes: ['id', 'size_code'],
+                    required: false
+                }
+            ],
+            attributes: ['id', 'sku', 'image_url', 'stock_quantity'],
+            order: [['stock_quantity', 'ASC']],
+            raw: true
+        })
+
+        /** 2. Định dạng dữ liệu trả về **/
+        const formattedProducts = lowStockProducts.map(product => ({
+            id: product.id,
+            product_variant_id: product.id,
+            sku: product.sku,
+            image_url: product.image_url,
+            stock_quantity: parseInt(product.stock_quantity || 0),
+            product: {
+                id: product['product.id'],
+                product_name: product['product.product_name']
+            },
+            color: product['color.color_name'] ? {
+                id: product['color.id'],
+                color_name: product['color.color_name'],
+                color_code: product['color.color_code']
+            } : undefined,
+            size: product['size.size_code'] ? {
+                id: product['size.id'],
+                size_code: product['size.size_code']
+            } : undefined
+        }));
+
+        return ResponseModel.success('Danh sách sản phẩm tồn kho thấp', {
+            products: formattedProducts
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+};
