@@ -48,4 +48,10 @@ OrderRouter.get(
     checkUserAuthentication,
     OrderController.fetchOrderStats
 )
+
+OrderRouter.get(
+    '/overview/stats/product/top-selling',
+    checkUserAuthentication,
+    OrderController.fetchTopSellingProducts
+)
 export default OrderRouter;

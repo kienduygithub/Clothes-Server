@@ -1043,7 +1043,7 @@ export const fetchOrderStats = async (shop_id, { startDate, endDate, groupBy = '
             attributes: [
                 [groupByExpression, 'period'],
                 [Sequelize.col('order.status'), 'status'],
-                [Sequelize.fn('COUNT', db.Sequelize.col('OrderShop.id')), 'count']
+                [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
             ],
             group: [groupByExpression, 'order.status'],
             order: [[Sequelize.col('period'), 'ASC']],
@@ -1055,7 +1055,7 @@ export const fetchOrderStats = async (shop_id, { startDate, endDate, groupBy = '
             include: [{ model: Order, as: 'order', attributes: ['id', 'status'] }],
             attributes: [
                 [Sequelize.col('order.status'), 'status'],
-                [Sequelize.fn('COUNT', db.Sequelize.col('OrderShop.id')), 'count']
+                [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
             ],
             group: ['order.status'],
             raw: true
@@ -1076,6 +1076,118 @@ export const fetchOrderStats = async (shop_id, { startDate, endDate, groupBy = '
                 return acc;
             }, { pending: 0, paid: 0, shipped: 0, completed: 0, canceled: 0 }),
             totalOrders: statusCounts.reduce((sum, stat) => sum + parseInt(stat.count || 0), 0)
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi lấy thống kê đơn hàng', error?.body);
+    }
+};
+
+// Thống kê sản phẩm bán chạy
+export const fetchTopSellingProducts = async (shop_id, { startDate, endDate, limit = 10 }) => {
+    try {
+        if (!shop_id || !startDate || !endDate) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shop_id: shop_id ?? '',
+                startDate: startDate ?? '',
+                endDate: endDate ?? '',
+            });
+        }
+
+        const topProducts = await OrderItem.findAll({
+            where: {
+                '$order_shop.shop_id$': shop_id,
+                '$order_shop.createdAt$': {
+                    [Op.between]: [startDate, endDate]
+                },
+                '$order_shop.order.status$': {
+                    [Op.ne]: OrderStatus.CANCELED
+                }
+            },
+            include: [
+                {
+                    model: OrderShop,
+                    as: 'order_shop',
+                    attributes: ['id', 'shop_id', 'order_id', 'createdAt'],
+                    include: [
+                        {
+                            model: Order,
+                            as: 'order',
+                            attributes: ['id', 'status']
+                        }
+                    ],
+                },
+                {
+                    model: ProductVariant,
+                    as: 'product_variant',
+                    attributes: ['id', 'sku', 'image_url', 'productId'],
+                    include: [
+                        {
+                            model: Product,
+                            as: 'product',
+                            attributes: ['id', 'product_name', 'unit_price']
+                        },
+                        {
+                            model: Color,
+                            as: 'color',
+                            attributes: ['id', 'color_name', 'color_code'],
+                            required: false
+                        },
+                        {
+                            model: Size,
+                            as: 'size',
+                            attributes: ['id', 'size_code'],
+                            required: false
+                        }
+                    ]
+                }
+            ],
+            attributes: [
+                [Sequelize.fn('SUM', Sequelize.col('quantity')), 'totalQuantity'],
+                [Sequelize.fn('SUM', Sequelize.literal('`OrderItem`.`quantity` * `product_variant->product`.`unit_price`')), 'totalRevenue']
+            ],
+            group: [
+                'product_variant.id',
+                'product_variant.sku',
+                'product_variant.image_url',
+                'product_variant->product.id',
+                'product_variant->product.product_name',
+                'product_variant->product.unit_price',
+                'product_variant->color.id',
+                'product_variant->color.color_name',
+                'product_variant->color.color_code',
+                'product_variant->size.id',
+                'product_variant->size.size_code'
+            ],
+            order: [[Sequelize.literal('totalQuantity'), 'DESC']],
+            limit,
+            raw: true
+        })
+
+        const formattedProducts = topProducts.map(product => ({
+            id: product['product_variant.id'],
+            product_variant_id: product['product_variant.id'],
+            sku: product['product_variant.sku'],
+            imageUrl: product['product_variant.image_url'],
+            product: {
+                id: product['product_variant.product.id'],
+                name: product['product_variant.product.product_name'],
+                unitPrice: parseFloat(product['product_variant.product.unit_price'] || 0)
+            },
+            color: product['product_variant.color.color_name'] ? {
+                id: product['product_variant.color.id'],
+                color_name: product['product_variant.color.color_name'],
+                color_code: product['product_variant.color.color_code']
+            } : undefined,
+            size: product['product_variant.size.size_code'] ? {
+                id: product['product_variant.size.id'],
+                size_code: product['product_variant.size.size_code']
+            } : undefined,
+            totalQuantity: parseInt(product.totalQuantity || 0),
+            totalRevenue: parseFloat(product.totalRevenue || 0)
+        }));
+
+        return ResponseModel.success('Danh sách sản phẩm bán chạy', {
+            products: formattedProducts
         });
     } catch (error) {
         return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi lấy thống kê đơn hàng', error?.body);
