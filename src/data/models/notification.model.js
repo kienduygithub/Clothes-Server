@@ -23,9 +23,29 @@ module.exports = (sequelize, DataTypes) => {
             onDelete: 'CASCADE'
         },
         roles: DataTypes.ENUM('Admin', 'Owner', 'Customer'),
-        type: DataTypes.ENUM("Drawback", "Order", "Product"),
-        title: DataTypes.STRING,
-        message: DataTypes.STRING,
+        type: DataTypes.ENUM(
+            'ORDER_NEW',
+            'ORDER_CANCELED',
+            'STORE_REGISTRATION_REQUEST',
+            'STORE_REGISTRATION_REJECTED',
+            'PRODUCT_LOW_STOCK'
+        ),
+        reference_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
+        reference_type: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        data: {
+            type: DataTypes.JSON, /** Lưu thêm thông tin bổ sung **/
+            allowNull: true,
+        },
+        action: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
         is_read: DataTypes.BOOLEAN
     }, {
         sequelize,

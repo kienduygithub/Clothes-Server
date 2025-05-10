@@ -23,9 +23,8 @@ import {
     sequelize,
     Sequelize
 } from "../models";
-import { NotificationType, OrderStatus } from "../../common/utils/status";
+import { NotificationActionType, NotificationReferenceType, NotificationType, OrderStatus } from "../../common/utils/status";
 import { UserRoles } from "../../common/utils/roles";
-import { raw } from "body-parser";
 
 export const createOrderMobile = async (user_id, cartInfo) => {
     const t = await sequelize.transaction();
@@ -86,7 +85,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                     await t.rollback();
                     ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thông tin sản phẩm không hợp lệ', { item });
                 }
-                console.log(item.product_variant.id);
+
                 const variant = await ProductVariant.findOne({
                     where: { id: item.product_variant.id },
                     transaction: t
@@ -241,10 +240,89 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                 }
             },
             transaction: t
-        })
+        });
 
         /** 6. Commit */
         await t.commit();
+
+        /** 7. Tạo thông báo **/
+        const existingCustomerNotification = await Notification.findOne({
+            where: {
+                user_id: user_id,
+                type: NotificationType.ORDER_NEW,
+                reference_id: order.id,
+                is_read: false
+            }
+        });
+
+        if (!existingCustomerNotification) {
+            const customerNotification = await Notification.create({
+                user_id,
+                roles: UserRoles.CUSTOMER,
+                type: NotificationType.ORDER_NEW,
+                reference_id: order.id,
+                reference_type: NotificationReferenceType.ORDER,
+                data: {
+                    order_id: order.id,
+                },
+                action: NotificationActionType.VIEW_ORDER,
+                is_read: false,
+            });
+            /** => Sau bắn socket **/
+            try {
+
+            } catch (socketError) {
+                console.error('Failed to emit socket notification for customer:', socketError);
+            }
+        }
+
+        // Thông báo cho chủ cửa hàng
+        for (const orderShop of orderShops) {
+            const shop = await Shop.findOne({
+                where: { id: orderShop.shop_id },
+                include: [{
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'roles']
+                }]
+            });
+
+            const shopOwner = shop?.user;
+            if (shopOwner && shopOwner.roles === UserRoles.OWNER) {
+                const existingOwnerNotification = await Notification.findOne({
+                    where: {
+                        user_id: shopOwner.id,
+                        type: NotificationType.ORDER_NEW,
+                        reference_id: order.id,
+                        is_read: false
+                    }
+                });
+
+                if (!existingOwnerNotification) {
+                    const ownerNotification = await Notification.create({
+                        user_id: shopOwner.id,
+                        roles: UserRoles.OWNER,
+                        type: NotificationType.ORDER_NEW,
+                        reference_id: order.id,
+                        reference_type: NotificationReferenceType.ORDER,
+                        data: {
+                            order_id: order.id,
+                            shop_name: shop.shop_name,
+                            customer_id: user_id,
+                            shop_total: orderShop.final_total
+                        },
+                        action: NotificationActionType.VIEW_ORDER,
+                        is_read: false,
+                    });
+                    /** => Sau bắn socket **/
+                    try {
+
+                    } catch (socketError) {
+                        console.error('Failed to emit socket notification for owner:', socketError);
+                    }
+                }
+            }
+        }
 
         return ResponseModel.success('Tạo đơn hàng thành công', {
             orders: [
@@ -589,28 +667,75 @@ export const cancelOrderUser = async (user_id, order_id) => {
             status_changed_at: new Date()
         }, { transaction: transaction });
 
-        await Notification.create({
-            user_id,
-            roles: UserRoles.CUSTOMER,
-            type: NotificationType.ORDER,
-            title: `Hủy đơn hàng #${order_id}`,
-            message: `Đơn hàng #${order_id} của bạn đã được hủy thành công.`,
-            is_read: false,
-            created_at: new Date()
-        }, { transaction });
+        /** Kiểm tra và tạo thông báo tới khách hàng **/
+        const existingCustomerNotification = await Notification.findOne({
+            where: {
+                user_id: user_id,
+                type: NotificationType.ORDER_CANCELED,
+                reference_id: order_id,
+                is_read: false
+            },
+            transaction
+        });
+
+        if (!existingCustomerNotification) {
+            const customerNotification = await Notification.create({
+                user_id,
+                roles: UserRoles.CUSTOMER,
+                type: NotificationType.ORDER_CANCELED,
+                reference_id: order_id,
+                reference_type: NotificationReferenceType.ORDER,
+                data: {
+                    order_id: order_id,
+                    reason: 'Hủy bởi người dùng'
+                },
+                action: NotificationActionType.VIEW_ORDER,
+                is_read: false,
+            }, { transaction });
+            /** => Sau bắn socket **/
+            try {
+
+            } catch (socketError) {
+                console.error('Failed to emit socket notification for customer:', socketError);
+            }
+        }
 
         for (const orderShop of order.order_shops) {
             const shopOwner = orderShop.shop.user;
             if (shopOwner && shopOwner.roles === UserRoles.OWNER) {
-                await Notification.create({
-                    user_id: shopOwner.id,
-                    roles: UserRoles.OWNER,
-                    type: NotificationType.ORDER,
-                    title: `Đơn hàng #${order_id} bị hủy`,
-                    message: `Đơn hàng #${order_id} từ cửa hàng của bạn đã bị khách hàng hủy.`,
-                    is_read: false,
-                    created_at: new Date()
-                }, { transaction: transaction });
+                const existingOwnerNotification = await Notification.findOne({
+                    where: {
+                        user_id: shopOwner.id,
+                        type: NotificationType.ORDER_CANCELED,
+                        reference_id: order_id,
+                        is_read: false
+                    },
+                    transaction
+                });
+
+                if (!existingOwnerNotification) {
+                    const ownerNotification = await Notification.create({
+                        user_id: shopOwner.id,
+                        roles: UserRoles.OWNER,
+                        type: NotificationType.ORDER_CANCELED,
+                        reference_id: order_id,
+                        reference_type: NotificationReferenceType.ORDER,
+                        data: {
+                            order_id: order_id,
+                            shop_name: orderShop.shop.shop_name,
+                            customer_id: user_id,
+                        },
+                        action: NotificationActionType.VIEW_ORDER,
+                        is_read: false,
+                    }, { transaction: transaction });
+
+                    /** => Sau bắn socket **/
+                    try {
+
+                    } catch (socketError) {
+                        console.error('Failed to emit socket notification for customer:', socketError);
+                    }
+                }
             }
         }
 

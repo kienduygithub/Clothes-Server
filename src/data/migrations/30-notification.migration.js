@@ -24,19 +24,30 @@ module.exports = {
                 defaultValue: "Admin"
             },
             type: {
-                type: Sequelize.ENUM("Drawback", "Order", "Product"),
+                type: Sequelize.ENUM(
+                    'ORDER_NEW',
+                    'ORDER_CANCELED',
+                    'STORE_REGISTRATION_REQUEST',
+                    'STORE_REGISTRATION_REJECTED',
+                    'PRODUCT_LOW_STOCK'
+                ),
                 allowNull: false,
-                defaultValue: "Drawback"
             },
-            title: {
-                type: Sequelize.STRING,
-                allowNull: false,
-                defaultValue: ''
+            reference_id: {
+                type: Sequelize.INTEGER,
+                allowNull: true
             },
-            message: {
+            reference_type: {
                 type: Sequelize.STRING,
-                allowNull: false,
-                defaultValue: ''
+                allowNull: true,
+            },
+            data: {
+                type: Sequelize.JSON, /** Lưu thêm thông tin bổ sung **/
+                allowNull: true,
+            },
+            action: {
+                type: Sequelize.STRING,
+                allowNull: true
             },
             is_read: {
                 type: Sequelize.BOOLEAN,
