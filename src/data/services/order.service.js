@@ -264,6 +264,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                 reference_type: NotificationReferenceType.ORDER,
                 data: {
                     order_id: order.id,
+                    order_total: final_total
                 },
                 action: NotificationActionType.VIEW_ORDER,
                 is_read: false,

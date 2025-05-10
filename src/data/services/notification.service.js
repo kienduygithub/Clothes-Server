@@ -42,7 +42,7 @@ export const fetchListNotificationUser = async (user_id, { page = 1, limit = 10 
                 user_id: notification.user_id,
                 roles: notification.roles,
                 type: notification.type,
-                reference_id: notification.reference_id,
+                reference_id: notification.reference_id !== null ? notification.reference_id : 0,
                 reference_type: notification.reference_type,
                 data: notification.data !== null ? JSON.parse(notification.data) : {},
                 action: notification.action,
