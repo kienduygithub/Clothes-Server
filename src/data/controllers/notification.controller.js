@@ -4,7 +4,7 @@ import * as NotificationService from "../services/notification.service";
 export const fetchListNotificationUser = async (req, res) => {
     try {
         const user_id = req.params.userId;
-        const response = NotificationService.fetchListNotificationUser(user_id);
+        const response = await NotificationService.fetchListNotificationUser(user_id);
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({

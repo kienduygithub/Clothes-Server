@@ -21,6 +21,7 @@ import FavoriteRouter from './routes/favorite.route';
 import CartRouter from './routes/cart.route';
 import OrderRouter from './routes/order.route';
 import ChatHistoryRouter from './routes/chatbot.route';
+import NotificationRouter from './routes/notification.route';
 
 require('dotenv').config();
 
@@ -67,6 +68,7 @@ app.use(
     CartRouter,
     OrderRouter,
     ChatHistoryRouter,
+    NotificationRouter,
     SocketIORouter
 );
 
