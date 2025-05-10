@@ -1167,11 +1167,11 @@ export const fetchTopSellingProducts = async (shop_id, { startDate, endDate, lim
             id: product['product_variant.id'],
             product_variant_id: product['product_variant.id'],
             sku: product['product_variant.sku'],
-            imageUrl: product['product_variant.image_url'],
+            image_url: product['product_variant.image_url'],
             product: {
                 id: product['product_variant.product.id'],
-                name: product['product_variant.product.product_name'],
-                unitPrice: parseFloat(product['product_variant.product.unit_price'] || 0)
+                product_name: product['product_variant.product.product_name'],
+                unit_price: parseFloat(product['product_variant.product.unit_price'] || 0)
             },
             color: product['product_variant.color.color_name'] ? {
                 id: product['product_variant.color.id'],
@@ -1249,7 +1249,7 @@ export const fetchCustomerStats = async (shop_id, { startDate, endDate, limit = 
                         {
                             model: User,
                             as: 'user',
-                            attributes: ['id', 'name', 'email']
+                            attributes: ['id', 'name', 'email', 'image_url']
                         }
                     ]
                 }
@@ -1258,12 +1258,14 @@ export const fetchCustomerStats = async (shop_id, { startDate, endDate, limit = 
                 [Sequelize.col('order.user_id'), 'userId'],
                 [Sequelize.col('order->user.name'), 'name'],
                 [Sequelize.col('order->user.email'), 'email'],
+                [Sequelize.col('order->user.image_url'), 'image_url'],
                 [Sequelize.fn('SUM', Sequelize.col('final_total')), 'totalSpent']
             ],
             group: [
                 'order.user_id',
                 'order->user.name',
-                'order->user.email'
+                'order->user.email',
+                'order->user.image_url'
             ],
             order: [[Sequelize.literal('totalSpent'), 'DESC']],
             limit,
@@ -1275,6 +1277,7 @@ export const fetchCustomerStats = async (shop_id, { startDate, endDate, limit = 
             userId: customer.userId,
             name: customer.name,
             email: customer.email,
+            image_url: customer.image_url,
             totalSpent: parseFloat(customer.totalSpent || 0)
         }));
 
