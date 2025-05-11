@@ -17,3 +17,33 @@ export const fetchListNotificationUser = async (req, res) => {
         })
     }
 }
+
+export const markNotificationAsRead = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const notification_id = req.params.notificationId
+        const response = await NotificationService.markNotificationAsRead(user_id, notification_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body || {}
+        })
+    }
+}
+
+export const fetchOrderDetails = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const order_id = req.params.orderId
+        const response = await NotificationService.fetchOrderDetails(user_id, order_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body || {}
+        })
+    }
+}
