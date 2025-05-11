@@ -25,6 +25,7 @@ import {
 } from "../models";
 import { NotificationActionType, NotificationReferenceType, NotificationType, OrderStatus } from "../../common/utils/status";
 import { UserRoles } from "../../common/utils/roles";
+import { pushNotificationUser } from "../../common/utils/socket.service";
 
 export const createOrderMobile = async (user_id, cartInfo) => {
     const t = await sequelize.transaction();
@@ -271,7 +272,22 @@ export const createOrderMobile = async (user_id, cartInfo) => {
             });
             /** => Sau bắn socket **/
             try {
-
+                const notificationPayload = {
+                    type: 'notification',
+                    notification: {
+                        id: customerNotification.id,
+                        user_id: customerNotification.user_id,
+                        roles: customerNotification.roles,
+                        type: customerNotification.type,
+                        reference_id: customerNotification.reference_id,
+                        reference_type: customerNotification.reference_type,
+                        data: customerNotification.data,
+                        action: customerNotification.action,
+                        is_read: customerNotification.is_read,
+                        created_at: customerNotification.createdAt
+                    }
+                };
+                pushNotificationUser(user_id, notificationPayload);
             } catch (socketError) {
                 console.error('Failed to emit socket notification for customer:', socketError);
             }
@@ -317,7 +333,23 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                     });
                     /** => Sau bắn socket **/
                     try {
+                        const notificationPayload = {
+                            type: 'notification',
+                            notification: {
+                                id: ownerNotification.id,
+                                user_id: ownerNotification.user_id,
+                                roles: ownerNotification.roles,
+                                type: ownerNotification.type,
+                                reference_id: ownerNotification.reference_id,
+                                reference_type: ownerNotification.reference_type,
+                                data: ownerNotification.data,
+                                action: ownerNotification.action,
+                                is_read: ownerNotification.is_read,
+                                created_at: ownerNotification.createdAt
+                            }
+                        };
 
+                        pushNotificationUser(shopOwner.id, notificationPayload);
                     } catch (socketError) {
                         console.error('Failed to emit socket notification for owner:', socketError);
                     }
@@ -695,7 +727,22 @@ export const cancelOrderUser = async (user_id, order_id) => {
             }, { transaction });
             /** => Sau bắn socket **/
             try {
-
+                const notificationPayload = {
+                    type: 'notification',
+                    notification: {
+                        id: customerNotification.id,
+                        user_id: customerNotification.user_id,
+                        roles: customerNotification.roles,
+                        type: customerNotification.type,
+                        reference_id: customerNotification.reference_id,
+                        reference_type: customerNotification.reference_type,
+                        data: customerNotification.data,
+                        action: customerNotification.action,
+                        is_read: customerNotification.is_read,
+                        created_at: customerNotification.createdAt
+                    }
+                };
+                pushNotificationUser(user_id, notificationPayload);
             } catch (socketError) {
                 console.error('Failed to emit socket notification for customer:', socketError);
             }
@@ -732,7 +779,22 @@ export const cancelOrderUser = async (user_id, order_id) => {
 
                     /** => Sau bắn socket **/
                     try {
-
+                        const notificationPayload = {
+                            type: 'notification',
+                            notification: {
+                                id: ownerNotification.id,
+                                user_id: ownerNotification.user_id,
+                                roles: ownerNotification.roles,
+                                type: ownerNotification.type,
+                                reference_id: ownerNotification.reference_id,
+                                reference_type: ownerNotification.reference_type,
+                                data: ownerNotification.data,
+                                action: ownerNotification.action,
+                                is_read: ownerNotification.is_read,
+                                created_at: ownerNotification.createdAt
+                            }
+                        };
+                        pushNotificationUser(orderShop.shop.id, notificationPayload);
                     } catch (socketError) {
                         console.error('Failed to emit socket notification for customer:', socketError);
                     }
