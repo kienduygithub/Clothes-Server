@@ -10,4 +10,20 @@ NotificationRouter.get(
     NotificationController.fetchListNotificationUser
 )
 
+NotificationRouter.get(
+    '/notification/unread-count',
+    checkUserAuthenticationMobile,
+    NotificationController.fetchUnreadNotificationCount
+)
+
+NotificationRouter.patch(
+    '/notification/user/:userId/:notificationId/read',
+    NotificationController.markNotificationAsRead
+)
+
+NotificationRouter.get(
+    '/order/user/:userId/:orderId/read',
+    NotificationController.fetchOrderDetails
+)
+
 export default NotificationRouter;

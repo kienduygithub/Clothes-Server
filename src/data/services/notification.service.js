@@ -68,6 +68,27 @@ export const fetchListNotificationUser = async (user_id, { page = 1, limit = 10 
     }
 }
 
+export const fetchUnreadNotificationCount = async (user_id) => {
+    try {
+        if (!user_id || isNaN(user_id)) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "User ID không hợp lệ", {
+                user_id: user_id ?? ''
+            });
+        }
+        const unreadCount = await Notification.count({
+            where: { user_id, is_read: false },
+        });
+
+        const responseData = {
+            unreadCount: unreadCount
+        };
+
+        return ResponseModel.success("Unread notification count", responseData);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const markNotificationAsRead = async (user_id, notification_id) => {
     const transaction = await sequelize.transaction();
     try {
