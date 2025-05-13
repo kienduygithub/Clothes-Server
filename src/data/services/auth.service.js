@@ -1,7 +1,7 @@
 import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import { User, Shop, Cart, sequelize } from "../models";
+import db, { User, Shop, Cart, sequelize } from "../models";
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed } from "../../common/middleware/upload.middleware";
@@ -168,6 +168,50 @@ export const signUp = async (
         if (files?.length) {
             await Promise.all(files.map(file => handleDeleteImageAsFailed(file)));
         }
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const changePassword = async (user_id, data) => {
+    const transaction = await sequelize.transaction();
+    try {
+        const { currentPassword, newPassword } = data;
+        if (!user_id || !currentPassword || !newPassword) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                user_id: user_id ?? '',
+                currentPassword: currentPassword ?? '',
+                newPassword: newPassword ?? ''
+            });
+        }
+
+        let user = await db.User.findOne({
+            where: { id: user_id },
+            attributes: ['id', 'password'],
+            transaction
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại', {});
+        }
+
+        const matchPassword = comparePassword(currentPassword, user.password);
+
+        if (!matchPassword) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Mật khẩu không đúng', {});
+        }
+
+        const hashedPassword = hashPassword(newPassword);
+
+        user.password = hashedPassword;
+
+        await user.save();
+
+        await transaction.commit();
+
+        return ResponseModel.success('Đổi mật khẩu thành công', true);
+    } catch (error) {
+        await transaction.rollback();
+        console.log(error);
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }

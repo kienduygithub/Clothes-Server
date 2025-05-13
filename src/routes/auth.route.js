@@ -7,6 +7,7 @@ import {
     fetchDetailUser,
     registerShopMobile,
     checkUserForShopRegistration,
+    changePassword,
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
@@ -17,6 +18,12 @@ import {
 import { uploadServer } from "../common/middleware/upload.middleware";
 
 const AuthRouter = express.Router();
+
+AuthRouter.post(
+    '/account/change-password',
+    checkUserAuthentication,
+    changePassword
+)
 
 AuthRouter.post(
     '/auth/sign-up',

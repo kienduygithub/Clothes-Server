@@ -44,6 +44,20 @@ export const signUp = async (req, res) => {
     }
 }
 
+export const changePassword = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const response = await authServices.changePassword(userId, req.body);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const signInMobile = async (req, res) => {
     try {
         const userInfo = req.body;
