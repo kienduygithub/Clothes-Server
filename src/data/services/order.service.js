@@ -1211,26 +1211,27 @@ export const fetchRevenueOverTime = async (shop_id, { dateRanges, groupBy = 'day
                 raw: true
             })
 
+            // Chuyển đổi revenueData thành map để tra cứu nhanh
+            const revenueMap = new Map(revenueData.map(item => [item.period, parseFloat(item.revenue || 0)]));
+            // Tạo danh sách đầy đủ các khoảng thời gian
             const formattedData = [];
-
-            if (groupBy === 'month') {
-                // Lấy năm từ startDate
+            if (groupBy === 'day') {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const period = d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
+                    formattedData.push({
+                        period: period,
+                        revenue: revenueMap.get(period) || 0
+                    });
+                }
+            } else if (groupBy === 'month') {
                 const year = new Date(startDate).getFullYear();
-                // Tạo period cho tháng hiện tại (ví dụ: "2025-05")
                 const expectedPeriod = `${year}-${month.toString().padStart(2, '0')}`;
-                // Tìm dữ liệu trong kết quả truy vấn
-                const foundData = revenueData.find(item => item.period === expectedPeriod);
-                // Thêm vào formattedData, nếu không có dữ liệu thì revenue = 0
                 formattedData.push({
                     period: expectedPeriod,
-                    revenue: foundData ? parseFloat(foundData.revenue || 0) : 0
+                    revenue: revenueMap.get(expectedPeriod) || 0
                 });
-            } else {
-                // Xử lý các trường hợp groupBy khác (day, week)
-                formattedData.push(...revenueData.map(item => ({
-                    period: item.period,
-                    revenue: parseFloat(item.revenue || 0)
-                })));
             }
 
             return {
