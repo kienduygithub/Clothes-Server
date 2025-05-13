@@ -975,152 +975,182 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
 }
 
 // Tổng quan cửa hàng 
-export const fetchShopOverview = async (shop_id, { startDate, endDate }) => {
+export const fetchShopOverview = async (shop_id, dateRanges) => {
     try {
 
-        if (!shop_id || !startDate || !endDate) {
+        if (!shop_id || !dateRanges || !Array.isArray(dateRanges?.dateRanges)) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 shop_id: shop_id ?? '',
-                startDate: startDate ?? '',
-                endDate: endDate ?? ''
+                dateRanges: dateRanges ?? ''
             });
         }
 
-        /** 1. Truy vấn tổng doanh thu và số đơn hàng **/
-        const orderShopStats = await OrderShop.findAll({
-            where: {
-                shop_id: shop_id,
-                createdAt: {
-                    [Op.between]: [startDate, endDate]
+        /** Tổng hợp dữ liệu cho từng khoảng thời gian **/
+        const monthlyStats = await Promise.all(dateRanges?.dateRanges.map(async (range) => {
+            const { startDate, endDate, month } = range;
+
+            /** 1. Truy vấn tổng doanh thu và số đơn hàng **/
+            const orderShopStats = await OrderShop.findAll({
+                where: {
+                    shop_id: shop_id,
+                    createdAt: {
+                        [Op.between]: [startDate, endDate]
+                    },
                 },
-            },
-            include: [
-                {
-                    model: Order,
-                    as: 'order',
-                    attributes: ['id', 'status'],
-                    where: {
-                        status: {
-                            [Op.ne]: OrderStatus.CANCELED
+                include: [
+                    {
+                        model: Order,
+                        as: 'order',
+                        attributes: ['id', 'status'],
+                        where: {
+                            status: {
+                                [Op.ne]: OrderStatus.CANCELED
+                            }
                         }
                     }
-                }
-            ],
-            attributes: [
-                [Sequelize.fn('SUM', Sequelize.col('final_total')), 'totalRevenue'],
-                [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'totalOrders']
-            ],
-            raw: true
-        })
+                ],
+                attributes: [
+                    [Sequelize.fn('SUM', Sequelize.col('final_total')), 'totalRevenue'],
+                    [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'totalOrders']
+                ],
+                raw: true
+            })
 
-        console.log('aaaa');
-
-        /** 2. Truy vấn số đơn hàng theo trạng thái **/
-        const statusStats = await OrderShop.findAll({
-            where: {
-                shop_id: shop_id,
-                createdAt: {
-                    [Op.between]: [startDate, endDate]
-                }
-            },
-            include: [
-                {
-                    model: Order,
-                    as: 'order',
-                    attributes: ['id', 'status'],
-                }
-            ],
-            attributes: [
-                [Sequelize.col('order.status'), 'status'],
-                [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
-            ],
-            group: ['order.status'],
-            raw: true
-        })
-
-        /** 3. Truy vấn tổng số sản phẩm bán ra **/
-        const productStats = await OrderItem.findAll({
-            where: {
-                '$order_shop.shop_id$': shop_id,
-                '$order_shop.createdAt$': {
-                    [Op.between]: [startDate, endDate]
+            /** 2. Truy vấn số đơn hàng theo trạng thái **/
+            const statusStats = await OrderShop.findAll({
+                where: {
+                    shop_id: shop_id,
+                    createdAt: {
+                        [Op.between]: [startDate, endDate]
+                    }
                 },
-                '$order_shop.order.status$': {
-                    [Op.ne]: OrderStatus.CANCELED
-                }
-            },
-            include: [
-                {
-                    model: OrderShop,
-                    as: 'order_shop',
-                    attributes: ['shop_id', 'createdAt'],
-                    include: [
-                        {
-                            model: Order,
-                            as: 'order',
-                            attributes: ['status']
-                        }
-                    ]
-                }
-            ],
-            attributes: [
-                [Sequelize.fn('SUM', Sequelize.col('quantity')), 'totalSoldProducts'],
-            ],
-            raw: true
-        })
+                include: [
+                    {
+                        model: Order,
+                        as: 'order',
+                        attributes: ['id', 'status'],
+                    }
+                ],
+                attributes: [
+                    [Sequelize.col('order.status'), 'status'],
+                    [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
+                ],
+                group: ['order.status'],
+                raw: true
+            })
 
-        /** 4. Truy vấn số khách hàng **/
-        const customerStats = await OrderShop.findAll({
-            where: {
-                shop_id: shop_id,
-                createdAt: {
-                    [Op.between]: [startDate, endDate]
+            /** 3. Truy vấn tổng số sản phẩm bán ra **/
+            const productStats = await OrderItem.findAll({
+                where: {
+                    '$order_shop.shop_id$': shop_id,
+                    '$order_shop.createdAt$': {
+                        [Op.between]: [startDate, endDate]
+                    },
+                    '$order_shop.order.status$': {
+                        [Op.ne]: OrderStatus.CANCELED
+                    }
                 },
-                '$order.status$': {
-                    [Op.ne]: OrderStatus.CANCELED
-                }
-            },
-            include: [
-                {
-                    model: Order,
-                    as: 'order',
-                    attributes: ['id', 'status', 'user_id']
-                }
-            ],
-            attributes: [
-                [
-                    Sequelize.fn(
-                        'COUNT',
+                include: [
+                    {
+                        model: OrderShop,
+                        as: 'order_shop',
+                        attributes: ['shop_id', 'createdAt'],
+                        include: [
+                            {
+                                model: Order,
+                                as: 'order',
+                                attributes: ['status']
+                            }
+                        ]
+                    }
+                ],
+                attributes: [
+                    [Sequelize.fn('SUM', Sequelize.col('quantity')), 'totalSoldProducts'],
+                ],
+                raw: true
+            })
+
+            /** 4. Truy vấn số khách hàng **/
+            const customerStats = await OrderShop.findAll({
+                where: {
+                    shop_id: shop_id,
+                    createdAt: {
+                        [Op.between]: [startDate, endDate]
+                    },
+                    '$order.status$': {
+                        [Op.ne]: OrderStatus.CANCELED
+                    }
+                },
+                include: [
+                    {
+                        model: Order,
+                        as: 'order',
+                        attributes: ['id', 'status', 'user_id']
+                    }
+                ],
+                attributes: [
+                    [
                         Sequelize.fn(
-                            'DISTINCT',
-                            Sequelize.col('order.user_id')
-                        )
-                    ), 'totalCustomers'
-                ]
-            ],
-            raw: true
-        })
+                            'COUNT',
+                            Sequelize.fn(
+                                'DISTINCT',
+                                Sequelize.col('order.user_id')
+                            )
+                        ), 'totalCustomers'
+                    ]
+                ],
+                raw: true
+            })
+
+            /** Tổng hợp **/
+            return {
+                month: month || null,
+                startDate,
+                endDate,
+                totalRevenue: parseFloat(orderShopStats[0]?.totalRevenue || 0),
+                totalOrders: parseInt(orderShopStats[0]?.totalOrders || 0),
+                totalSoldProducts: parseInt(productStats[0]?.totalSoldProducts || 0),
+                totalCustomers: parseInt(customerStats[0]?.totalCustomers || 0),
+                orderStatusCounts: statusStats.reduce((acc, stat) => {
+                    acc[stat.status] = parseInt(stat.count || 0);
+                    return acc;
+                }, {
+                    [OrderStatus.PENDING]: 0,
+                    [OrderStatus.PAID]: 0,
+                    [OrderStatus.SHIPPED]: 0,
+                    [OrderStatus.COMPLETED]: 0,
+                    [OrderStatus.CANCELED]: 0
+                })
+            };
+        }))
 
         /** 5. Định dạng dữ liệu trả về **/
-        const overview = {
-            totalRevenue: parseFloat(orderShopStats[0]?.totalRevenue || 0),
-            totalOrders: parseInt(orderShopStats[0]?.totalOrders || 0),
-            totalSoldProducts: parseInt(productStats[0]?.totalSoldProducts || 0),
-            totalCustomers: parseInt(customerStats[0]?.totalCustomers || 0),
-            orderStatusCounts: statusStats.reduce((acc, stat) => {
-                acc[stat.status] = parseInt(stat.count || 0);
-                return acc;
-            }, {
+        const overview = monthlyStats.reduce((acc, stat) => {
+            acc.totalRevenue += stat.totalRevenue;
+            acc.totalOrders += stat.totalOrders;
+            acc.totalSoldProducts += stat.totalSoldProducts;
+            acc.totalCustomers = Math.max(acc.totalCustomers, stat.totalCustomers);
+            Object.keys(stat.orderStatusCounts).forEach(status => {
+                acc.orderStatusCounts[status] += stat.orderStatusCounts[status];
+            });
+            return acc;
+        }, {
+            totalRevenue: 0,
+            totalOrders: 0,
+            totalSoldProducts: 0,
+            totalCustomers: 0,
+            orderStatusCounts: {
                 [OrderStatus.PENDING]: 0,
                 [OrderStatus.PAID]: 0,
                 [OrderStatus.SHIPPED]: 0,
                 [OrderStatus.COMPLETED]: 0,
                 [OrderStatus.CANCELED]: 0
-            })
-        }
+            }
+        });
 
         return ResponseModel.success('Thống kê tổng quan cửa hàng', {
-            overview: overview
+            monthlyStats,
+            overview
         });
 
     } catch (error) {
