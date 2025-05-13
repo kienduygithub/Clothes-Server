@@ -975,10 +975,10 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
 }
 
 // Tổng quan cửa hàng 
-export const fetchShopOverview = async (shop_id, dateRanges) => {
+export const fetchShopOverview = async (shop_id, { dateRanges }) => {
     try {
 
-        if (!shop_id || !dateRanges || !Array.isArray(dateRanges?.dateRanges)) {
+        if (!shop_id || !dateRanges || !Array.isArray(dateRanges)) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 shop_id: shop_id ?? '',
                 dateRanges: dateRanges ?? ''
@@ -986,7 +986,7 @@ export const fetchShopOverview = async (shop_id, dateRanges) => {
         }
 
         /** Tổng hợp dữ liệu cho từng khoảng thời gian **/
-        const monthlyStats = await Promise.all(dateRanges?.dateRanges.map(async (range) => {
+        const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
             const { startDate, endDate, month } = range;
 
             /** 1. Truy vấn tổng doanh thu và số đơn hàng **/
@@ -1159,14 +1159,13 @@ export const fetchShopOverview = async (shop_id, dateRanges) => {
 }
 
 // Thống kê doanh thu theo thời gian
-export const fetchRevenueOverTime = async (shop_id, { startDate, endDate, groupBy = 'day' }) => {
+export const fetchRevenueOverTime = async (shop_id, { dateRanges, groupBy = 'day' }) => {
     try {
 
-        if (!shop_id || !startDate || !endDate || !['day', 'week', 'month'].includes(groupBy)) {
+        if (!shop_id || !dateRanges || !Array.isArray(dateRanges) || !['day', 'week', 'month'].includes(groupBy)) {
             return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai thông tin', {
                 shop_id: shop_id ?? '',
-                startDate: startDate ?? '',
-                endDate: endDate ?? '',
+                dateRanges: dateRanges ?? '',
                 groupBy: groupBy ?? ''
             });
         }
@@ -1183,40 +1182,74 @@ export const fetchRevenueOverTime = async (shop_id, { startDate, endDate, groupB
             month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%m')
         }[groupBy];
 
-        const revenueData = await OrderShop.findAll({
-            where: {
-                shop_id: shop_id,
-                createdAt: {
-                    [Op.between]: [startDate, endDate]
-                },
-                '$order.status$': {
-                    [Op.ne]: OrderStatus.CANCELED
-                }
-            },
-            include: [
-                {
-                    model: Order,
-                    as: 'order',
-                    attributes: ['id', 'status']
-                }
-            ],
-            attributes: [
-                [groupByExpression, 'period'],
-                [Sequelize.fn('SUM', Sequelize.col('final_total')), 'revenue']
-            ],
-            group: [groupByAlias],
-            order: [[Sequelize.col('period'), 'ASC']],
-            raw: true
-        })
+        const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
+            const { startDate, endDate, month } = range;
 
-        const formattedData = revenueData.map(item => ({
-            period: item.period, // Ví dụ: "2025-05-01" (day), "2025-19" (week), "2025-05" (month)
-            revenue: parseFloat(item.revenue || 0)
-        }));
+            const revenueData = await OrderShop.findAll({
+                where: {
+                    shop_id: shop_id,
+                    createdAt: {
+                        [Op.between]: [startDate, endDate]
+                    },
+                    '$order.status$': {
+                        [Op.ne]: OrderStatus.CANCELED
+                    }
+                },
+                include: [
+                    {
+                        model: Order,
+                        as: 'order',
+                        attributes: ['id', 'status']
+                    }
+                ],
+                attributes: [
+                    [groupByExpression, 'period'],
+                    [Sequelize.fn('SUM', Sequelize.col('final_total')), 'revenue']
+                ],
+                group: [groupByAlias],
+                order: [[Sequelize.col('period'), 'ASC']],
+                raw: true
+            })
+
+            const formattedData = [];
+
+            if (groupBy === 'month') {
+                // Lấy năm từ startDate
+                const year = new Date(startDate).getFullYear();
+                // Tạo period cho tháng hiện tại (ví dụ: "2025-05")
+                const expectedPeriod = `${year}-${month.toString().padStart(2, '0')}`;
+                // Tìm dữ liệu trong kết quả truy vấn
+                const foundData = revenueData.find(item => item.period === expectedPeriod);
+                // Thêm vào formattedData, nếu không có dữ liệu thì revenue = 0
+                formattedData.push({
+                    period: expectedPeriod,
+                    revenue: foundData ? parseFloat(foundData.revenue || 0) : 0
+                });
+            } else {
+                // Xử lý các trường hợp groupBy khác (day, week)
+                formattedData.push(...revenueData.map(item => ({
+                    period: item.period,
+                    revenue: parseFloat(item.revenue || 0)
+                })));
+            }
+
+            return {
+                month: month || null,
+                startDate,
+                endDate,
+                revenues: formattedData,
+                totalRevenue: formattedData.reduce((sum, item) => sum + item.revenue, 0)
+            };
+        }))
+
+        const overview = {
+            revenues: monthlyStats.flatMap(stat => stat.revenues),
+            totalRevenue: monthlyStats.reduce((sum, stat) => sum + stat.totalRevenue, 0)
+        };
 
         return ResponseModel.success('Thống kê doanh thu theo thời gian', {
-            revenues: formattedData,
-            totalRevenue: formattedData.reduce((sum, item) => sum + item.revenue, 0)
+            monthlyStats,
+            overview
         });
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
