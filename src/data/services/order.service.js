@@ -1708,14 +1708,20 @@ export const fetchLowStockProducts = async (shop_id, { minStock = 10 }) => {
 };
 
 // Thống kê tỷ lệ hoàn thành đơn hàng
-export const fetchOrderCompletionStats = async (shop_id, { startDate, endDate, groupBy = 'day' }) => {
+export const fetchOrderCompletionStats = async (shop_id, { dateRanges, groupBy = 'day' }) => {
     try {
-        if (!shop_id || !startDate || !endDate || !['day', 'week', 'month'].includes(groupBy)) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai thông tin', {
+        if (!shop_id || !dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0 || !['day', 'month'].includes(groupBy)) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai thông tin', {
                 shop_id: shop_id ?? '',
-                startDate: startDate ?? '',
-                endDate: endDate ?? '',
+                dateRanges: dateRanges ?? '',
                 groupBy: groupBy ?? ''
+            });
+        }
+
+        const hasInvalidRange = dateRanges.some(range => !range.startDate || !range.endDate);
+        if (hasInvalidRange) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu startDate hoặc endDate trong một hoặc nhiều dateRanges', {
+                dateRanges: dateRanges
             });
         }
 
@@ -1729,7 +1735,10 @@ export const fetchOrderCompletionStats = async (shop_id, { startDate, endDate, g
             where: {
                 shop_id: shop_id,
                 createdAt: {
-                    [Op.between]: [startDate, endDate]
+                    [Op.between]: [
+                        new Date(Math.min(...dateRanges.map(r => new Date(r.startDate)))),
+                        new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))))
+                    ]
                 }
             },
             include: [
@@ -1749,20 +1758,44 @@ export const fetchOrderCompletionStats = async (shop_id, { startDate, endDate, g
             raw: true
         })
 
-        const formattedData = completionData.reduce((acc, item) => {
-            if (!acc[item.period]) {
-                acc[item.period] = { period: item.period, completed: 0, canceled: 0, total: 0 };
-            }
-            if (item.status === 'completed') {
-                acc[item.period].completed = parseInt(item.count || 0);
-            } else if (item.status === 'canceled') {
-                acc[item.period].canceled = parseInt(item.count || 0);
-            }
-            acc[item.period].total += parseInt(item.count || 0);
+        // Chuyển đổi completionData thành map để tra cứu nhanh
+        const completionMap = completionData.reduce((acc, item) => {
+            const key = `${item.period}-${item.status}`;
+            acc[key] = parseInt(item.count || 0);
             return acc;
         }, {});
 
-        const summary = Object.values(formattedData).reduce(
+        // Tạo danh sách đầy đủ các khoảng thời gian
+        const formattedData = [];
+        if (groupBy === 'day') {
+            const overallStartDate = new Date(Math.min(...dateRanges.map(r => new Date(r.startDate))));
+            const overallEndDate = new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))));
+            for (let d = new Date(overallStartDate); d <= overallEndDate; d.setDate(d.getDate() + 1)) {
+                const period = d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
+                const completed = completionMap[`${period}-completed`] || 0;
+                const canceled = completionMap[`${period}-canceled`] || 0;
+                const total = completed + canceled;
+                formattedData.push({ period, completed, canceled, total });
+            }
+        } else if (groupBy === 'month') {
+            const overallStartDate = new Date(Math.min(...dateRanges.map(r => new Date(r.startDate))));
+            const overallEndDate = new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))));
+            const startYear = overallStartDate.getFullYear();
+            const endYear = overallEndDate.getFullYear();
+            const startMonth = overallStartDate.getMonth();
+            const endMonth = overallEndDate.getMonth() + (endYear - startYear) * 12;
+            for (let m = startMonth; m <= endMonth; m++) {
+                const year = startYear + Math.floor(m / 12);
+                const month = (m % 12) + 1;
+                const period = `${year}-${month.toString().padStart(2, '0')}`;
+                const completed = completionMap[`${period}-completed`] || 0;
+                const canceled = completionMap[`${period}-canceled`] || 0;
+                const total = completed + canceled;
+                formattedData.push({ period, completed, canceled, total });
+            }
+        }
+
+        const summary = formattedData.reduce(
             (acc, item) => {
                 acc.completed += item.completed;
                 acc.canceled += item.canceled;
@@ -1773,7 +1806,7 @@ export const fetchOrderCompletionStats = async (shop_id, { startDate, endDate, g
         );
 
         return ResponseModel.success('Thống kê tỷ lệ hoàn thành đơn hàng', {
-            byPeriod: Object.values(formattedData),
+            byPeriod: formattedData,
             summary
         });
     } catch (error) {
