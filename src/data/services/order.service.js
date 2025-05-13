@@ -1406,21 +1406,32 @@ export const fetchOrderStats = async (shop_id, { dateRanges, groupBy = 'day', st
 };
 
 // Thống kê sản phẩm bán chạy
-export const fetchTopSellingProducts = async (shop_id, { startDate, endDate, limit = 10 }) => {
+export const fetchTopSellingProducts = async (shop_id, { dateRanges, limit = 10 }) => {
     try {
-        if (!shop_id || !startDate || !endDate) {
+        if (!shop_id || !dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0) {
             return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 shop_id: shop_id ?? '',
-                startDate: startDate ?? '',
-                endDate: endDate ?? '',
+                dateRanges: dateRanges ?? '',
             });
         }
 
+        // Kiểm tra xem mỗi range có startDate và endDate hợp lệ không
+        const hasInvalidRange = dateRanges.some(range => !range.startDate || !range.endDate);
+        if (hasInvalidRange) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu startDate hoặc endDate trong một hoặc nhiều dateRanges', {
+                dateRanges: dateRanges
+            });
+        }
+
+        // Tổng hợp dữ liệu từ tất cả các khoảng thời gian trong dateRanges
         const topProducts = await OrderItem.findAll({
             where: {
                 '$order_shop.shop_id$': shop_id,
                 '$order_shop.createdAt$': {
-                    [Op.between]: [startDate, endDate]
+                    [Op.between]: [
+                        new Date(Math.min(...dateRanges.map(r => new Date(r.startDate)))),
+                        new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))))
+                    ]
                 },
                 '$order_shop.order.status$': {
                     [Op.ne]: OrderStatus.CANCELED
@@ -1484,7 +1495,7 @@ export const fetchTopSellingProducts = async (shop_id, { startDate, endDate, lim
             order: [[Sequelize.literal('totalQuantity'), 'DESC']],
             limit,
             raw: true
-        })
+        });
 
         const formattedProducts = topProducts.map(product => ({
             id: product['product_variant.id'],
@@ -1518,22 +1529,33 @@ export const fetchTopSellingProducts = async (shop_id, { startDate, endDate, lim
 };
 
 // Thống kê khách hàng gồm tổng số khách hàng và top khách hàng chi tiêu cao
-export const fetchCustomerStats = async (shop_id, { startDate, endDate, limit = 5 }) => {
+export const fetchCustomerStats = async (shop_id, { dateRanges, limit = 5 }) => {
     try {
-        if (!shop_id || !startDate || !endDate) {
+        if (!shop_id || !dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0) {
             return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 shop_id: shop_id ?? '',
-                startDate: startDate ?? '',
-                endDate: endDate ?? '',
+                dateRanges: dateRanges ?? ''
             });
         }
+
+        // Kiểm tra xem mỗi range có startDate và endDate hợp lệ không
+        const hasInvalidRange = dateRanges.some(range => !range.startDate || !range.endDate);
+        if (hasInvalidRange) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu startDate hoặc endDate trong một hoặc nhiều dateRanges', {
+                dateRanges: dateRanges
+            });
+        }
+
+        // Tính khoảng thời gian lớn nhất bao gồm tất cả dateRanges
+        const overallStartDate = new Date(Math.min(...dateRanges.map(r => new Date(r.startDate))));
+        const overallEndDate = new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))));
 
         /** 1. Tổng số khách hàng **/
         const totalCustomers = await OrderShop.findAll({
             where: {
                 shop_id: shop_id,
                 createdAt: {
-                    [Op.between]: [startDate, endDate]
+                    [Op.between]: [overallStartDate, overallEndDate]
                 },
                 '$order.status$': {
                     [Op.ne]: OrderStatus.CANCELED
@@ -1557,7 +1579,7 @@ export const fetchCustomerStats = async (shop_id, { startDate, endDate, limit = 
             where: {
                 shop_id: shop_id,
                 createdAt: {
-                    [Op.between]: [startDate, endDate],
+                    [Op.between]: [overallStartDate, overallEndDate],
                 },
                 '$order.status$': {
                     [Op.ne]: OrderStatus.CANCELED
