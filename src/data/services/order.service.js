@@ -967,7 +967,7 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
         }))
 
         return ResponseModel.success('Danh sách đơn hàng của cửa hàng: ', {
-            orders: [formatedOrders]
+            orders: formatedOrders
         });
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
