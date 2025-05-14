@@ -58,6 +58,26 @@ export const changePassword = async (req, res) => {
     }
 }
 
+export const editAccountDetails = async (req, res) => {
+    try {
+        const user_id = req.user.id;
+        const userInfo = req.body.userInfo;
+        const file = req.file;
+        const response = await authServices.editAccountDetails(
+            user_id,
+            userInfo,
+            file
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const signInMobile = async (req, res) => {
     try {
         const userInfo = req.body;
@@ -93,6 +113,20 @@ export const signUpMobile = async (req, res) => {
 export const fetchDetailUser = async (req, res) => {
     try {
         const userId = req.params.id;
+        const response = await authServices.fetchDetailUser(userId);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
+export const fetchDetailUserWithAuth = async (req, res) => {
+    try {
+        const userId = req.user.id;
         const response = await authServices.fetchDetailUser(userId);
         return res.status(response?.status).json(response);
     } catch (error) {

@@ -4,7 +4,7 @@ import { ResponseModel } from "../../common/errors/response";
 import db, { User, Shop, Cart, sequelize } from "../models";
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
-import { handleDeleteImageAsFailed } from "../../common/middleware/upload.middleware";
+import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
 import { sendActivateStoreMailer } from "../../common/mails/mailer.config";
 import { ShopStatus } from "../../common/utils/status";
 import { UserRoles } from "../../common/utils/roles";
@@ -493,3 +493,62 @@ export const checkUserForShopRegistration = async ({ email, password }) => {
         return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi kiểm tra người dùng', error?.body);
     }
 };
+
+export const editAccountDetails = async (user_id, info, file) => {
+    const t = await sequelize.transaction();
+    try {
+        if (!info) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                info: info ?? {},
+                file: file ?? ''
+            });
+        }
+
+        const {
+            name,
+            gender,
+            phone,
+        } = JSON.parse(info);
+
+        if (!name) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                name: name ?? '',
+            });
+        }
+
+        const existUser = await User.findOne({
+            where: { id: user_id },
+            transaction: t
+        });
+
+        if (!existUser) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại', {});
+        }
+
+        existUser.name = name?.trim();
+        existUser.phone = phone?.trim();
+        existUser.gender = parseInt(gender);
+
+        let image_url;
+        if (file) {
+            image_url = existUser.image_url;
+            existUser.image_url = `admin-owners/${file?.filename}`;
+        }
+
+        await existUser.save({ transaction: t });
+
+        await t.commit();
+
+        if (image_url) {
+            await handleDeleteImages([image_url]);
+        }
+
+        return ResponseModel.success('Chỉnh sửa thông tin thành công', {
+            image_url: existUser.image_url
+        });
+    } catch (error) {
+        await t.rollback();
+        await handleDeleteImageAsFailed(file);
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}

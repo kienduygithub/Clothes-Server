@@ -8,6 +8,8 @@ import {
     registerShopMobile,
     checkUserForShopRegistration,
     changePassword,
+    fetchDetailUserWithAuth,
+    editAccountDetails
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
@@ -46,6 +48,15 @@ AuthRouter.post('/auth/refresh', refreshTokenWeb);
 AuthRouter.post('/auth/refresh/mobile', refreshTokenMobile);
 
 AuthRouter.get('/auth/user-details/:id', checkUserAuthentication, fetchDetailUser);
+
+AuthRouter.get('/auth/user-details', checkUserAuthentication, fetchDetailUserWithAuth);
+
+AuthRouter.patch(
+    '/auth/edit-details',
+    checkUserAuthentication,
+    uploadServer.single('adminOwnerFile'),
+    editAccountDetails
+)
 
 AuthRouter.post(
     '/shop/register-shop/mobile',
