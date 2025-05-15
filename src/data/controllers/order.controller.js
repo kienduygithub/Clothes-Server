@@ -85,6 +85,20 @@ export const updateStatusOrder = async (req, res) => {
     }
 }
 
+export const fetchOrderShopDetail = async (req, res) => {
+    try {
+        const { order_id, order_shop_id } = req.query;
+        const response = await OrderService.fetchOrderShopDetail(order_id, order_shop_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}
+
 export const fetchShopOverview = async (req, res) => {
     try {
         const shop_id = req.user.shopId;

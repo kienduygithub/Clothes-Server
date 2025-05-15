@@ -1028,6 +1028,179 @@ export const updateStatusOrder = async (order_id, status) => {
     }
 }
 
+/**
+ * API lấy chi tiết một đơn hàng của cửa hàng trong đơn hàng chính
+ * @param {number} order_id - ID của đơn hàng chính
+ * @param {number} order_shop_id - ID của đơn hàng cửa hàng
+ * @returns {Promise<Object>} - Phản hồi chứa chi tiết đơn hàng cửa hàng
+ */
+export const fetchOrderShopDetail = async (order_id, order_shop_id) => {
+    try {
+        if (!order_id || !order_shop_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                order_id: order_id ?? '',
+                order_shop_id: order_shop_id ?? ''
+            });
+        }
+
+        const orderShop = await OrderShop.findOne({
+            where: {
+                id: order_shop_id,
+                order_id: order_id // Đảm bảo OrderShop thuộc Order
+            },
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'user_id', 'total_price', 'status', 'payment_date', 'status_changed_at'],
+                    include: [
+                        {
+                            model: User,
+                            as: 'user',
+                            attributes: ['id', 'name', 'email', 'phone']
+                        },
+                        {
+                            model: Address,
+                            as: 'address',
+                            attributes: ['id', 'name', 'phone', 'address_detail', 'city_id', 'district_id', 'ward_id'],
+                            required: false,
+                            include: [
+                                { model: City, as: 'city', attributes: ['name'] },
+                                { model: District, as: 'district', attributes: ['name'] },
+                                { model: Ward, as: 'ward', attributes: ['name'] }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    model: Coupon,
+                    as: 'coupon',
+                    attributes: [
+                        'id', 'name', 'code', 'discount_type',
+                        'discount_value', 'max_discount'
+                    ],
+                    required: false
+                },
+                {
+                    model: OrderItem,
+                    as: 'order_shop_items',
+                    attributes: ['id', 'order_shop_id', 'quantity'],
+                    include: [
+                        {
+                            model: ProductVariant,
+                            as: 'product_variant',
+                            attributes: ['id', 'sku', 'image_url', 'stock_quantity'],
+                            include: [
+                                {
+                                    model: Product,
+                                    as: 'product',
+                                    attributes: ['id', 'product_name', 'unit_price']
+                                },
+                                {
+                                    model: Color,
+                                    as: 'color',
+                                    attributes: ['id', 'color_name', 'color_code'],
+                                    required: false
+                                },
+                                {
+                                    model: Size,
+                                    as: 'size',
+                                    attributes: ['id', 'size_code'],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            attributes: [
+                'id', 'subtotal', 'discount', 'final_total', 'createdAt'
+            ]
+        });
+
+        // Kiểm tra đơn hàng tồn tại
+        if (!orderShop) {
+            throw ResponseModel.error(HttpErrors.NOT_FOUND, 'Đơn hàng cửa hàng không tồn tại', {
+                order_id,
+                order_shop_id
+            });
+        }
+
+        // Định dạng dữ liệu trả về
+        const formattedOrder = {
+            id: orderShop.order.id,
+            order_shop_id: orderShop.id,
+            user: {
+                id: orderShop.order.user.id,
+                name: orderShop.order.user.name,
+                email: orderShop.order.user.email,
+                phone: orderShop.order.user.phone
+            },
+            address: orderShop.order.address ? {
+                id: orderShop.order.address.id,
+                name: orderShop.order.address.name,
+                phone: orderShop.order.address.phone,
+                address_detail: orderShop.order.address.address_detail,
+                city: orderShop.order.address?.city ? orderShop.order.address.city : undefined,
+                district: orderShop.order.address?.district ? orderShop.order.address.district : undefined,
+                ward: orderShop.order.address?.ward ? orderShop.order.address.ward : undefined
+            } : undefined,
+            subtotal: parseFloat(orderShop.subtotal),
+            discount: parseFloat(orderShop.discount),
+            final_total: parseFloat(orderShop.final_total),
+            status: orderShop.order.status,
+            payment_date: orderShop.order.payment_date,
+            status_changed_at: orderShop.order.status_changed_at,
+            created_at: orderShop.createdAt,
+            coupon: orderShop.coupon ? {
+                id: orderShop.coupon.id,
+                name: orderShop.coupon.name,
+                code: orderShop.coupon.code,
+                discountType: orderShop.coupon.discount_type,
+                discountValue: parseFloat(orderShop.coupon.discount_value),
+                maxDiscount: parseFloat(orderShop.coupon.max_discount)
+            } : undefined,
+            order_items: orderShop.order_shop_items.map(item => ({
+                id: item.id,
+                order_shop: {
+                    id: orderShop.id
+                },
+                quantity: item.quantity,
+                product_variant: {
+                    id: item.product_variant.id,
+                    sku: item.product_variant.sku,
+                    image_url: item.product_variant.image_url,
+                    stock_quantity: item.product_variant.stock_quantity,
+                    product: {
+                        id: item.product_variant.product.id,
+                        name: item.product_variant.product.product_name,
+                        unit_price: parseFloat(item.product_variant.product.unit_price)
+                    },
+                    color: item.product_variant.color ? {
+                        id: item.product_variant.color.id,
+                        color_name: item.product_variant.color.color_name,
+                        color_code: item.product_variant.color.color_code
+                    } : undefined,
+                    size: item.product_variant.size ? {
+                        id: item.product_variant.size.id,
+                        size_code: item.product_variant.size.size_code
+                    } : undefined
+                }
+            }))
+        };
+
+        return ResponseModel.success('Chi tiết đơn hàng của cửa hàng', {
+            orders: [formattedOrder]
+        });
+    } catch (error) {
+        throw ResponseModel.error(
+            error?.status ?? HttpErrors.INTERNAL_SERVER_ERROR,
+            error?.message ?? 'Lỗi khi lấy chi tiết đơn hàng cửa hàng',
+            error?.body ?? { order_id, order_shop_id }
+        );
+    }
+};
+
 // Tổng quan cửa hàng 
 export const fetchShopOverview = async (shop_id, { dateRanges }) => {
     try {
