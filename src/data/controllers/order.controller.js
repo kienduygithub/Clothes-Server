@@ -56,6 +56,19 @@ export const cancelOrderUser = async (req, res) => {
 }
 
 /** ADMIN - OWNER **/
+export const fetchListOrderForAdmin = async (req, res) => {
+    try {
+        const response = await OrderService.fetchListOrderForAdmin();
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body ?? {}
+        })
+    }
+}
+
 export const fetchListShopOrder = async (req, res) => {
     try {
         const shop_id = req.user.shopId;

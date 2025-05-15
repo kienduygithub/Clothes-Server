@@ -41,6 +41,11 @@ OrderRouter.get(
     OrderController.fetchOrderShopDetail
 )
 
+OrderRouter.get(
+    '/admin/order/list',
+    OrderController.fetchListOrderForAdmin
+)
+
 OrderRouter.post(
     '/overview/stats',
     checkUserAuthentication,

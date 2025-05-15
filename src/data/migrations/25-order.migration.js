@@ -50,7 +50,7 @@ module.exports = {
             },
             payment_date: {
                 type: Sequelize.DATE,
-                allowNull: false
+                allowNull: true
             },
             createdAt: {
                 allowNull: false,
