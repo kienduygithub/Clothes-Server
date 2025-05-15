@@ -36,6 +36,17 @@ module.exports = {
                 allowNull: true, // Có thể không dùng coupon
                 onDelete: 'SET NULL'
             },
+            status: {
+                type: Sequelize.ENUM(
+                    'pending',
+                    'paid',
+                    'shipped',
+                    'completed',
+                    'canceled',
+                    'processing'
+                ),
+                allowNull: false
+            },
             subtotal: {
                 type: Sequelize.DECIMAL(10, 2),
                 allowNull: false

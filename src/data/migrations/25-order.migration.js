@@ -1,4 +1,6 @@
 'use strict';
+
+
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
     async up(queryInterface, Sequelize) {
@@ -32,7 +34,14 @@ module.exports = {
                 allowNull: false
             },
             status: {
-                type: Sequelize.ENUM('pending', 'paid', 'shipped', 'completed', 'canceled'),
+                type: Sequelize.ENUM(
+                    'pending',
+                    'paid',
+                    'shipped',
+                    'completed',
+                    'canceled',
+                    'processing'
+                ),
                 allowNull: false
             },
             status_changed_at: {

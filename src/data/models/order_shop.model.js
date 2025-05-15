@@ -59,6 +59,14 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true, // Có thể không dùng coupon
             onDelete: 'SET NULL'
         },
+        status: DataTypes.ENUM(
+            'pending',
+            'paid',
+            'shipped',
+            'completed',
+            'canceled',
+            'processing'
+        ),
         subtotal: DataTypes.DECIMAL(10, 2),
         discount: DataTypes.DECIMAL(10, 2),
         final_total: DataTypes.DECIMAL(10, 2),

@@ -45,7 +45,14 @@ module.exports = (sequelize, DataTypes) => {
             onDelete: 'SET NULL',
         },
         total_price: DataTypes.DECIMAL(10, 2),
-        status: DataTypes.ENUM('pending', 'paid', 'shipped', 'completed', 'canceled'),
+        status: DataTypes.ENUM(
+            'pending',
+            'paid',
+            'shipped',
+            'completed',
+            'canceled',
+            'processing'
+        ),
         status_changed_at: DataTypes.DATE,
         payment_date: DataTypes.DATE,
     }, {

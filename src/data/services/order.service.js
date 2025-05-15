@@ -166,7 +166,8 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                 coupon_id: finalCouponId,
                 subtotal: shop_total,
                 discount: finalDiscountShop,
-                final_total: finalTotalShop
+                final_total: finalTotalShop,
+                status: OrderStatus.PENDING
             }, { transaction: t });
 
             /** Tạo OrderItems */

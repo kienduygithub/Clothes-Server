@@ -75,7 +75,6 @@ export const signUp = async (
     userId = null
 ) => {
     const transaction = await sequelize.transaction();
-
     try {
         if (!userInfo || !shopInfo || !files) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
@@ -164,6 +163,7 @@ export const signUp = async (
             shop: shop
         });
     } catch (error) {
+        console.log(error);
         await transaction.rollback();
         if (files?.length) {
             await Promise.all(files.map(file => handleDeleteImageAsFailed(file)));
@@ -490,6 +490,7 @@ export const checkUserForShopRegistration = async ({ email, password }) => {
             users: [user]
         });
     } catch (error) {
+        console.log(error);
         return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi khi kiểm tra người dùng', error?.body);
     }
 };
