@@ -812,6 +812,13 @@ export const cancelOrderUser = async (user_id, order_id) => {
 }
 
 /** ADMIN - OWNER **/
+/**
+ * Lấy danh sách đơn hàng của cửa hàng
+ * @param {number} shop_id - ID của cửa hàng
+ * @param {string|null} status - Trạng thái đơn hàng cửa hàng (pending, paid, processing, shipped, completed, canceled)
+ * @returns {Promise<Object>} - Phản hồi chứa danh sách đơn hàng
+ */
+
 export const fetchListShopOrder = async (shop_id, status = null) => {
     try {
         if (!shop_id) {
@@ -827,7 +834,10 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
         const orderInclude = {
             model: Order,
             as: 'order',
-            attributes: ['id', 'user_id', 'total_price', 'status', 'payment_date', 'status_changed_at'],
+            attributes: [
+                'id', 'user_id', 'total_price', 'status',
+                'payment_date', 'status_changed_at'
+            ],
             include: [
                 {
                     model: User,
@@ -837,7 +847,10 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
                 {
                     model: Address,
                     as: 'address',
-                    attributes: ['id', 'name', 'phone', 'address_detail', 'city_id', 'district_id', 'ward_id'],
+                    attributes: [
+                        'id', 'name', 'phone', 'address_detail',
+                        'city_id', 'district_id', 'ward_id'
+                    ],
                     required: false,
                     include: [
                         { model: City, as: 'city', attributes: ['name'] },
@@ -848,9 +861,7 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
             ]
         };
         if (status) {
-            orderInclude.where = {
-                status: status
-            }
+            whereClause.status = status;
         }
 
         const orderShops = await OrderShop.findAll({
@@ -899,13 +910,13 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
                 }
             ],
             attributes: [
-                'id', 'subtotal', 'discount', 'final_total', 'createdAt'
+                'id', 'subtotal', 'discount', 'status', 'final_total', 'createdAt'
             ],
             order: [['createdAt', 'DESC']]
         });
 
         /** 2. Định dạng dữ liệu trả về **/
-        const formatedOrders = orderShops.map(orderShop => ({
+        const formattedOrders = orderShops.map(orderShop => ({
             id: orderShop.order.id,
             order_shop_id: orderShop.id,
             user: {
@@ -921,12 +932,13 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
                 address_detail: orderShop.order.address.address_detail,
                 city: orderShop.order.address?.city ? orderShop.order.address.city : undefined,
                 district: orderShop.order.address?.district ? orderShop.order.address.district : undefined,
-                ward: orderShop.order.address?.ward ? orderShop.order.address.ward : undefined,
+                ward: orderShop.order.address?.ward ? orderShop.order.address.ward : undefined
             } : undefined,
+            status: orderShop.status,
             subtotal: parseFloat(orderShop.subtotal),
             discount: parseFloat(orderShop.discount),
             final_total: parseFloat(orderShop.final_total),
-            status: orderShop.order.status,
+            status: orderShop.status, // Sử dụng status của OrderShop
             payment_date: orderShop.order.payment_date,
             status_changed_at: orderShop.order.status_changed_at,
             created_at: orderShop.createdAt,
@@ -934,8 +946,8 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
                 id: orderShop.coupon.id,
                 name: orderShop.coupon.name,
                 code: orderShop.coupon.code,
-                discountType: orderShop.coupon.discount_type,
-                discountValue: parseFloat(orderShop.coupon.discount_value),
+                discount_type: orderShop.coupon.discount_type,
+                discount_value: parseFloat(orderShop.coupon.discount_value),
                 maxDiscount: parseFloat(orderShop.coupon.max_discount)
             } : undefined,
             order_items: orderShop.order_shop_items.map(item => ({
@@ -944,15 +956,15 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
                     id: orderShop.id
                 },
                 quantity: item.quantity,
-                productVariant: {
+                product_variant: {
                     id: item.product_variant.id,
                     sku: item.product_variant.sku,
-                    imageUrl: item.product_variant.image_url,
-                    stockQuantity: item.product_variant.stock_quantity,
+                    image_url: item.product_variant.image_url,
+                    stock_quantity: item.product_variant.stock_quantity,
                     product: {
                         id: item.product_variant.product.id,
                         name: item.product_variant.product.product_name,
-                        unitPrice: parseFloat(item.product_variant.product.unit_price)
+                        unit_price: parseFloat(item.product_variant.product.unit_price)
                     },
                     color: item.product_variant.color ? {
                         id: item.product_variant.color.id,
@@ -965,10 +977,10 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
                     } : undefined
                 }
             }))
-        }))
+        }));
 
         return ResponseModel.success('Danh sách đơn hàng của cửa hàng: ', {
-            orders: formatedOrders
+            orders: formattedOrders
         });
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
