@@ -1242,7 +1242,7 @@ export const fetchOrderShopDetail = async (order_id, order_shop_id) => {
 // Tổng quan cửa hàng 
 export const fetchShopOverview = async (shop_id, { dateRanges }) => {
     try {
-
+        console.log('aa');
         if (!shop_id || !dateRanges || !Array.isArray(dateRanges)) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
                 shop_id: shop_id ?? '',
@@ -1300,7 +1300,7 @@ export const fetchShopOverview = async (shop_id, { dateRanges }) => {
                     [Sequelize.col('order.status'), 'status'],
                     [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
                 ],
-                group: ['order.status'],
+                group: ['OrderShop.status'],
                 raw: true
             })
 
