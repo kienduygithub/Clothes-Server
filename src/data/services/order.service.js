@@ -1852,9 +1852,10 @@ export const fetchCustomerStats = async (shop_id, { dateRanges, limit = 5 }) => 
                 createdAt: {
                     [Op.between]: [overallStartDate, overallEndDate],
                 },
-                '$order.status$': {
-                    [Op.ne]: OrderStatus.CANCELED
-                }
+                status: [
+                    OrderStatus.PAID,
+                    OrderStatus.COMPLETED
+                ],
             },
             include: [
                 {
@@ -1865,7 +1866,8 @@ export const fetchCustomerStats = async (shop_id, { dateRanges, limit = 5 }) => 
                         {
                             model: User,
                             as: 'user',
-                            attributes: ['id', 'name', 'email', 'image_url']
+                            attributes: ['id', 'name', 'email', 'image_url'],
+                            required: false
                         }
                     ]
                 }
@@ -2010,7 +2012,8 @@ export const fetchOrderCompletionStats = async (shop_id, { dateRanges, groupBy =
                         new Date(Math.min(...dateRanges.map(r => new Date(r.startDate)))),
                         new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))))
                     ]
-                }
+                },
+                status: [OrderStatus.COMPLETED, OrderStatus.CANCELED]
             },
             include: [
                 {
@@ -2021,36 +2024,42 @@ export const fetchOrderCompletionStats = async (shop_id, { dateRanges, groupBy =
             ],
             attributes: [
                 [groupByExpression, 'period'],
-                [Sequelize.col('order.status'), 'status'],
+                ['status', 'status'],
                 [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
             ],
-            group: [groupByExpression, 'order.status'],
+            group: [groupByExpression, 'OrderShop.status'],
             order: [[Sequelize.col('period'), 'ASC']],
             raw: true
         })
 
         // Chuyển đổi completionData thành map để tra cứu nhanh
-        const completionMap = completionData.reduce((acc, item) => {
-            const key = `${item.period}-${item.status}`;
-            acc[key] = parseInt(item.count || 0);
-            return acc;
-        }, {});
+        const completionMap = new Map(
+            completionData.map(
+                item => [`${item.period}:${item.status}`, parseInt(item.count || 0)]
+            )
+        );
 
         // Tạo danh sách đầy đủ các khoảng thời gian
         const formattedData = [];
+        const overallStartDate = new Date(Math.min(...dateRanges.map(r => new Date(r.startDate))));
+        const overallEndDate = new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))));
+
         if (groupBy === 'day') {
-            const overallStartDate = new Date(Math.min(...dateRanges.map(r => new Date(r.startDate))));
-            const overallEndDate = new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))));
             for (let d = new Date(overallStartDate); d <= overallEndDate; d.setDate(d.getDate() + 1)) {
-                const period = d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
-                const completed = completionMap[`${period}-completed`] || 0;
-                const canceled = completionMap[`${period}-canceled`] || 0;
+                const period = d.toISOString().split('T')[0]; // YYYY-MM-DD
+                const completed = completionMap.get(`${period}:${OrderStatus.COMPLETED}`) || 0;
+                const canceled = completionMap.get(`${period}:${OrderStatus.CANCELED}`) || 0;
                 const total = completed + canceled;
-                formattedData.push({ period, completed, canceled, total });
+                const completionRate = total > 0 ? parseFloat((completed / total).toFixed(4)) : 0;
+                formattedData.push({
+                    period,
+                    completed,
+                    canceled,
+                    total,
+                    completion_rate: completionRate
+                });
             }
         } else if (groupBy === 'month') {
-            const overallStartDate = new Date(Math.min(...dateRanges.map(r => new Date(r.startDate))));
-            const overallEndDate = new Date(Math.max(...dateRanges.map(r => new Date(r.endDate))));
             const startYear = overallStartDate.getFullYear();
             const endYear = overallEndDate.getFullYear();
             const startMonth = overallStartDate.getMonth();
@@ -2059,10 +2068,17 @@ export const fetchOrderCompletionStats = async (shop_id, { dateRanges, groupBy =
                 const year = startYear + Math.floor(m / 12);
                 const month = (m % 12) + 1;
                 const period = `${year}-${month.toString().padStart(2, '0')}`;
-                const completed = completionMap[`${period}-completed`] || 0;
-                const canceled = completionMap[`${period}-canceled`] || 0;
+                const completed = completionMap.get(`${period}:${OrderStatus.COMPLETED}`) || 0;
+                const canceled = completionMap.get(`${period}:${OrderStatus.CANCELED}`) || 0;
                 const total = completed + canceled;
-                formattedData.push({ period, completed, canceled, total });
+                const completionRate = total > 0 ? parseFloat((completed / total).toFixed(4)) : 0;
+                formattedData.push({
+                    period,
+                    completed,
+                    canceled,
+                    total,
+                    completion_rate: completionRate
+                });
             }
         }
 
