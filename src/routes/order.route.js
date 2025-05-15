@@ -31,6 +31,11 @@ OrderRouter.get(
     OrderController.fetchListShopOrder
 )
 
+OrderRouter.patch(
+    '/order/shop',
+    OrderController.updateStatusOrder
+)
+
 OrderRouter.post(
     '/overview/stats',
     checkUserAuthentication,

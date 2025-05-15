@@ -9,7 +9,8 @@ export const OrderStatus = Object.freeze({
     PAID: 'paid',
     SHIPPED: 'shipped',
     COMPLETED: 'completed',
-    CANCELED: 'canceled'
+    CANCELED: 'canceled',
+    PROCESSING: 'processing'
 });
 
 export const NotificationType = Object.freeze({

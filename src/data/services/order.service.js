@@ -974,6 +974,60 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
     }
 }
 
+export const updateStatusOrder = async (order_id, status) => {
+    const transaction = await sequelize.transaction();
+    try {
+        if (!order_id || !status) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                order_id: order_id ?? '',
+                status: status ?? ''
+            })
+        }
+
+        const validStatuses = [
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
+            OrderStatus.COMPLETED
+        ];
+        if (!validStatuses.includes(status)) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Trạng thái không hợp lệ', {
+                status,
+                validStatuses
+            });
+        }
+
+        const order = await Order.findOne({
+            where: {
+                id: order_id,
+                status: {
+                    [Op.or]: [
+                        OrderStatus.PENDING,
+                        OrderStatus.PAID,
+                        OrderStatus.PROCESSING,
+                        OrderStatus.SHIPPED
+                    ]
+                }
+            },
+            transaction: transaction
+        })
+
+        if (!order) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Đơn hàng không tồn tại hoặc không thể thay đổi trạng thái', {
+                order_id
+            });
+        }
+
+        await order.update({ status }, { transaction });
+
+        await transaction.commit();
+
+        return ResponseModel.success(`Đơn hàng #${order_id} đã được cập nhật thành ${status}`, {});
+    } catch (error) {
+        await transaction.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 // Tổng quan cửa hàng 
 export const fetchShopOverview = async (shop_id, { dateRanges }) => {
     try {
