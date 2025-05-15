@@ -1423,7 +1423,14 @@ export const fetchShopOverview = async (shop_id, { dateRanges }) => {
     }
 }
 
-// Thống kê doanh thu theo thời gian
+/**
+ * API lấy thống kê doanh thu theo thời gian
+ * @param {number} shopId - ID của cửa hàng
+ * @param {Object} params - Tham số
+ * @param {Array<{startDate: Date, endDate: Date, month: string}>} params.dateRanges - Khoảng thời gian thống kê
+ * @param {string} params.groupBy - Nhóm theo (day, week, month)
+ * @returns {Promise<Object>} - Phản hồi chứa thống kê doanh thu
+ */
 export const fetchRevenueOverTime = async (shop_id, { dateRanges, groupBy = 'day' }) => {
     try {
 
@@ -1450,12 +1457,14 @@ export const fetchRevenueOverTime = async (shop_id, { dateRanges, groupBy = 'day
         const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
             const { startDate, endDate, month } = range;
 
+            // 1. Truy vấn doanh thu tổng
             const revenueData = await OrderShop.findAll({
                 where: {
                     shop_id: shop_id,
                     createdAt: {
                         [Op.between]: [startDate, endDate]
                     },
+                    status: OrderStatus.COMPLETED,
                     '$order.status$': {
                         [Op.ne]: OrderStatus.CANCELED
                     }
@@ -1476,26 +1485,32 @@ export const fetchRevenueOverTime = async (shop_id, { dateRanges, groupBy = 'day
                 raw: true
             })
 
-            // Chuyển đổi revenueData thành map để tra cứu nhanh
+
+
+            // Chuyển đổi dữ liệu thành map để tra cứu nhanh
             const revenueMap = new Map(revenueData.map(item => [item.period, parseFloat(item.revenue || 0)]));
+
             // Tạo danh sách đầy đủ các khoảng thời gian
             const formattedData = [];
+
             if (groupBy === 'day') {
                 const start = new Date(startDate);
                 const end = new Date(endDate);
                 for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                     const period = d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
+
                     formattedData.push({
                         period: period,
-                        revenue: revenueMap.get(period) || 0
+                        revenue: revenueMap.get(period) || 0,
                     });
                 }
             } else if (groupBy === 'month') {
                 const year = new Date(startDate).getFullYear();
                 const expectedPeriod = `${year}-${month.toString().padStart(2, '0')}`;
+
                 formattedData.push({
                     period: expectedPeriod,
-                    revenue: revenueMap.get(expectedPeriod) || 0
+                    revenue: revenueMap.get(expectedPeriod) || 0,
                 });
             }
 
@@ -1510,7 +1525,7 @@ export const fetchRevenueOverTime = async (shop_id, { dateRanges, groupBy = 'day
 
         const overview = {
             revenues: monthlyStats.flatMap(stat => stat.revenues),
-            totalRevenue: monthlyStats.reduce((sum, stat) => sum + stat.totalRevenue, 0)
+            totalRevenue: monthlyStats.reduce((sum, stat) => sum + stat.totalRevenue, 0),
         };
 
         return ResponseModel.success('Thống kê doanh thu theo thời gian', {
