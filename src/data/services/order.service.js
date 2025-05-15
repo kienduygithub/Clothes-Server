@@ -1554,6 +1554,12 @@ export const fetchOrderStats = async (shop_id, { dateRanges, groupBy = 'day', st
             month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%m')
         }[groupBy];
 
+        const groupByAlias = {
+            day: Sequelize.fn('DATE', Sequelize.col('OrderShop.createdAt')),
+            week: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%u'),
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%m')
+        }[groupBy];
+
         const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
             const { startDate, endDate, month } = range;
             const whereClause = {
@@ -1561,37 +1567,33 @@ export const fetchOrderStats = async (shop_id, { dateRanges, groupBy = 'day', st
                 createdAt: { [Op.between]: [startDate, endDate] },
             };
 
-            const orderInclude = {
-                model: Order,
-                as: 'order',
-                attributes: ['id', 'status']
-            };
-
-            if (status) {
-                orderInclude.where = { status };
-            }
-
             const orderData = await OrderShop.findAll({
                 where: whereClause,
-                include: [orderInclude],
                 attributes: [
                     [groupByExpression, 'period'],
-                    [Sequelize.col('order.status'), 'status'],
+                    ['status', 'status'],
                     [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
                 ],
-                group: [groupByExpression, 'order.status'],
+                group: [groupByExpression, 'OrderShop.status'],
                 order: [[Sequelize.col('period'), 'ASC']],
                 raw: true
             });
 
             // Chuyển đổi orderData thành map để tra cứu nhanh
-            const orderMap = orderData.reduce((acc, item) => {
-                const key = `${item.period}-${item.status}`;
-                acc[key] = parseInt(item.count || 0);
-                return acc;
-            }, {});
+            const orderMap = new Map(orderData.map(
+                item =>
+                    [`${item.period}:${item.status}`, parseInt(item.count || 0)]
+            ));
 
             const formattedData = [];
+            const statusList = [
+                OrderStatus.PENDING,
+                OrderStatus.PAID,
+                OrderStatus.PROCESSING,
+                OrderStatus.SHIPPED,
+                OrderStatus.COMPLETED,
+                OrderStatus.CANCELED
+            ];
 
             if (groupBy === 'day') {
                 const start = new Date(startDate);
@@ -1599,9 +1601,9 @@ export const fetchOrderStats = async (shop_id, { dateRanges, groupBy = 'day', st
                 for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                     const period = d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
                     const counts = {};
-                    ['pending', 'paid', 'shipped', 'completed', 'canceled'].forEach(status => {
-                        const key = `${period}-${status}`;
-                        counts[status] = orderMap[key] || 0;
+                    statusList.forEach(s => {
+                        const key = `${period}:${s}`;
+                        counts[s] = orderMap.get(key) || 0;
                     });
                     formattedData.push({
                         period: period,
@@ -1620,7 +1622,7 @@ export const fetchOrderStats = async (shop_id, { dateRanges, groupBy = 'day', st
                     const month = (m % 12) + 1;
                     const period = `${year}-${month.toString().padStart(2, '0')}`;
                     const counts = {};
-                    ['pending', 'paid', 'shipped', 'completed', 'canceled'].forEach(status => {
+                    statusList.forEach(status => {
                         const key = `${period}-${status}`;
                         counts[status] = orderMap[key] || 0;
                     });
@@ -1650,24 +1652,13 @@ export const fetchOrderStats = async (shop_id, { dateRanges, groupBy = 'day', st
             createdAt: { [Op.between]: [new Date(dateRanges[0].startDate), new Date(dateRanges[0].endDate)] },
         };
 
-        const orderInclude = {
-            model: Order,
-            as: 'order',
-            attributes: ['id', 'status']
-        };
-
-        if (status) {
-            orderInclude.where = { status };
-        }
-
         const statusCounts = await OrderShop.findAll({
             where: whereClause,
-            include: [{ model: Order, as: 'order', attributes: ['id', 'status'] }],
             attributes: [
-                [Sequelize.col('order.status'), 'status'],
+                ['status', 'status'],
                 [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
             ],
-            group: ['order.status'],
+            group: ['status'],
             raw: true
         });
 
@@ -1677,7 +1668,7 @@ export const fetchOrderStats = async (shop_id, { dateRanges, groupBy = 'day', st
             statusCounts: statusCounts.reduce((acc, stat) => {
                 acc[stat.status] = parseInt(stat.count || 0);
                 return acc;
-            }, { pending: 0, paid: 0, shipped: 0, completed: 0, canceled: 0 }),
+            }, { pending: 0, paid: 0, shipped: 0, completed: 0, canceled: 0, processing: 0 }),
             totalOrders: statusCounts.reduce((sum, stat) => sum + parseInt(stat.count || 0), 0)
         });
     } catch (error) {
