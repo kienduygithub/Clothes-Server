@@ -934,7 +934,6 @@ export const fetchListShopOrder = async (shop_id, status = null) => {
                 district: orderShop.order.address?.district ? orderShop.order.address.district : undefined,
                 ward: orderShop.order.address?.ward ? orderShop.order.address.ward : undefined
             } : undefined,
-            status: orderShop.status,
             subtotal: parseFloat(orderShop.subtotal),
             discount: parseFloat(orderShop.discount),
             final_total: parseFloat(orderShop.final_total),
@@ -1065,7 +1064,10 @@ export const fetchOrderShopDetail = async (order_id, order_shop_id) => {
                 {
                     model: Order,
                     as: 'order',
-                    attributes: ['id', 'user_id', 'total_price', 'status', 'payment_date', 'status_changed_at'],
+                    attributes: [
+                        'id', 'user_id', 'total_price', 'status',
+                        'payment_date', 'status_changed_at'
+                    ],
                     include: [
                         {
                             model: User,
@@ -1127,7 +1129,8 @@ export const fetchOrderShopDetail = async (order_id, order_shop_id) => {
                 }
             ],
             attributes: [
-                'id', 'subtotal', 'discount', 'final_total', 'createdAt'
+                'id', 'subtotal', 'discount', 'final_total',
+                'status', 'createdAt'
             ]
         });
 
@@ -1161,7 +1164,7 @@ export const fetchOrderShopDetail = async (order_id, order_shop_id) => {
             subtotal: parseFloat(orderShop.subtotal),
             discount: parseFloat(orderShop.discount),
             final_total: parseFloat(orderShop.final_total),
-            status: orderShop.order.status,
+            status: orderShop.status, // Sử dụng status của OrderShop
             payment_date: orderShop.order.payment_date,
             status_changed_at: orderShop.order.status_changed_at,
             created_at: orderShop.createdAt,
