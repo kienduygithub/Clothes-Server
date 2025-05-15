@@ -1046,6 +1046,11 @@ export const updateStatusOrder = async (order_shop_id, status) => {
                 { status: OrderStatus.COMPLETED },
                 { where: { id: order_id }, transaction }
             );
+
+            await OrderShop.update(
+                { status: OrderStatus.COMPLETED },
+                { where: { order_id: order_id }, transaction }
+            );
         }
 
         await transaction.commit();
