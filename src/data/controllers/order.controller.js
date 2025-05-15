@@ -73,8 +73,8 @@ export const fetchListShopOrder = async (req, res) => {
 
 export const updateStatusOrder = async (req, res) => {
     try {
-        const { order_id, status } = req.body;
-        const response = await OrderService.updateStatusOrder(order_id, status);
+        const { order_shop_id, status } = req.body;
+        const response = await OrderService.updateStatusOrder(order_shop_id, status);
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
