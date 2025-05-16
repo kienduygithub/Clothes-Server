@@ -845,3 +845,30 @@ export const withdrawalMoneyByOwner = async (userId, tokenShopId, { shopId, amou
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+export const fetchListWithdrawalHistories = async (tokenShopId) => {
+    const transaction = await sequelize.transaction();
+    try {
+        const shop = await db.Shop.findByPk(tokenShopId, { transaction });
+
+        if (!shop) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Cửa hàng không tồn tại', {});
+        }
+
+        const withdrawals = await db.Withdrawal.findAll({
+            where: {
+                shop_id: tokenShopId
+            },
+            order: [['createdAt', 'DESC']]
+        });
+
+        await transaction.commit();
+
+        return ResponseModel.success('Lịch sử giao dịch', {
+            withdrawals: withdrawals
+        })
+    } catch (error) {
+        await transaction.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}

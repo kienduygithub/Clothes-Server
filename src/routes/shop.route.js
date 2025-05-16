@@ -17,7 +17,9 @@ import {
     fetchPriceProductsByShop,
     fetchParentCategoriesWithTotalProductByShop,
     fetchProductsByParentCategoryInShop,
-    fetchListShopNotPending
+    fetchListShopNotPending,
+    withdrawalMoneyByOwner,
+    fetchListWithdrawalHistories
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
@@ -119,4 +121,15 @@ ShopRouter.get(
     fetchProductsByParentCategoryInShop
 )
 
+ShopRouter.post(
+    '/shop/withdrawal',
+    checkUserAuthentication,
+    withdrawalMoneyByOwner
+)
+
+ShopRouter.get(
+    '/shop/withdrawal/history',
+    checkUserAuthentication,
+    fetchListWithdrawalHistories
+)
 export default ShopRouter;
