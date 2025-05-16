@@ -261,3 +261,17 @@ export const fetchListWithdrawalHistories = async (req, res) => {
     }
 }
 
+export const fetchBalanceShop = async (req, res) => {
+    try {
+        const { shopId: tokenShopId, id: tokenUserId } = req.user;
+        const response = await shopServices.fetchBalanceShop(tokenUserId, tokenShopId);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+

@@ -872,3 +872,40 @@ export const fetchListWithdrawalHistories = async (tokenShopId) => {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+
+export const fetchBalanceShop = async (tokenUserId, tokenShopId) => {
+    const transaction = await sequelize.transaction();
+    try {
+        console.log(tokenShopId);
+        const user = await db.User.findOne({
+            where: {
+                id: tokenUserId,
+                roles: UserRoles.OWNER
+            },
+            transaction
+        });
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại hoặc không phải chủ cửa hàng', {});
+        }
+
+        if (user.shopId !== tokenShopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Không có quyền truy cập cửa hàng này', {});
+        }
+
+        const shop = await db.Shop.findByPk(tokenShopId, { transaction });
+
+        if (!shop) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Cửa hàng không tồn tại', {});
+        }
+
+        await transaction.commit();
+
+        return ResponseModel.success('Balance của cửa hàng', {
+            balance: shop.balance
+        })
+    } catch (error) {
+        await transaction.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
