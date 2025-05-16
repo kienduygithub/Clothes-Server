@@ -825,7 +825,7 @@ export const withdrawalMoneyByOwner = async (userId, tokenShopId, { shopId, amou
         }
 
         if (shop.balance < amount) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Số dữ rút không đủ', {});
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Số dư rút không đủ', {});
         }
 
         const newWithdrawal = await db.Withdrawal.create({
