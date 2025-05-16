@@ -576,7 +576,7 @@ export const cancelOrderUser = async (user_id, order_id) => {
                     model: OrderShop,
                     as: 'order_shops',
                     attributes: [
-                        'id', 'order_id', 'shop_id', 'coupon_id',
+                        'id', 'order_id', 'shop_id', 'coupon_id', 'status'
                     ],
                     include: [
                         {
@@ -694,6 +694,10 @@ export const cancelOrderUser = async (user_id, order_id) => {
                     }, { transaction: transaction })
                 }
             }
+
+            await orderShop.update({
+                status: OrderStatus.CANCELED
+            }, { transaction: transaction })
         }
 
         await order.update({
@@ -1035,7 +1039,14 @@ export const updateStatusOrder = async (order_shop_id, status) => {
         const order_id = orderShop.order_id;
         const order_shops = await OrderShop.findAll({
             where: { order_id },
-            attributes: ['id', 'status'],
+            attributes: ['id', 'status', 'shop_id', 'final_total'],
+            include: [
+                {
+                    model: Shop,
+                    as: 'shop',
+                    attributes: ['id', 'balance']
+                }
+            ],
             transaction
         });
 
@@ -1051,6 +1062,16 @@ export const updateStatusOrder = async (order_shop_id, status) => {
                 { status: OrderStatus.COMPLETED },
                 { where: { order_id: order_id }, transaction }
             );
+
+            await Promise.all(order_shops.map(async (order_shop) => {
+                const shop = order_shop.shop;
+                const final_total = order_shop.final_total;
+
+                await shop.increment('balance', {
+                    by: final_total,
+                    transaction
+                });
+            }))
         }
 
         await transaction.commit();
