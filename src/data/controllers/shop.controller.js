@@ -227,3 +227,23 @@ export const fetchProductsByParentCategoryInShop = async (req, res) => {
         });
     }
 }
+
+export const withdrawalMoneyByOwner = async (req, res) => {
+    try {
+        const { id: userId, shopId: tokenShopId } = req.user;
+        const { shop_id, amount, password } = req.body;
+        const response = await shopServices.withdrawalMoneyByOwner(
+            userId,
+            tokenShopId,
+            { shopId: shop_id, amount: amount, password: password }
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+

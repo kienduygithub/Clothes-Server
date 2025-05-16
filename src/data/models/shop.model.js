@@ -35,6 +35,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'cart_shops',
                 onDelete: 'CASCADE'
             });
+            Shop.hasMany(models.Withdrawal, {
+                foreignKey: 'shop_id',
+                as: 'withdrawals',
+                onDelete: 'CASCADE'
+            });
         }
     }
     Shop.init({
@@ -44,7 +49,20 @@ module.exports = (sequelize, DataTypes) => {
         contact_email: DataTypes.STRING,
         contact_address: DataTypes.STRING,
         description: DataTypes.TEXT('medium'),
-        status: DataTypes.ENUM('active', 'inactive', 'pending')
+        status: DataTypes.ENUM('active', 'inactive', 'pending'),
+
+        balance: {
+            type: DataTypes.DECIMAL(10, 2),
+            defaultValue: 0
+        },
+        failed_attempts: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0
+        },
+        lock_until: {
+            type: DataTypes.DATE,
+            allowNull: true
+        }
     }, {
         sequelize,
         modelName: 'Shop',

@@ -36,6 +36,19 @@ module.exports = {
             status: {
                 type: Sequelize.ENUM('active', 'inactive', 'pending')
             },
+
+            balance: {
+                type: Sequelize.DECIMAL(10, 2),
+                defaultValue: 0
+            },
+            failed_attempts: {
+                type: Sequelize.INTEGER,
+                defaultValue: 0
+            },
+            lock_until: {
+                type: Sequelize.DATE,
+                allowNull: true
+            },
             createdAt: {
                 allowNull: false,
                 type: Sequelize.DATE

@@ -6,6 +6,7 @@ import { handleDeleteImageAsFailed, handleDeleteImages } from '../../common/midd
 import { ShopStatus } from '../../common/utils/status';
 import db, { sequelize } from '../models';
 import { UserRoles } from '../../common/utils/roles';
+import { comparePassword, hashPassword } from "../../common/utils/user.common";
 
 export const fetchAllProductsInShop = async (shopId) => {
     try {
@@ -766,6 +767,81 @@ export const fetchProductsByParentCategoryInShop = async (
 
         return ResponseModel.success('Danh sách sản phẩm thuộc danh mục cha', payload);
     } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const withdrawalMoneyByOwner = async (userId, tokenShopId, { shopId, amount, password }) => {
+    const transaction = await sequelize.transaction();
+    try {
+        if (shopId !== tokenShopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Không có quyền truy cập cửa hàng này', {});
+        }
+
+        const shop = await db.Shop.findByPk(tokenShopId, { transaction });
+
+        if (!shop) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Cửa hàng không tồn tại', {});
+        }
+
+        if (shop.lock_until && shop.lock_until > new Date()) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản đã bị khóa trong 1 ngày kể từ lúc lệnh khóa có hiệu lực', {});
+        }
+
+        const user = await db.User.findOne({
+            where: { id: userId, roles: UserRoles.OWNER },
+            transaction: transaction
+        })
+
+        if (!user) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản không tồn tại hoặc không phải chủ cửa hàng', {});
+        }
+
+        const isPasswordValid = comparePassword(password, user.password);
+        if (!isPasswordValid) {
+            const newAttempts = shop.failed_attempts + 1;
+            let lockUntil = null;
+            if (newAttempts >= 3) {
+                lockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            }
+            console.log(':' + newAttempts);
+            await shop.update(
+                { failed_attempts: newAttempts, lock_until: lockUntil },
+            );
+
+            ResponseModel.error(HttpErrors.BAD_REQUEST, `Sai mật khẩu. Còn ${3 - newAttempts} lần thử.`, {});
+        }
+
+        // Reset số lần nhập sai nếu mật khẩu đúng
+        if (shop.failed_attempts > 0) {
+            await shop.update({
+                failed_attempts: 0,
+                lock_until: null
+            })
+        }
+
+        if (shop.balance < 1000000) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Số dư phải từ 1 triệu trở lên', {});
+        }
+
+        if (shop.balance < amount) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Số dữ rút không đủ', {});
+        }
+
+        const newWithdrawal = await db.Withdrawal.create({
+            shop_id: shopId,
+            amount
+        }, { transaction });
+
+        await shop.update({ balance: shop.balance - amount }, { transaction });
+
+        await transaction.commit();
+
+        return ResponseModel.success('Rút tiền thành công', {
+            newWithdrawal
+        })
+    } catch (error) {
+        await transaction.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
