@@ -157,6 +157,39 @@ export const fetchShopById = async (shopId) => {
     }
 }
 
+export const fetchShopByTokenId = async (tokenShopId) => {
+    try {
+        if (!tokenShopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                tokenShopId: tokenShopId ?? '',
+            });
+        }
+
+        const shop = await db.Shop.findOne({
+            where: { id: tokenShopId },
+            include: [
+                {
+                    model: db.User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'email', 'phone', 'address', 'gender', 'image_url']
+                }
+            ]
+        });
+
+        if (!shop) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng');
+        }
+
+        const payload = {
+            shops: [shop]
+        };
+
+        return ResponseModel.success('Danh sách cửa hàng', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const createNewShop = async (shopInfo, files) => {
     try {
         if (!shopInfo) {

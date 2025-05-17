@@ -20,7 +20,8 @@ import {
     fetchListShopNotPending,
     withdrawalMoneyByOwner,
     fetchListWithdrawalHistories,
-    fetchBalanceShop
+    fetchBalanceShop,
+    fetchShopByTokenId
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
@@ -39,6 +40,12 @@ ShopRouter.get(
     '/shop/admin/:id',
     checkUserAuthentication,
     fetchShopById
+);
+
+ShopRouter.get(
+    '/shop/owner/token-shop',
+    checkUserAuthentication,
+    fetchShopByTokenId
 );
 
 ShopRouter.get(
