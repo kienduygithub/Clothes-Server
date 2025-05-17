@@ -30,7 +30,6 @@ AuthRouter.post(
 AuthRouter.post(
     '/auth/sign-up',
     uploadServer.fields([
-        { name: 'adminOwnerFile', maxCount: 1 },
         { name: 'logoShopFile', maxCount: 1 },
         { name: 'backgroundShopFile', maxCount: 1 },
     ]),

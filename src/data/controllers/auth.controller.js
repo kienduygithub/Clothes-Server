@@ -18,22 +18,11 @@ export const signUp = async (req, res) => {
         const userInfo = req.body.userInfo;
         const shopInfo = req.body.shopInfo;
         const files = req.files;
-        const userId = req.body.userId;
-        let id;
-        if (userId) {
-            let parsedUserId = JSON.parse(userId);
-            if (parsedUserId) {
-                id = parsedUserId;
-            } else {
-                id = null;
-            }
-        }
 
         const response = await authServices.signUp(
             userInfo,
             shopInfo,
             files,
-            id
         );
         return res.status(response.status).json(response);
     } catch (error) {

@@ -18,7 +18,7 @@ module.exports = {
                 },
                 onDelete: "CASCADE"
             },
-            message: {
+            messages: {
                 type: Sequelize.TEXT('long'),
                 allowNull: false,
                 defaultValue: '[]',

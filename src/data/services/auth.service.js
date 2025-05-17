@@ -35,7 +35,7 @@ export const signIn = async (info) => {
         const compared = comparePassword(password, existUser.password);
 
         if (!compared) {
-            ResponseModel.error(HttpErrors.NOT_FOUND, 'Tên đăng nhập hoặc mật khẩu không chính xác.', null);
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Thông tin đăng nhập không hợp lệ', {});
         }
 
         const roles = existUser.roles;
@@ -72,57 +72,25 @@ export const signUp = async (
     userInfo,
     shopInfo,
     files,
-    userId = null
 ) => {
     const transaction = await sequelize.transaction();
     try {
         if (!userInfo || !shopInfo || !files) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
-
-            });
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {});
         }
 
-        let user;
+        let {
+            id,
+        } = JSON.parse(userInfo);
 
-        if (userId) {
-            user = await db.User.findOne({
-                where: { id: userId },
-                transaction
-            });
+        let user = await db.User.findByPk(id, { transaction });
 
-            if (!user) {
-                ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại', {});
-            }
+        if (!user) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Người dùng không tồn tại', {});
+        }
 
-            if (user.roles === UserRoles.OWNER || user.shopId) {
-                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã là chủ cửa hàng', {});
-            }
-        } else {
-            // Trường hợp tạo tài khoản mới
-            if (!userInfo) {
-                return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin người dùng', null);
-            }
-            const { name, email, password, address, phone, gender } = JSON.parse(userInfo);
-            if (!email || !password) {
-                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu email hoặc mật khẩu', null);
-            }
-
-            const existEmail = await db.User.findOne({ where: { email }, transaction });
-            if (existEmail) {
-                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tài khoản đã tồn tại', {});
-            }
-
-            const hash = hashPassword(password);
-            user = await db.User.create({
-                name,
-                email,
-                password: hash,
-                address,
-                phone,
-                gender,
-                image_url: files['adminOwnerFile'] ? `admin-owners/${files['adminOwnerFile'][0]?.filename}` : '',
-                roles: UserRoles.OWNER
-            }, { transaction });
+        if (user.roles === UserRoles.OWNER || user.shopId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không được phép đăng ký cửa hàng.', {});
         }
 
         const {
@@ -465,14 +433,15 @@ export const checkUserForShopRegistration = async ({ email, password }) => {
 
         const user = await User.findOne({
             where: { email: email },
-            attributes: ['id', 'email', 'password', 'image_url', 'address', 'name', 'roles', 'shopId']
+            attributes: [
+                'id', 'email', 'password', 'image_url',
+                'address', 'name', 'roles', 'shopId',
+                'gender', 'phone'
+            ]
         });
 
         if (!user || user === null) {
-            return ResponseModel.success('Email chưa được đăng ký, có thể tạo tài khoản mới để đăng ký cửa hàng', {
-                canRegister: true,
-                isNewUser: true
-            });
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không tồn tại');
         }
 
         const isPasswordValid = comparePassword(password, user.password);
@@ -481,12 +450,10 @@ export const checkUserForShopRegistration = async ({ email, password }) => {
         }
 
         if (user.roles === UserRoles.OWNER || user.shopId) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng đã là chủ cửa hàng hoặc đã liên kết với một cửa hàng', {});
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Người dùng không được phép đăng ký', {});
         }
 
         return ResponseModel.success('Người dùng có thể đăng ký cửa hàng', {
-            canRegister: true,
-            isNewUser: false,
             users: [user]
         });
     } catch (error) {
