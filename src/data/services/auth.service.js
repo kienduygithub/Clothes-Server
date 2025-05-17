@@ -81,6 +81,7 @@ export const signUp = async (
 
         let {
             id,
+            name: shopOwnerName
         } = JSON.parse(userInfo);
 
         let user = await db.User.findByPk(id, { transaction });
@@ -125,6 +126,12 @@ export const signUp = async (
         await user.update({ shopId: shop.id, roles: UserRoles.OWNER }, { transaction });
 
         await transaction.commit();
+
+        await sendActivateStoreMailer(
+            'buikienduy2020@gmail.com',
+            shopOwnerName,
+            shop.shop_name
+        )
 
         return ResponseModel.success('Đăng ký chủ cửa hàng thành công', {
             user: user,
@@ -414,6 +421,12 @@ export const registerShopMobile = async (
         );
 
         await transaction.commit();
+
+        await sendActivateStoreMailer(
+            'buikienduy2020@gmail.com',
+            user.name,
+            shop_name
+        )
 
         return ResponseModel.success('Đăng ký chủ cửa hàng thành công', {});
     } catch (error) {
