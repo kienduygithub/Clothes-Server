@@ -81,6 +81,23 @@ export const fetchShopByTokenId = async (req, res) => {
     }
 }
 
+export const fetchListLatestOrderShop = async (req, res) => {
+    try {
+        const { shopId } = req.user;
+        const response = await shopServices.fetchListLatestOrderShop(
+            shopId,
+            req.body
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const createNewShop = async (req, res) => {
     try {
         const shopInfo = req.body.shopInfo;

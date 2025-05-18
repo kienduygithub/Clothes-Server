@@ -3,8 +3,8 @@ import HttpErrors from '../../common/errors/http-errors';
 import { ResponseModel } from '../../common/errors/response';
 import { sendActivateStoreMailer, sendDeclineStoreMailer } from '../../common/mails/mailer.config';
 import { handleDeleteImageAsFailed, handleDeleteImages } from '../../common/middleware/upload.middleware';
-import { ShopStatus } from '../../common/utils/status';
-import db, { sequelize } from '../models';
+import { OrderStatus, ShopStatus } from '../../common/utils/status';
+import db, { Sequelize, sequelize } from '../models';
 import { UserRoles } from '../../common/utils/roles';
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 
@@ -185,6 +185,174 @@ export const fetchShopByTokenId = async (tokenShopId) => {
         };
 
         return ResponseModel.success('Danh sách cửa hàng', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const fetchListLatestOrderShop = async (tokenShopId, { dateRanges }) => {
+    try {
+        if (!tokenShopId || !dateRanges || !Array.isArray(dateRanges)) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                tokenShopId: tokenShopId ?? '',
+                dateRanges: dateRanges ?? []
+            });
+        }
+
+
+        const shop = await db.Shop.findOne({
+            where: { id: tokenShopId },
+        });
+
+        if (!shop) {
+            ResponseModel.error(HttpErrors.NOT_FOUND, 'Không tìm thấy cửa hàng');
+        }
+
+        const { startDate, endDate, month } = dateRanges[0];
+
+        const latestOrderShops = await db.OrderShop.findAll({
+            where: {
+                shop_id: tokenShopId,
+                createdAt: {
+                    [Op.between]: [new Date(startDate), new Date(endDate)]
+                },
+            },
+            include: [
+                {
+                    model: db.Order,
+                    as: 'order',
+                    where: {
+                        status: {
+                            [Op.ne]: OrderStatus.CANCELED
+                        }
+                    },
+                    include: [
+                        {
+                            model: db.Address,
+                            as: 'address',
+                            include: [
+                                { model: db.City, as: 'city' },
+                                { model: db.District, as: 'district' },
+                                { model: db.Ward, as: 'ward' }
+                            ],
+                            required: false
+                        },
+                        {
+                            model: db.User,
+                            as: 'user',
+                            attributes: ['id', 'name', 'email', 'phone']
+                        }
+                    ]
+                },
+                {
+                    model: db.OrderItem,
+                    as: 'order_shop_items',
+                    include: [
+                        {
+                            model: db.ProductVariant,
+                            as: 'product_variant',
+                            attributes: ['id', 'sku', 'image_url', 'stock_quantity'],
+                            include: [
+                                {
+                                    model: db.Product,
+                                    as: 'product',
+                                    attributes: ['id', 'product_name', 'unit_price']
+                                },
+                                {
+                                    model: db.Color,
+                                    as: 'color',
+                                    attributes: ['id', 'color_name', 'color_code'],
+                                    required: false
+                                },
+                                {
+                                    model: db.Size,
+                                    as: 'size',
+                                    attributes: ['id', 'size_code'],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    model: db.Coupon,
+                    as: 'coupon',
+                    attributes: [
+                        'id', 'name', 'code', 'discount_type',
+                        'discount_value', 'max_discount'
+                    ],
+                    required: false
+                }
+            ],
+            order: [['createdAt', 'DESC']],
+            attributes: [
+                'id', 'subtotal', 'discount', 'final_total',
+                'status', 'createdAt', 'order_id'
+            ]
+        });
+
+        const formattedOrders = latestOrderShops.map(orderShop => ({
+            id: orderShop.order_id,
+            order_shop_id: orderShop.id,
+            status: orderShop.status,
+            subtotal: parseFloat(orderShop.subtotal),
+            discount: parseFloat(orderShop.discount),
+            final_total: parseFloat(orderShop.final_total),
+            created_at: orderShop.createdAt,
+            coupon: orderShop.coupon ? {
+                id: orderShop.coupon.id,
+                name: orderShop.coupon.name,
+                code: orderShop.coupon.code,
+                discountType: orderShop.coupon.discount_type,
+                discountValue: parseFloat(orderShop.coupon.discount_value),
+                maxDiscount: parseFloat(orderShop.coupon.max_discount)
+            } : undefined,
+            user: orderShop.order?.user ? {
+                id: orderShop.order.user.id,
+                name: orderShop.order.user.name,
+                email: orderShop.order.user.email,
+                phone: orderShop.order.user.phone
+            } : undefined,
+            address: orderShop.order?.address ? {
+                addressDetail: orderShop.order.address.address_detail,
+                city: orderShop.order.address.city,
+                district: orderShop.order.address.district,
+                ward: orderShop.order.address.ward,
+                phone: orderShop.order.address.phone,
+                name: orderShop.order.address.name
+            } : undefined,
+            order_items: orderShop.order_shop_items.map(item => ({
+                id: item.id,
+                order_shop: {
+                    id: orderShop.id
+                },
+                quantity: item.quantity,
+                product_variant: {
+                    id: item.product_variant.id,
+                    sku: item.product_variant.sku,
+                    image_url: item.product_variant.image_url,
+                    stock_quantity: item.product_variant.stock_quantity,
+                    product: {
+                        id: item.product_variant.product.id,
+                        name: item.product_variant.product.product_name,
+                        unit_price: parseFloat(item.product_variant.product.unit_price)
+                    },
+                    color: item.product_variant.color ? {
+                        id: item.product_variant.color.id,
+                        color_name: item.product_variant.color.color_name,
+                        color_code: item.product_variant.color.color_code
+                    } : undefined,
+                    size: item.product_variant.size ? {
+                        id: item.product_variant.size.id,
+                        size_code: item.product_variant.size.size_code
+                    } : undefined
+                }
+            }))
+        }));
+
+        return ResponseModel.success('Danh sách đơn hàng mới', {
+            orders: formattedOrders
+        });
     } catch (error) {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }

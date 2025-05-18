@@ -21,10 +21,17 @@ import {
     withdrawalMoneyByOwner,
     fetchListWithdrawalHistories,
     fetchBalanceShop,
-    fetchShopByTokenId
+    fetchShopByTokenId,
+    fetchListLatestOrderShop
 } from '../data/controllers/shop.controller';
 import { checkUserAuthentication } from '../common/middleware/jwt.middleware';
 const ShopRouter = express.Router();
+
+ShopRouter.post(
+    '/shop/order/latest',
+    checkUserAuthentication,
+    fetchListLatestOrderShop
+)
 
 ShopRouter.get(
     '/shop/all',
