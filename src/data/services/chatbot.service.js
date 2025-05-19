@@ -22,6 +22,10 @@ Follow these rules:
 7. Respond naturally to social phrases (like "thank you", "good job", "ok", etc.) with friendly Vietnamese responses like "Không có gì ạ", "Cảm ơn bạn", "Rất vui khi được giúp đỡ bạn", etc.
 8. Use conversational Vietnamese that matches how young people speak today, friendly but professional.
 9. If someone is just chatting with you without asking about products, engage them in a friendly way and try to bring the conversation back to shopping topics.
+10. Never output debug information or notes to self in your responses.
+11. Never output text in English or explain your limitations in responses.
+12. Never add comments like "At this point...", "I would need..." - just provide the information directly.
+13. If you don't have specific data about something, provide a general response without mentioning that you don't have access to a database.
 `;
 
 // Add temporary storage for guest sessions
@@ -143,6 +147,11 @@ const searchProducts = async (userMessage) => {
             return [];
         }
 
+        // Nếu chỉ là từ xã giao, trả về kết quả đặc biệt
+        if (searchTerms.isSocialOnly) {
+            return { type: 'social_only', data: [] };
+        }
+
         // Check if this is a shop search
         if (searchTerms.isShopSearch) {
             return await searchShops(searchTerms);
@@ -254,17 +263,94 @@ const searchShops = async (searchTerms) => {
 
         const shops = await db.Shop.findAll(query);
 
-        // Format shop data for response
-        return {
+        // Kết quả trả về
+        const result = {
             type: 'shops',
             data: shops.map(shop => ({
                 id: shop.id,
                 name: shop.shop_name,
                 email: shop.contact_email,
                 address: shop.contact_address,
-                logo_url: shop.logo_url
+                logo_url: shop.logo_url,
+                products: [] // Sẽ chứa sản phẩm của shop
             }))
         };
+
+        // Xử lý tùy thuộc vào mục đích tìm kiếm
+        if (searchTerms.wantsShopProducts || !searchTerms.wantsShopInfo) {
+            // Người dùng muốn xem sản phẩm của shop hoặc không xác định rõ ý định
+            // Lấy nhiều sản phẩm hơn nếu người dùng yêu cầu xem sản phẩm cụ thể
+            const productLimit = searchTerms.wantsShopProducts ? 5 : 2;
+
+            // Lấy thêm sản phẩm của mỗi shop
+            for (let i = 0; i < result.data.length; i++) {
+                const shop = result.data[i];
+                // Tìm sản phẩm của shop
+                const products = await db.Product.findAll({
+                    where: { shop_id: shop.id },
+                    limit: productLimit, // Giới hạn theo mục đích tìm kiếm
+                    include: [
+                        {
+                            model: db.ProductImages,
+                            as: 'product_images',
+                        },
+                        {
+                            model: db.ProductVariant,
+                            as: 'variants',
+                            include: [
+                                {
+                                    model: db.Size,
+                                    as: 'size',
+                                    attributes: ['id', 'size_code']
+                                },
+                                {
+                                    model: db.Color,
+                                    as: 'color',
+                                    attributes: ['id', 'color_name', 'color_code']
+                                }
+                            ]
+                        },
+                    ]
+                });
+
+                // Format sản phẩm và thêm vào kết quả
+                shop.products = formatProductsForResponse(products);
+            }
+        } else if (searchTerms.wantsShopInfo) {
+            // Người dùng chỉ muốn thông tin shop, không cần sản phẩm
+            // Có thể lấy thêm thông tin shop nếu cần thiết
+            for (let i = 0; i < result.data.length; i++) {
+                const shop = result.data[i];
+
+                // Thêm dữ liệu bổ sung (ví dụ: số lượng sản phẩm, review, rating)
+                try {
+                    // Đếm tổng số sản phẩm của shop
+                    const productCount = await db.Product.count({
+                        where: { shop_id: shop.id }
+                    });
+
+                    // Lấy rating trung bình nếu có
+                    const reviewStats = await db.Review.findOne({
+                        attributes: [
+                            [db.sequelize.fn('AVG', db.sequelize.col('star_point')), 'avg_rating'],
+                            [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'total_reviews']
+                        ],
+                        where: { shop_id: shop.id }
+                    });
+
+                    // Thêm thông tin bổ sung vào kết quả
+                    shop.total_products = productCount || 0;
+                    shop.avg_rating = reviewStats && reviewStats.dataValues.avg_rating
+                        ? parseFloat(reviewStats.dataValues.avg_rating).toFixed(1)
+                        : "Chưa có đánh giá";
+                    shop.total_reviews = reviewStats ? reviewStats.dataValues.total_reviews : 0;
+                } catch (err) {
+                    console.error('Error fetching additional shop info:', err);
+                }
+            }
+        }
+
+        return result;
     } catch (error) {
         console.error('Shop search error:', error);
         return { type: 'error', message: error.message };
@@ -279,26 +365,108 @@ const extractSearchTerms = (message) => {
     // Object to store search terms
     const searchTerms = {};
 
-    // Check if user is searching for shop information
-    const shopKeywords = ['cửa hàng', 'shop', 'store'];
-    for (const keyword of shopKeywords) {
-        if (lowerMessage.includes(keyword)) {
-            searchTerms.isShopSearch = true;
+    // Kiểm tra các từ khóa xã giao (có thể lưu ý để bot trả lời theo cách tự nhiên)
+    const socialPhrases = [
+        'cảm ơn', 'thanks', 'thank', 'cám ơn', 'ok', 'oke', 'được', 'hay', 'tốt', 'good', 'nice',
+        'tuyệt vời', 'great', 'hello', 'hi', 'xin chào', 'chào', 'bye', 'tạm biệt',
+        'vâng', 'ừ', 'đúng', 'sai', 'không', 'yes', 'no', 'cool', 'wow', 'amazing',
+        'chuẩn', 'đỉnh', 'quá xịn', 'xuất sắc', 'quá đã', 'quá tốt', 'hiểu rồi'
+    ];
 
-            // Extract shop name if provided
-            const shopNameRegex = new RegExp(`${keyword}\\s+([\\w\\s]+)`, 'i');
-            const shopNameMatch = message.match(shopNameRegex);
-            if (shopNameMatch && shopNameMatch[1]) {
-                searchTerms.shopName = shopNameMatch[1].trim();
+    // Phát hiện từ khóa xã giao riêng lẻ
+    const isSocialPhrase = socialPhrases.some(phrase => {
+        // Kiểm tra xem message có chứa đúng từ đó không (cách nhau bởi dấu cách hoặc đầu/cuối chuỗi)
+        const regex = new RegExp(`(^|\\s)${phrase}(\\s|$|[,.!?;:])`, 'i');
+        return regex.test(lowerMessage);
+    });
+
+    // Nếu chỉ có từ xã giao và không có từ khóa khác, đánh dấu là social_only
+    if (isSocialPhrase && lowerMessage.length < 20) {
+        searchTerms.isSocialOnly = true;
+        return searchTerms;
+    }
+
+    // Define các loại từ khóa
+    const shopKeywords = ['cửa hàng', 'shop', 'store', 'brand', 'thương hiệu', 'hiệu', 'tiệm', 'nơi bán', 'chỗ bán', 'hãng'];
+
+    const productKeywords = [
+        'sản phẩm', 'mặt hàng', 'item', 'đồ', 'quần áo', 'trang phục',
+        'áo', 'quần', 'váy', 'đầm', 'giày', 'dép', 'túi', 'ví', 'mũ', 'nón', 'kính',
+        'vòng', 'dây', 'nhẫn', 'đồng hồ', 'phụ kiện', 'khăn', 'tất', 'vớ',
+        'bán', 'mua', 'order', 'đặt hàng', 'có bán', 'đang bán', 'mẫu mã', 'sản xuất',
+        'collection', 'bộ sưu tập', 'dòng', 'loại'
+    ];
+
+    const infoKeywords = [
+        'thông tin', 'chi tiết', 'giới thiệu', 'mô tả', 'tổng quan', 'profile',
+        'địa chỉ', 'liên hệ', 'contact', 'hotline', 'email', 'số điện thoại', 'website',
+        'fanpage', 'facebook', 'instagram', 'mạng xã hội', 'socials',
+        'thành lập', 'lịch sử', 'xuất xứ', 'nguồn gốc', 'giờ mở cửa', 'nơi sản xuất',
+        'chất lượng', 'uy tín', 'đánh giá', 'review', 'feedback', 'nhận xét', 'phản hồi',
+        'chính sách', 'bảo hành', 'đổi trả', 'giao hàng', 'thanh toán', 'delivery', 'shipping',
+        'giấy phép', 'chứng nhận', 'thông tin liên hệ', 'quy mô', 'nhân viên', 'danh tiếng',
+        'mấy giờ mở cửa', 'họ bán gì', 'họ là ai'
+    ];
+
+    // Check if user is looking for shop information
+    if (shopKeywords.some(keyword => lowerMessage.includes(keyword))) {
+        searchTerms.isShopSearch = true;
+
+        // Phân biệt giữa tìm sản phẩm của shop và thông tin shop
+        const hasProductIntent = productKeywords.some(keyword => lowerMessage.includes(keyword));
+        const hasInfoIntent = infoKeywords.some(keyword => lowerMessage.includes(keyword));
+
+        if (hasProductIntent) {
+            // Nếu có từ khóa liên quan đến sản phẩm, đánh dấu là tìm sản phẩm của shop
+            searchTerms.wantsShopProducts = true;
+        } else if (hasInfoIntent || !hasProductIntent) {
+            // Nếu có từ khóa thông tin hoặc không có từ khóa sản phẩm, mặc định là tìm thông tin shop
+            searchTerms.wantsShopInfo = true;
+        }
+
+        // Extract shop name using various patterns
+        let shopName = null;
+
+        // Try matching after shop keywords
+        for (const keyword of shopKeywords) {
+            if (lowerMessage.includes(keyword)) {
+                const regex = new RegExp(`${keyword}\\s+([\\w\\s]+)`, 'i');
+                const match = message.match(regex);
+                if (match && match[1]) {
+                    shopName = match[1].trim();
+                    break;
+                }
             }
-            break;
+        }
+
+        // Try matching after product of shop keywords
+        if (!shopName) {
+            const shopProductPatterns = ['của\\s+([\\w\\s]+)', 'từ\\s+([\\w\\s]+)', 'tại\\s+([\\w\\s]+)', 'ở\\s+([\\w\\s]+)'];
+
+            for (const pattern of shopProductPatterns) {
+                const regex = new RegExp(pattern, 'i');
+                const match = message.match(regex);
+                if (match && match[1]) {
+                    shopName = match[1].trim();
+                    break;
+                }
+            }
+        }
+
+        // If we found a shop name, clean it up
+        if (shopName) {
+            // Remove filler words
+            shopName = shopName.replace(/\s+(nào|đó|không|nhỉ|vậy|thế|ạ|a|nhé|nha|đi|ở|này)(\s+|$)/gi, ' ').trim();
+            // Remove punctuation at end
+            shopName = shopName.replace(/[.,?!;:]+$/, '').trim();
+            searchTerms.shopName = shopName;
         }
     }
 
     // If not searching for shop, assume product search
     if (!searchTerms.isShopSearch) {
-        // Extract product name (basic approach - could be enhanced with NLP)
-        const nameKeywords = ['áo', 'quần', 'váy', 'đầm', 'giày', 'dép', 'túi', 'ví', 'mũ', 'nón', 'kính', 'trang phục'];
+        // Extract product name (enhanced approach with more keywords)
+        const nameKeywords = ['áo', 'quần', 'váy', 'đầm', 'giày', 'dép', 'túi', 'ví', 'mũ', 'nón', 'kính', 'trang phục', 'phụ kiện', 'vòng cổ', 'thắt lưng', 'đồng hồ', 'khăn'];
 
         for (const keyword of nameKeywords) {
             if (lowerMessage.includes(keyword)) {
@@ -449,7 +617,10 @@ const generateBotResponse = async (messages, searchResults) => {
     // Generate context for the chatbot
     let systemContext = SYSTEM_PROMPT;
 
-    if (searchResults && searchResults.type === 'products' && searchResults.data.length > 0) {
+    if (searchResults && searchResults.type === 'social_only') {
+        // Xử lý đặc biệt với câu xã giao
+        systemContext += "\n\nThe user has sent a short social message (like 'thank you', 'ok', etc.). Respond naturally in a friendly, casual Vietnamese tone. Don't try to bring the conversation back to shopping unless it makes sense. Just acknowledge their message naturally as a friend would.";
+    } else if (searchResults && searchResults.type === 'products' && searchResults.data.length > 0) {
         // Handle product results
         systemContext += "\n\nBelow are the products that match the user's search criteria:\n";
         searchResults.data.forEach((product, index) => {
@@ -486,7 +657,37 @@ const generateBotResponse = async (messages, searchResults) => {
             if (shop.email) systemContext += `- Email: ${shop.email}\n`;
             if (shop.address) systemContext += `- Địa chỉ: ${shop.address}\n`;
             if (shop.logo_url) systemContext += `- Logo: ${shop.logo_url}\n`;
+
+            // Nếu có thông tin đánh giá, hiển thị
+            if (shop.avg_rating) systemContext += `- Đánh giá: ${shop.avg_rating}\n`;
+            if (shop.total_reviews) systemContext += `- Số lượng đánh giá: ${shop.total_reviews}\n`;
+            if (shop.total_products) systemContext += `- Số lượng sản phẩm: ${shop.total_products}\n`;
+
+            // Thêm thông tin về sản phẩm nổi bật của shop (nếu có)
+            if (shop.products && shop.products.length > 0) {
+                systemContext += `- Một số sản phẩm nổi bật:\n`;
+                shop.products.forEach((product, pIndex) => {
+                    systemContext += `  + Sản phẩm ${pIndex + 1}: ${product.name} - ${product.price} VND\n`;
+                    if (product.sizes && product.sizes.length > 0) {
+                        systemContext += `    Size: ${product.sizes.join(', ')}\n`;
+                    }
+                    if (product.colors && product.colors.length > 0) {
+                        systemContext += `    Màu: ${product.colors.join(', ')}\n`;
+                    }
+                });
+            }
         });
+
+        // Hướng dẫn cách phản hồi dựa trên loại thông tin shop
+        const shopData = searchResults.data[0]; // Lấy shop đầu tiên để kiểm tra
+
+        if (shopData.total_products !== undefined && shopData.products.length === 0) {
+            // Đây là tìm kiếm thông tin shop, không kèm sản phẩm
+            systemContext += "\n\nUser is asking for shop information only. Focus on details about the shop like contact information, ratings, history, or policies. DO NOT apologize for not having product details, as the user is specifically looking for shop information.";
+        } else if (shopData.products && shopData.products.length > 0) {
+            // Đây là tìm kiếm sản phẩm của shop
+            systemContext += "\n\nUser is asking for products from this shop. Highlight the available products and mention that these are just examples, and there may be more products available from this shop.";
+        }
     } else if (messages[messages.length - 1].content.toLowerCase().includes('tìm') ||
         messages[messages.length - 1].content.toLowerCase().includes('kiếm') ||
         messages[messages.length - 1].content.toLowerCase().includes('mua')) {
@@ -499,7 +700,13 @@ const generateBotResponse = async (messages, searchResults) => {
         
         User message: ${messages[messages.length - 1].content}
         
-        Please respond to the user's message based on the above instructions and context. Respond in Vietnamese.
+        Please respond to the user's message based on the above instructions and context. Respond in Vietnamese only.
+        
+        Remember:
+        1. NEVER output any English text
+        2. NEVER include the words "Product" or "Shop" followed by numbers in your response
+        3. Format shop/product info in natural conversational Vietnamese
+        4. Do not include system phrases like "Dưới đây là", "Tôi thấy", etc.
     `;
 
     // Start with primary model, then try fallbacks
