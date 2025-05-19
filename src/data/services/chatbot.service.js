@@ -569,17 +569,37 @@ export const createSession = async (userId, title) => {
         session_id,
         title: title || 'Cuộc hội thoại mới'
     });
+
+    // Thêm tin nhắn chào khi tạo session mới
+    await db.ChatHistory.create({
+        user_id: userId || null,
+        session_id: session.session_id,
+        messages: JSON.stringify([{
+            role: 'assistant',
+            content: 'Xin chào! Tôi là ClothesShop Assistant. Tôi có thể giúp bạn tìm kiếm quần áo, phụ kiện và trả lời các câu hỏi về sản phẩm của chúng tôi. Bạn muốn tìm kiếm sản phẩm gì hôm nay?'
+        }])
+    });
+
     return { sessionId: session.session_id, title: session.title, createdAt: session.createdAt };
 };
 
 export const getSessions = async (userId, sessionIds) => {
+    let results = [];
     if (userId) {
-        return await db.ChatSession.findAll({ where: { user_id: userId } });
+        results = await db.ChatSession.findAll({ where: { user_id: userId } });
     } else if (sessionIds) {
         const ids = Array.isArray(sessionIds) ? sessionIds : sessionIds.split(',');
-        return await db.ChatSession.findAll({ where: { session_id: { [Op.in]: ids } } });
+        results = await db.ChatSession.findAll({ where: { session_id: { [Op.in]: ids } } });
     }
-    return [];
+
+    // Map lại để đảm bảo luôn có sessionId (dùng session_id)
+    return results.map(session => {
+        const sessionData = session.toJSON ? session.toJSON() : session;
+        return {
+            ...sessionData,
+            sessionId: sessionData.session_id // Đảm bảo luôn có sessionId từ session_id
+        };
+    });
 };
 
 export const getChatHistoryBySession = async (sessionId) => {
@@ -595,7 +615,23 @@ export const getChatHistoryBySession = async (sessionId) => {
             messages = messages.concat(arr);
         } catch (e) { }
     });
-    return messages;
+
+    // Nếu không có tin nhắn, thêm tin nhắn chào mặc định
+    if (messages.length === 0) {
+        messages = [{
+            role: 'assistant',
+            content: 'Xin chào! Tôi là ClothesShop Assistant. Tôi có thể giúp bạn tìm kiếm quần áo, phụ kiện và trả lời các câu hỏi về sản phẩm của chúng tôi. Bạn muốn tìm kiếm sản phẩm gì hôm nay?'
+        }];
+    }
+
+    // Map lại format cho FE
+    const mapped = (messages || []).map((msg, idx) => ({
+        id: msg.id || `${msg.role}-${idx}-${Date.now()}`,
+        text: msg.content,
+        isUser: msg.role === 'user',
+        searchResults: msg.searchResults || undefined
+    }));
+    return mapped;
 };
 
 export const sendMessageToSession = async (sessionId, userId, userMessage) => {
@@ -618,7 +654,9 @@ export const sendMessageToSession = async (sessionId, userId, userMessage) => {
     const searchResults = await searchProducts(userMessage); // dùng lại hàm searchProducts nếu có
     const botResponse = await generateBotResponse(messages, searchResults); // dùng lại hàm generateBotResponse nếu có
 
-    messages.push({ role: 'assistant', content: botResponse, searchResults });
+    // Tin nhắn mới từ bot
+    const botMessage = { role: 'assistant', content: botResponse, searchResults };
+    messages.push(botMessage);
 
     // Lưu lại bản ghi mới
     await db.ChatHistory.create({
@@ -626,8 +664,15 @@ export const sendMessageToSession = async (sessionId, userId, userMessage) => {
         session_id: sessionId,
         messages: JSON.stringify([
             { role: 'user', content: userMessage },
-            { role: 'assistant', content: botResponse, searchResults }
+            botMessage
         ])
     });
-    return { messages };
+
+    // Chỉ trả về tin nhắn mới, không trả về toàn bộ lịch sử
+    return {
+        messages: [
+            { role: 'user', content: userMessage },
+            botMessage
+        ]
+    };
 };
