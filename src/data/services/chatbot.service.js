@@ -5,12 +5,13 @@ import { Op } from 'sequelize';
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Default model is gemini-1.5-pro
-const PRIMARY_MODEL = "gemini-1.5-pro";
+const PRIMARY_MODEL = "gemini-1.5-flash";
 // Fallback models in case of quota issues - only use models available in v1beta
 const FALLBACK_MODELS = ["gemini-1.5-flash"]; // Removing unavailable models
 
 // System prompt for the chatbot
 const SYSTEM_PROMPT = `You are a helpful shopping assistant for an online clothing store. Your name is ClothesShop Assistant.
+
 Follow these rules:
 1. Start every conversation with a friendly greeting.
 2. Only answer questions related to shopping and the products in our database.
@@ -18,6 +19,9 @@ Follow these rules:
 4. Do not search for or mention external products or websites.
 5. Keep responses concise and helpful.
 6. When users ask about products, provide relevant details like name, price, sizes, colors, etc.
+7. Respond naturally to social phrases (like "thank you", "good job", "ok", etc.) with friendly Vietnamese responses like "Không có gì ạ", "Cảm ơn bạn", "Rất vui khi được giúp đỡ bạn", etc.
+8. Use conversational Vietnamese that matches how young people speak today, friendly but professional.
+9. If someone is just chatting with you without asking about products, engage them in a friendly way and try to bring the conversation back to shopping topics.
 `;
 
 // Add temporary storage for guest sessions
@@ -331,19 +335,72 @@ const extractSearchTerms = (message) => {
         else if (lowerMessage.includes('unisex')) searchTerms.gender = 'Unisex';
         else if (lowerMessage.includes('trẻ em') || lowerMessage.includes('kid')) searchTerms.gender = 'Kids';
 
-        // Extract price range
-        const priceRegex = /(dưới|under|less than|không quá)\s*(\d+)|(từ|from)\s*(\d+)\s*(đến|to)\s*(\d+)|(\d+)\s*(đến|to)\s*(\d+)|(\d+)\s*k|\s*(\d+)\s*vnd|\s*(\d+)\s*đồng/i;
-        const priceMatch = message.match(priceRegex);
+        // Helper function to convert price strings to numerical values
+        const convertPrice = (priceStr) => {
+            priceStr = priceStr.trim().toLowerCase();
+            let multiplier = 1;
 
-        if (priceMatch) {
-            if (priceMatch[1] && priceMatch[2]) {  // "dưới X"
-                searchTerms.maxPrice = parseInt(priceMatch[2]);
-            } else if (priceMatch[3] && priceMatch[4] && priceMatch[6]) {  // "từ X đến Y"
-                searchTerms.minPrice = parseInt(priceMatch[4]);
-                searchTerms.maxPrice = parseInt(priceMatch[6]);
-            } else if (priceMatch[7] && priceMatch[9]) {  // "X đến Y"
-                searchTerms.minPrice = parseInt(priceMatch[7]);
-                searchTerms.maxPrice = parseInt(priceMatch[9]);
+            // Check for k, nghìn, ngàn (thousands)
+            if (priceStr.endsWith('k') || priceStr.endsWith('nghìn') || priceStr.endsWith('ngàn')) {
+                multiplier = 1000;
+                priceStr = priceStr.replace(/k$|nghìn$|ngàn$/i, '').trim();
+            }
+            // Check for tr, triệu (millions)
+            else if (priceStr.endsWith('tr') || priceStr.endsWith('triệu')) {
+                multiplier = 1000000;
+                priceStr = priceStr.replace(/tr$|triệu$/i, '').trim();
+            }
+
+            // Remove commas, dots in numbers
+            priceStr = priceStr.replace(/\./g, '').replace(/,/g, '');
+
+            // Parse the number
+            const num = parseFloat(priceStr);
+            if (!isNaN(num)) {
+                return num * multiplier;
+            }
+            return null;
+        };
+
+        // Improved price extraction patterns
+        // 1. Standard format: dưới/từ X đến Y
+        const rangeRegex = /(dưới|under|less than|không quá)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(từ|from)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)/i;
+
+        // 2. Direct price mentions: 100k, 100 nghìn, 1tr, 1.5 triệu, etc.
+        const directPriceRegex = /\b(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\b/i;
+
+        // First try range regex
+        const rangeMatch = lowerMessage.match(rangeRegex);
+        if (rangeMatch) {
+            if (rangeMatch[1] && rangeMatch[2]) {  // "dưới X"
+                searchTerms.maxPrice = convertPrice(rangeMatch[2]);
+            } else if (rangeMatch[4] && rangeMatch[5] && rangeMatch[8]) {  // "từ X đến Y"
+                searchTerms.minPrice = convertPrice(rangeMatch[5]);
+                searchTerms.maxPrice = convertPrice(rangeMatch[8]);
+            } else if (rangeMatch[10] && rangeMatch[13]) {  // "X đến Y"
+                searchTerms.minPrice = convertPrice(rangeMatch[10]);
+                searchTerms.maxPrice = convertPrice(rangeMatch[13]);
+            }
+        }
+        // If no range found, look for direct price mentions if accompanied by price-related words
+        else if (lowerMessage.match(/(giá|price|cost|tiền|khoảng|tầm|khoảng chừng|tầm khoảng)/i)) {
+            const priceMatches = [...lowerMessage.matchAll(/\b(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\b/gi)];
+            if (priceMatches.length === 1) {
+                // Only one price mentioned - assume it's "around this price"
+                const price = convertPrice(priceMatches[0][0]);
+                if (price) {
+                    // Create a reasonable range around this price
+                    searchTerms.minPrice = Math.max(0, price * 0.8); // 20% below
+                    searchTerms.maxPrice = price * 1.2; // 20% above
+                }
+            } else if (priceMatches.length >= 2) {
+                // Multiple prices - assume it's a range
+                const prices = priceMatches.map(match => convertPrice(match[0])).filter(p => p !== null);
+                if (prices.length >= 2) {
+                    prices.sort((a, b) => a - b);
+                    searchTerms.minPrice = prices[0];
+                    searchTerms.maxPrice = prices[prices.length - 1];
+                }
             }
         }
     }
