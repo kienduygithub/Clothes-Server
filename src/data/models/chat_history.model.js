@@ -5,7 +5,10 @@ const {
 module.exports = (sequelize, DataTypes) => {
     class ChatHistory extends Model {
         static associate(models) {
-
+            ChatHistory.belongsTo(models.ChatSession, {
+                foreignKey: 'session_id',
+                targetKey: 'session_id'
+            });
         }
     }
     ChatHistory.init({
@@ -29,7 +32,15 @@ module.exports = (sequelize, DataTypes) => {
             set(value) {
                 this.setDataValue('messages', JSON.stringify(value))
             }
-        }
+        },
+        session_id: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            references: {
+                model: 'chatsessions',
+                key: 'session_id'
+            }
+        },
     }, {
         sequelize,
         modelName: 'ChatHistory',
