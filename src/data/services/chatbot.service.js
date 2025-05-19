@@ -263,6 +263,64 @@ const searchShops = async (searchTerms) => {
 
         const shops = await db.Shop.findAll(query);
 
+        // Handle case where no shops found, but user wants shop products
+        if (shops.length === 0 && searchTerms.wantsShopProducts) {
+            console.log("Không tìm thấy shop cụ thể, tìm một số sản phẩm từ các shop khác nhau");
+
+            // Lấy một số shop có sẵn trong hệ thống
+            const fallbackShops = await db.Shop.findAll({ limit: 3 });
+
+            if (fallbackShops.length > 0) {
+                const result = {
+                    type: 'shops',
+                    data: fallbackShops.map(shop => ({
+                        id: shop.id,
+                        name: shop.shop_name,
+                        email: shop.contact_email,
+                        address: shop.contact_address,
+                        logo_url: shop.logo_url,
+                        products: [] // Sẽ chứa sản phẩm của shop
+                    }))
+                };
+
+                // Lấy sản phẩm cho mỗi shop
+                for (let i = 0; i < result.data.length; i++) {
+                    const shop = result.data[i];
+                    const products = await db.Product.findAll({
+                        where: { shop_id: shop.id },
+                        limit: 3,
+                        include: [
+                            {
+                                model: db.ProductImages,
+                                as: 'product_images',
+                            },
+                            {
+                                model: db.ProductVariant,
+                                as: 'variants',
+                                include: [
+                                    {
+                                        model: db.Size,
+                                        as: 'size',
+                                        attributes: ['id', 'size_code']
+                                    },
+                                    {
+                                        model: db.Color,
+                                        as: 'color',
+                                        attributes: ['id', 'color_name', 'color_code']
+                                    }
+                                ]
+                            }
+                        ]
+                    });
+                    shop.products = formatProductsForResponse(products);
+                }
+                return result;
+            }
+
+            // Nếu không tìm thấy shop, trả về kết quả rỗng
+            return { type: 'shops', data: [] };
+        }
+
         // Kết quả trả về
         const result = {
             type: 'shops',
@@ -276,11 +334,10 @@ const searchShops = async (searchTerms) => {
             }))
         };
 
-        // Xử lý tùy thuộc vào mục đích tìm kiếm
-        if (searchTerms.wantsShopProducts || !searchTerms.wantsShopInfo) {
-            // Người dùng muốn xem sản phẩm của shop hoặc không xác định rõ ý định
-            // Lấy nhiều sản phẩm hơn nếu người dùng yêu cầu xem sản phẩm cụ thể
-            const productLimit = searchTerms.wantsShopProducts ? 5 : 2;
+        // Force sản phẩm nếu shop search nhưng wantsShopProducts = true
+        if (searchTerms.wantsShopProducts) {
+            // Lấy nhiều sản phẩm hơn vì người dùng muốn xem sản phẩm
+            const productLimit = 5;
 
             // Lấy thêm sản phẩm của mỗi shop
             for (let i = 0; i < result.data.length; i++) {
@@ -288,7 +345,7 @@ const searchShops = async (searchTerms) => {
                 // Tìm sản phẩm của shop
                 const products = await db.Product.findAll({
                     where: { shop_id: shop.id },
-                    limit: productLimit, // Giới hạn theo mục đích tìm kiếm
+                    limit: productLimit,
                     include: [
                         {
                             model: db.ProductImages,
@@ -316,13 +373,17 @@ const searchShops = async (searchTerms) => {
                 // Format sản phẩm và thêm vào kết quả
                 shop.products = formatProductsForResponse(products);
             }
-        } else if (searchTerms.wantsShopInfo) {
+        }
+        // Xử lý thông tin shop nếu không phải tìm sản phẩm
+        else if (searchTerms.wantsShopInfo || !searchTerms.wantsShopProducts) {
+            // Lấy thêm sản phẩm nếu không chỉ định cụ thể yêu cầu info
+            const shouldIncludeProducts = !searchTerms.wantsShopInfo;
+
             // Người dùng chỉ muốn thông tin shop, không cần sản phẩm
-            // Có thể lấy thêm thông tin shop nếu cần thiết
             for (let i = 0; i < result.data.length; i++) {
                 const shop = result.data[i];
 
-                // Thêm dữ liệu bổ sung (ví dụ: số lượng sản phẩm, review, rating)
+                // Thêm dữ liệu bổ sung
                 try {
                     // Đếm tổng số sản phẩm của shop
                     const productCount = await db.Product.count({
@@ -344,6 +405,37 @@ const searchShops = async (searchTerms) => {
                         ? parseFloat(reviewStats.dataValues.avg_rating).toFixed(1)
                         : "Chưa có đánh giá";
                     shop.total_reviews = reviewStats ? reviewStats.dataValues.total_reviews : 0;
+
+                    // Nếu không yêu cầu info cụ thể, thêm một vài sản phẩm
+                    if (shouldIncludeProducts) {
+                        const products = await db.Product.findAll({
+                            where: { shop_id: shop.id },
+                            limit: 2,
+                            include: [
+                                {
+                                    model: db.ProductImages,
+                                    as: 'product_images',
+                                },
+                                {
+                                    model: db.ProductVariant,
+                                    as: 'variants',
+                                    include: [
+                                        {
+                                            model: db.Size,
+                                            as: 'size',
+                                            attributes: ['id', 'size_code']
+                                        },
+                                        {
+                                            model: db.Color,
+                                            as: 'color',
+                                            attributes: ['id', 'color_name', 'color_code']
+                                        }
+                                    ]
+                                },
+                            ]
+                        });
+                        shop.products = formatProductsForResponse(products);
+                    }
                 } catch (err) {
                     console.error('Error fetching additional shop info:', err);
                 }
@@ -408,8 +500,51 @@ const extractSearchTerms = (message) => {
         'mấy giờ mở cửa', 'họ bán gì', 'họ là ai'
     ];
 
-    // Check if user is looking for shop information
-    if (shopKeywords.some(keyword => lowerMessage.includes(keyword))) {
+    // Kiểm tra các pattern phổ biến về sản phẩm của shop
+    const shopProductPatterns = [
+        'sản phẩm của (cửa hàng|shop|thương hiệu|hiệu|tiệm|hãng)',
+        'các sản phẩm của',
+        'mặt hàng của',
+        'đồ của',
+        'bán gì',
+        'có những gì',
+        'có gì',
+        'sản xuất gì',
+        'có sản phẩm gì',
+        'có mặt hàng gì',
+        'bán những gì'
+    ];
+
+    // Check 1: Tìm kiếm shop products theo pattern đặc thù
+    for (const pattern of shopProductPatterns) {
+        const regex = new RegExp(pattern, 'i');
+        if (regex.test(lowerMessage)) {
+            searchTerms.isShopSearch = true;
+            searchTerms.wantsShopProducts = true;
+
+            // Extract shop name
+            const shopMatches = [
+                /sản phẩm của (\w+\s?\w*)/i,
+                /đồ của (\w+\s?\w*)/i,
+                /hàng của (\w+\s?\w*)/i,
+                /cửa hàng (\w+\s?\w*) bán/i,
+                /shop (\w+\s?\w*) bán/i
+            ];
+
+            for (const shopRegex of shopMatches) {
+                const match = message.match(shopRegex);
+                if (match && match[1]) {
+                    searchTerms.shopName = match[1].trim();
+                    break;
+                }
+            }
+
+            break;
+        }
+    }
+
+    // Check 2: Tiếp tục check theo cách thông thường nếu chưa tìm thấy
+    if (!searchTerms.isShopSearch && shopKeywords.some(keyword => lowerMessage.includes(keyword))) {
         searchTerms.isShopSearch = true;
 
         // Phân biệt giữa tìm sản phẩm của shop và thông tin shop
@@ -441,9 +576,9 @@ const extractSearchTerms = (message) => {
 
         // Try matching after product of shop keywords
         if (!shopName) {
-            const shopProductPatterns = ['của\\s+([\\w\\s]+)', 'từ\\s+([\\w\\s]+)', 'tại\\s+([\\w\\s]+)', 'ở\\s+([\\w\\s]+)'];
+            const productOfPatterns = ['của\\s+([\\w\\s]+)', 'từ\\s+([\\w\\s]+)', 'tại\\s+([\\w\\s]+)', 'ở\\s+([\\w\\s]+)'];
 
-            for (const pattern of shopProductPatterns) {
+            for (const pattern of productOfPatterns) {
                 const regex = new RegExp(pattern, 'i');
                 const match = message.match(regex);
                 if (match && match[1]) {
@@ -451,6 +586,13 @@ const extractSearchTerms = (message) => {
                     break;
                 }
             }
+        }
+
+        // Check 3: Nếu không tìm thấy tên shop cụ thể nhưng có từ khóa sản phẩm và cửa hàng
+        // thì giả định muốn xem tất cả sản phẩm của một cửa hàng bất kỳ
+        if (!shopName && hasProductIntent && lowerMessage.includes('sản phẩm') && shopKeywords.some(kw => lowerMessage.includes(kw))) {
+            searchTerms.wantsShopProducts = true;
+            searchTerms.wantsShopInfo = false;
         }
 
         // If we found a shop name, clean it up
