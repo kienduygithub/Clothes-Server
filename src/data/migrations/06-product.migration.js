@@ -52,11 +52,6 @@ module.exports = {
                 type: Sequelize.DECIMAL(10, 2),
                 allowNull: false
             },
-            // avgRating: {
-            //     type: Sequelize.DECIMAL(10, 2),
-            //     allowNull: false,
-            //     defaultValue: 0
-            // },
             createdAt: {
                 allowNull: false,
                 type: Sequelize.DATE
