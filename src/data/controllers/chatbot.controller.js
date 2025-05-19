@@ -108,3 +108,50 @@ export const getGuestSession = async (req, res) => {
         });
     }
 };
+
+// Tạo mới session (user hoặc guest)
+export const createSession = async (req, res) => {
+    try {
+        const { userId, title } = req.body;
+        const result = await chatbotService.createSession(userId, title);
+        return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || 'Error creating session' });
+    }
+};
+
+// Lấy danh sách session (user hoặc guest)
+export const getSessions = async (req, res) => {
+    try {
+        const { userId, sessionIds } = req.query;
+        const result = await chatbotService.getSessions(userId, sessionIds);
+        return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || 'Error getting sessions' });
+    }
+};
+
+// Lấy lịch sử chat theo session
+export const getChatHistoryBySession = async (req, res) => {
+    try {
+        const { sessionId } = req.query;
+        const result = await chatbotService.getChatHistoryBySession(sessionId);
+        return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || 'Error getting chat history' });
+    }
+};
+
+// Gửi tin nhắn vào session
+export const sendMessageToSession = async (req, res) => {
+    try {
+        const { sessionId, userId, message } = req.body;
+        if (!message || !sessionId) {
+            return res.status(400).json({ success: false, message: 'Message and sessionId are required' });
+        }
+        const result = await chatbotService.sendMessageToSession(sessionId, userId, message);
+        return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || 'Error sending message' });
+    }
+};

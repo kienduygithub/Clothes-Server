@@ -1,36 +1,11 @@
 import express from 'express';
 import * as chatbotController from '../data/controllers/chatbot.controller';
 
-const ChatHistoryRouter = express.Router();
+const router = express.Router();
 
-ChatHistoryRouter.post(
-    '/chatbot/message',
-    chatbotController.sendMessage
-)
+router.post('/chatbot/session', chatbotController.createSession);
+router.get('/chatbot/sessions', chatbotController.getSessions);
+router.get('/chatbot/history', chatbotController.getChatHistoryBySession);
+router.post('/chatbot/message', chatbotController.sendMessageToSession);
 
-ChatHistoryRouter.get(
-    '/chatbot/history',
-    chatbotController.getChatHistory
-)
-
-ChatHistoryRouter.post(
-    '/chatbot/history',
-    chatbotController.saveChatHistory
-)
-
-ChatHistoryRouter.post(
-    '/chatbot/product-search',
-    chatbotController.productSearch
-)
-
-ChatHistoryRouter.get(
-    '/chatbot/test-connection',
-    chatbotController.testConnection
-)
-
-ChatHistoryRouter.get(
-    '/chatbot/list-models',
-    chatbotController.listModels
-)
-
-export default ChatHistoryRouter
+export default router;

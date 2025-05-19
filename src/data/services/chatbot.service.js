@@ -561,3 +561,73 @@ export const getGuestChatHistory = (sessionId) => {
         sessionId: sessionId
     };
 };
+
+export const createSession = async (userId, title) => {
+    const session_id = `guest-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const session = await db.ChatSession.create({
+        user_id: userId || null,
+        session_id,
+        title: title || 'Cuộc hội thoại mới'
+    });
+    return { sessionId: session.session_id, title: session.title, createdAt: session.createdAt };
+};
+
+export const getSessions = async (userId, sessionIds) => {
+    if (userId) {
+        return await db.ChatSession.findAll({ where: { user_id: userId } });
+    } else if (sessionIds) {
+        const ids = Array.isArray(sessionIds) ? sessionIds : sessionIds.split(',');
+        return await db.ChatSession.findAll({ where: { session_id: { [Op.in]: ids } } });
+    }
+    return [];
+};
+
+export const getChatHistoryBySession = async (sessionId) => {
+    const histories = await db.ChatHistory.findAll({
+        where: { session_id: sessionId },
+        order: [['createdAt', 'ASC']]
+    });
+    // Flatten messages
+    let messages = [];
+    histories.forEach(h => {
+        try {
+            const arr = Array.isArray(h.messages) ? h.messages : JSON.parse(h.messages);
+            messages = messages.concat(arr);
+        } catch (e) { }
+    });
+    return messages;
+};
+
+export const sendMessageToSession = async (sessionId, userId, userMessage) => {
+    // Lấy lịch sử chat hiện tại
+    const histories = await db.ChatHistory.findAll({
+        where: { session_id: sessionId },
+        order: [['createdAt', 'ASC']]
+    });
+    let messages = [];
+    histories.forEach(h => {
+        try {
+            const arr = Array.isArray(h.messages) ? h.messages : JSON.parse(h.messages);
+            messages = messages.concat(arr);
+        } catch (e) { }
+    });
+    // Thêm tin nhắn user
+    messages.push({ role: 'user', content: userMessage });
+
+    // Gọi AI hoặc search thực tế
+    const searchResults = await searchProducts(userMessage); // dùng lại hàm searchProducts nếu có
+    const botResponse = await generateBotResponse(messages, searchResults); // dùng lại hàm generateBotResponse nếu có
+
+    messages.push({ role: 'assistant', content: botResponse, searchResults });
+
+    // Lưu lại bản ghi mới
+    await db.ChatHistory.create({
+        user_id: userId || null,
+        session_id: sessionId,
+        messages: JSON.stringify([
+            { role: 'user', content: userMessage },
+            { role: 'assistant', content: botResponse, searchResults }
+        ])
+    });
+    return { messages };
+};
