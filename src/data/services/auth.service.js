@@ -916,7 +916,11 @@ export const fetchProductPerformanceStats = async ({ dateRanges, groupBy = 'day'
             const topProductsMap = new Map();
             topProductsData.forEach(item => {
                 if (!topProductsMap.has(item.period)) topProductsMap.set(item.period, []);
-                topProductsMap.get(item.period).push({ id: item.id, name: item.name, sold_quantity: item.sold_quantity });
+                topProductsMap.get(item.period).push({
+                    id: item.id,
+                    product_name: item.product_name,
+                    sold_quantity: item.sold_quantity
+                });
             });
 
             // Truy vấn sản phẩm đánh giá thấp (rating <= 2)
@@ -949,7 +953,11 @@ export const fetchProductPerformanceStats = async ({ dateRanges, groupBy = 'day'
             const lowRatedProductsMap = new Map();
             lowRatedProductsData.forEach(item => {
                 if (!lowRatedProductsMap.has(item.period)) lowRatedProductsMap.set(item.period, []);
-                lowRatedProductsMap.get(item.period).push({ id: item.id, name: item.name, avgRating: parseFloat(item.avgRating) });
+                lowRatedProductsMap.get(item.period).push({
+                    id: item.id,
+                    product_name: item.product_name,
+                    avgRating: parseFloat(item.avgRating)
+                });
             });
 
             // Định dạng dữ liệu
