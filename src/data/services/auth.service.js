@@ -534,6 +534,7 @@ export const editAccountDetails = async (user_id, info, file) => {
     }
 }
 /** Thống kê các cửa hàng mới **/
+// => Theo năm (12 tháng)
 export const fetchNewShopsStats = async ({ dateRanges }) => {
     try {
         // Kiểm tra dateRanges
@@ -612,7 +613,7 @@ export const fetchNewShopsStats = async ({ dateRanges }) => {
         return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server');
     }
 };
-
+// => Theo năm (12 tháng)
 export const fetchInactiveShopsStats = async ({ dateRanges }) => {
     try {
         // Kiểm tra dateRanges
@@ -688,7 +689,7 @@ export const fetchInactiveShopsStats = async ({ dateRanges }) => {
         return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server');
     }
 };
-
+// => Theo tháng/năm
 export const fetchOrderActivityStats = async ({ dateRanges, groupBy = 'day' }) => {
     try {
         // Kiểm tra đầu vào
@@ -842,5 +843,187 @@ export const fetchOrderActivityStats = async ({ dateRanges, groupBy = 'day' }) =
         return ResponseModel.success('Thống kê hoạt động đơn hàng', { monthlyStats, overview });
     } catch (error) {
         ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server', error?.body);
+    }
+};
+
+export const fetchProductPerformanceStats = async ({ dateRanges, groupBy = 'day' }) => {
+    try {
+        // Kiểm tra đầu vào
+        if (!dateRanges || !Array.isArray(dateRanges) || !['day', 'week', 'month'].includes(groupBy)) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges/groupBy', {
+                dateRanges, groupBy
+            });
+        }
+
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentDay = currentDate.getDate();
+
+        const groupByExpression = {
+            day: Sequelize.fn('DATE', Sequelize.col('Product.createdAt')),
+            week: Sequelize.fn('DATE_FORMAT', Sequelize.col('Product.createdAt'), '%Y-%u'),
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('Product.createdAt'), '%Y-%m')
+        }[groupBy];
+
+        const groupByAlias = groupByExpression;
+
+        const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
+            const { startDate, endDate, month } = range;
+
+            // Kiểm tra tháng hợp lệ
+            const rangeDate = new Date(startDate);
+            const rangeYear = rangeDate.getFullYear();
+            const rangeMonth = rangeDate.getMonth() + 1;
+            if (rangeYear > currentYear || (rangeYear === currentYear && rangeMonth > currentMonth)) {
+                return {
+                    month: month || null,
+                    startDate,
+                    endDate,
+                    productsListed: [],
+                    totalProductsListed: 0,
+                    topProducts: [],
+                    lowRatedProducts: []
+                };
+            }
+
+            // Truy vấn sản phẩm đăng bán
+            const productData = await db.Product.findAll({
+                where: {
+                    createdAt: { [Op.between]: [startDate, endDate] }
+                },
+                attributes: [
+                    [groupByExpression, 'period'],
+                    [Sequelize.fn('COUNT', Sequelize.col('Product.id')), 'count']
+                ],
+                group: [groupByAlias],
+                order: [[Sequelize.col('period'), 'ASC']],
+                raw: true
+            });
+
+            const productMap = new Map(productData.map(item => [item.period, parseInt(item.count || 0)]));
+
+            // Truy vấn sản phẩm bán chạy (top 5 mỗi ngày)
+            const topProductsData = await db.Product.findAll({
+                where: {
+                    createdAt: { [Op.between]: [startDate, endDate] }
+                },
+                attributes: ['id', 'product_name', 'sold_quantity', [groupByExpression, 'period']],
+                order: [['sold_quantity', 'DESC']],
+                raw: true
+            });
+
+            const topProductsMap = new Map();
+            topProductsData.forEach(item => {
+                if (!topProductsMap.has(item.period)) topProductsMap.set(item.period, []);
+                topProductsMap.get(item.period).push({ id: item.id, name: item.name, sold_quantity: item.sold_quantity });
+            });
+
+            // Truy vấn sản phẩm đánh giá thấp (rating <= 2)
+            const subQueryRating = sequelize.literal(`(
+                SELECT AVG(rating)
+                FROM Reviews
+                WHERE Reviews.product_id = Product.id
+            )`);
+            const lowRatedProductsData = await db.Product.findAll({
+                where: {
+                    createdAt: { [Op.between]: [startDate, endDate] }
+                },
+                attributes: [
+                    'id',
+                    'product_name',
+                    [groupByExpression, 'period'],
+                    [subQueryRating, 'avgRating']
+                ],
+                having: Sequelize.literal('AVG(Reviews.rating) <= 2'),
+                include: [{
+                    model: db.Review,
+                    as: 'reviews',
+                    attributes: [],
+                    required: true // Chỉ lấy sản phẩm có review
+                }],
+                group: ['Product.id', groupByAlias],
+                raw: true
+            });
+
+            const lowRatedProductsMap = new Map();
+            lowRatedProductsData.forEach(item => {
+                if (!lowRatedProductsMap.has(item.period)) lowRatedProductsMap.set(item.period, []);
+                lowRatedProductsMap.get(item.period).push({ id: item.id, name: item.name, avgRating: parseFloat(item.avgRating) });
+            });
+
+            // Định dạng dữ liệu
+            const formattedData = [];
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+
+            if (groupBy === 'day') {
+                // Lặp qua tất cả ngày trong tháng
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const period = d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
+                    const day = d.getDate();
+                    // Ngày tương lai trả về 0
+                    if (rangeYear === currentYear && rangeMonth === currentMonth && day > currentDay) {
+                        formattedData.push({
+                            period,
+                            productsListed: 0,
+                            topProducts: [],
+                            lowRatedProducts: []
+                        });
+                        continue;
+                    }
+
+                    formattedData.push({
+                        period,
+                        productsListed: productMap.get(period) || 0,
+                        topProducts: topProductsMap.get(period)?.slice(0, 5) || [],
+                        lowRatedProducts: lowRatedProductsMap.get(period) || []
+                    });
+                }
+            } else if (groupBy === 'month') {
+                const year = new Date(startDate).getFullYear();
+                const expectedPeriod = `${year}-${month.toString().padStart(2, '0')}`;
+                formattedData.push({
+                    period: expectedPeriod,
+                    productsListed: productMap.get(expectedPeriod) || 0,
+                    topProducts: topProductsMap.get(expectedPeriod)?.slice(0, 5) || [],
+                    lowRatedProducts: lowRatedProductsMap.get(expectedPeriod) || []
+                });
+            }
+
+            // Tính tổng số sản phẩm
+            const totalProductsListed = formattedData.reduce((sum, item) => sum + item.productsListed, 0);
+
+            return {
+                month: month || null,
+                startDate,
+                endDate,
+                productsListed: formattedData,
+                totalProductsListed,
+                topProducts: formattedData.flatMap(item => item.topProducts),
+                lowRatedProducts: formattedData.flatMap(item => item.lowRatedProducts)
+            };
+        }));
+
+        // Tổng hợp
+        const overview = {
+            productsListed: monthlyStats.flatMap(stat => stat.productsListed),
+            totalProductsListed: monthlyStats.reduce((sum, stat) => sum + stat.totalProductsListed, 0),
+            topProducts: monthlyStats
+                .flatMap(stat => stat.topProducts)
+                .sort((a, b) => b.sold_quantity - a.sold_quantity)
+                .slice(0, 5),
+            lowRatedProducts: monthlyStats
+                .flatMap(stat => stat.lowRatedProducts)
+                .sort((a, b) => a.avgRating - b.avgRating) // Sắp xếp theo rating thấp nhất
+                .slice(0, 5)
+        };
+
+        return ResponseModel.success('Thống kê hiệu suất sản phẩm', {
+            monthlyStats,
+            overview
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server', error?.body);
     }
 };

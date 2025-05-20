@@ -11,7 +11,8 @@ import {
     fetchDetailUserWithAuth,
     editAccountDetails,
     fetchNewShopsStats,
-    fetchOrderActivityStats
+    fetchOrderActivityStats,
+    fetchProductPerformanceStats
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
@@ -82,6 +83,11 @@ AuthRouter.post(
 AuthRouter.post(
     '/admin/order-activity-stats',
     fetchOrderActivityStats
+)
+
+AuthRouter.post(
+    '/admin/product-performance-stats',
+    fetchProductPerformanceStats
 )
 
 export default AuthRouter;

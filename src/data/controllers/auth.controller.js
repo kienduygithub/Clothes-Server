@@ -204,4 +204,17 @@ export const fetchOrderActivityStats = async (req, res) => {
     }
 }
 
+export const fetchProductPerformanceStats = async (req, res) => {
+    try {
+        const response = await authServices.fetchProductPerformanceStats(req.body);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 
