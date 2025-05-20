@@ -6,7 +6,7 @@ import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
 import { sendActivateStoreMailer } from "../../common/mails/mailer.config";
-import { ShopStatus } from "../../common/utils/status";
+import { OrderStatus, ShopStatus } from "../../common/utils/status";
 import { UserRoles } from "../../common/utils/roles";
 
 export const signIn = async (info) => {
@@ -610,5 +610,237 @@ export const fetchNewShopsStats = async ({ dateRanges }) => {
         });
     } catch (error) {
         return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server');
+    }
+};
+
+export const fetchInactiveShopsStats = async ({ dateRanges }) => {
+    try {
+        // Kiểm tra dateRanges
+        if (!dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0) {
+            return ResponseModel.error(400, 'Thiếu hoặc sai định dạng dateRanges');
+        }
+
+        // Lấy ngày hiện tại (20/05/2025)
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // Tháng từ 1-12
+
+        // Thống kê cho từng tháng trong dateRanges
+        const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
+            const { startDate, endDate, month } = range;
+
+            // Kiểm tra tháng có hợp lệ không (không vượt quá tháng hiện tại)
+            const rangeDate = new Date(startDate);
+            const rangeYear = rangeDate.getFullYear();
+            const rangeMonth = rangeDate.getMonth() + 1;
+
+            // Nếu tháng trong tương lai, trả về kết quả rỗng
+            if (rangeYear > currentYear || (rangeYear === currentYear && rangeMonth > currentMonth)) {
+                return {
+                    month: month || null,
+                    startDate,
+                    endDate,
+                    totalInactiveShops: 0,
+                    inactiveShops: []
+                };
+            }
+
+            // Lấy các cửa hàng không hoạt động cho tháng hợp lệ
+            const inactiveShops = await db.Shop.findAll({
+                where: {
+                    status: 'inactive',
+                    statusChangedAt: {
+                        [Op.between]: [startDate, endDate]
+                    }
+                },
+                attributes: ['id', 'shop_name', 'statusChangedAt'],
+                raw: true
+            });
+
+            return {
+                month: month || null,
+                startDate,
+                endDate,
+                totalInactiveShops: inactiveShops.length,
+                inactiveShops: inactiveShops.map(shop => ({
+                    id: shop.id,
+                    shop_name: shop.shop_name,
+                    statusChangedAt: shop.statusChangedAt
+                }))
+            };
+        }));
+
+        // Tổng hợp (chỉ tính các tháng hợp lệ)
+        const overview = {
+            totalInactiveShops: monthlyStats
+                .filter(stat => {
+                    const statDate = new Date(stat.startDate);
+                    const statYear = statDate.getFullYear();
+                    const statMonth = statDate.getMonth() + 1;
+                    return statYear < currentYear || (statYear === currentYear && statMonth <= currentMonth);
+                })
+                .reduce((sum, stat) => sum + stat.totalInactiveShops, 0),
+            inactiveShops: monthlyStats.flatMap(stat => stat.inactiveShops)
+        };
+
+        return ResponseModel.success('Thống kê cửa hàng không hoạt động', { monthlyStats, overview });
+    } catch (error) {
+        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server');
+    }
+};
+
+export const fetchOrderActivityStats = async ({ dateRanges, groupBy = 'day' }) => {
+    try {
+        // Kiểm tra đầu vào
+        if (!dateRanges || !Array.isArray(dateRanges) || !['day', 'week', 'month'].includes(groupBy)) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges/groupBy', {
+                dateRanges,
+                groupBy
+            });
+        }
+
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentDay = currentDate.getDate();
+
+        // Xác định biểu thức groupBy
+        const groupByExpression = {
+            day: Sequelize.fn('DATE', Sequelize.col('OrderShop.createdAt')),
+            week: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%u'),
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('OrderShop.createdAt'), '%Y-%m')
+        }[groupBy];
+
+        const groupByAlias = groupByExpression;
+
+        // Thống kê cho từng tháng trong dateRanges
+        const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
+            const { startDate, endDate, month } = range;
+
+            // Kiểm tra tháng hợp lệ
+            const rangeDate = new Date(startDate);
+            const rangeYear = rangeDate.getFullYear();
+            const rangeMonth = rangeDate.getMonth() + 1;
+            if (rangeYear > currentYear || (rangeYear === currentYear && rangeMonth > currentMonth)) {
+                return {
+                    month: month || null,
+                    startDate,
+                    endDate,
+                    orders: [],
+                    totalOrders: 0,
+                    statusCounts: { pending: 0, paid: 0, processing: 0, shipped: 0, completed: 0, canceled: 0 }
+                };
+            }
+
+            // Truy vấn đơn hàng
+            const orderData = await db.OrderShop.findAll({
+                where: {
+                    createdAt: { [Op.between]: [startDate, endDate] }
+                },
+                attributes: [
+                    [groupByExpression, 'period'],
+                    ['status', 'status'],
+                    [Sequelize.fn('COUNT', Sequelize.col('OrderShop.id')), 'count']
+                ],
+                group: [groupByAlias, 'OrderShop.status'],
+                order: [[Sequelize.col('period'), 'ASC']],
+                raw: true
+            });
+
+            // Chuyển đổi dữ liệu thành map
+            const orderMap = new Map(orderData.map(item => [`${item.period}:${item.status}`, parseInt(item.count || 0)]));
+
+            // Định dạng dữ liệu
+            const formattedData = [];
+            const statusList = [
+                OrderStatus.PENDING,
+                OrderStatus.PAID,
+                OrderStatus.PROCESSING,
+                OrderStatus.SHIPPED,
+                OrderStatus.COMPLETED,
+                OrderStatus.CANCELED
+            ];
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+
+            if (groupBy === 'day') {
+                // Lặp qua tất cả ngày trong tháng
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const period = d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
+                    const day = d.getDate();
+                    // Ngày tương lai trả về 0
+                    if (rangeYear === currentYear && rangeMonth === currentMonth && day > currentDay) {
+                        formattedData.push({
+                            period,
+                            counts: { pending: 0, paid: 0, processing: 0, shipped: 0, completed: 0, canceled: 0 }
+                        });
+                        continue;
+                    }
+
+                    const counts = {};
+                    statusList.forEach(status => {
+                        const key = `${period}:${status}`;
+                        counts[status] = orderMap.get(key) || 0;
+                    });
+                    formattedData.push({
+                        period,
+                        counts
+                    });
+                }
+            } else if (groupBy === 'month') {
+                const year = new Date(startDate).getFullYear();
+                const expectedPeriod = `${year}-${month.toString().padStart(2, '0')}`;
+                const counts = {};
+                statusList.forEach(status => {
+                    const key = `${expectedPeriod}:${status}`;
+                    counts[status] = orderMap.get(key) || 0;
+                });
+                formattedData.push({
+                    period: expectedPeriod,
+                    counts
+                });
+            }
+
+            // Tính tổng số đơn hàng
+            const totalOrders = formattedData.reduce((sum, item) => sum + Object.values(item.counts).reduce((s, c) => s + c, 0), 0);
+            const statusCounts = formattedData.reduce((acc, item) => {
+                Object.keys(item.counts).forEach(status => {
+                    acc[status] = (acc[status] || 0) + item.counts[status];
+                });
+                return acc;
+            }, { pending: 0, paid: 0, processing: 0, shipped: 0, completed: 0, canceled: 0 });
+
+            return {
+                month: month || null,
+                startDate,
+                endDate,
+                orders: formattedData,
+                totalOrders,
+                statusCounts
+            };
+        }));
+
+        // Tổng hợp
+        const overview = {
+            orders: monthlyStats.flatMap(stat => stat.orders),
+            totalOrders: monthlyStats.reduce((sum, stat) => sum + stat.totalOrders, 0),
+            statusCounts: monthlyStats
+                .filter(stat => {
+                    const statDate = new Date(stat.startDate);
+                    const statYear = statDate.getFullYear();
+                    const statMonth = statDate.getMonth() + 1;
+                    return statYear < currentYear || (statYear === currentYear && statMonth <= currentMonth);
+                })
+                .reduce((acc, stat) => {
+                    Object.keys(stat.statusCounts).forEach(status => {
+                        acc[status] = (acc[status] || 0) + stat.statusCounts[status];
+                    });
+                    return acc;
+                }, { pending: 0, paid: 0, shipped: 0, completed: 0, canceled: 0 })
+        };
+
+        return ResponseModel.success('Thống kê hoạt động đơn hàng', { monthlyStats, overview });
+    } catch (error) {
+        ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server', error?.body);
     }
 };

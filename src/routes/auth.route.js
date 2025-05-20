@@ -9,7 +9,9 @@ import {
     checkUserForShopRegistration,
     changePassword,
     fetchDetailUserWithAuth,
-    editAccountDetails
+    editAccountDetails,
+    fetchNewShopsStats,
+    fetchOrderActivityStats
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
@@ -71,4 +73,15 @@ AuthRouter.post(
     '/shop/register-check',
     checkUserForShopRegistration
 )
+
+AuthRouter.post(
+    '/admin/shop-stats',
+    fetchNewShopsStats
+)
+
+AuthRouter.post(
+    '/admin/order-activity-stats',
+    fetchOrderActivityStats
+)
+
 export default AuthRouter;
