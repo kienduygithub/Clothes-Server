@@ -535,65 +535,172 @@ export const editAccountDetails = async (user_id, info, file) => {
 }
 /** Thống kê các cửa hàng mới **/
 // => Theo năm (12 tháng)
-export const fetchNewShopsStats = async ({ dateRanges }) => {
+export const fetchNewShopsStats = async ({ dateRanges, groupBy = 'day' }) => {
     try {
         // Kiểm tra dateRanges
-        if (!dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0) {
-            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges');
+        if (!dateRanges || !Array.isArray(dateRanges) || !['day', 'month'].includes(groupBy)) {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges/groupBy', {
+                dateRanges,
+                groupBy
+            });
         }
 
-        // Lấy ngày hiện tại (20/05/2025)
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
-        const currentMonth = currentDate.getMonth() + 1; // Tháng từ 1-12
+        const currentMonth = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const currentDay = currentDate.getDate();
+
+        const groupByExpression = {
+            day: Sequelize.fn('DATE', Sequelize.col('statusChangedAt')),
+            month: Sequelize.fn('DATE_FORMAT', Sequelize.col('statusChangedAt'), '%Y-%m')
+        }[groupBy];
+
+        const groupByAlias = groupByExpression;
 
         // Thống kê cho từng tháng trong dateRanges
         const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
             const { startDate, endDate, month } = range;
 
-            // Kiểm tra tháng có hợp lệ không (không vượt quá tháng hiện tại)
-            const rangeDate = new Date(startDate);
-            const rangeYear = rangeDate.getFullYear();
-            const rangeMonth = rangeDate.getMonth() + 1;
+            // Kiểm tra startDate và endDate hợp lệ
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            if (isNaN(start) || isNaN(end) || start > end) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'startDate hoặc endDate không hợp lệ');
+            }
 
-            // Nếu tháng trong tương lai, trả về kết quả rỗng
+            // Nếu month không null, kiểm tra là số từ 1-12
+            if (month !== null && (typeof month !== 'number' || month < 1 || month > 12)) {
+                ResponseModel.error(HttpErrors.BAD_REQUEST, 'Month phải là số từ 1 đến 12 hoặc null');
+            }
+
+            // Lấy rangeYear và rangeMonth để kiểm tra tương lai
+            const rangeYear = start.getFullYear();
+            const rangeMonth = start.getMonth() + 1;
+
+            // Định dạng month cho output (chuỗi "01" đến "12")
+            const outputMonth = month !== null ? String(month).padStart(2, '0') : String(rangeMonth).padStart(2, '0');
+
+            // Nếu khoảng thời gian nằm hoàn toàn trong tương lai, trả về rỗng
             if (rangeYear > currentYear || (rangeYear === currentYear && rangeMonth > currentMonth)) {
                 return {
-                    month: month || null,
+                    month: outputMonth,
                     startDate,
                     endDate,
+                    newShops: [],
                     totalNewShops: 0,
-                    newShops: []
+                    periods: []
                 };
             }
 
-            // Lấy các cửa hàng mới cho tháng hợp lệ
-            const newShops = await db.Shop.findAll({
-                where: {
-                    status: ShopStatus.ACTIVE,
-                    statusChangedAt: {
-                        [Op.between]: [startDate, endDate]
+            let periods = [];
+            let newShops = [];
+
+            if (groupBy === 'day') {
+                // Truy vấn cửa hàng mới theo ngày
+                const shopData = await db.Shop.findAll({
+                    where: {
+                        status: ShopStatus.ACTIVE,
+                        statusChangedAt: {
+                            [Op.between]: [startDate, endDate]
+                        }
+                    },
+                    attributes: [
+                        [groupByExpression, 'period'],
+                        'id',
+                        'shop_name',
+                        'statusChangedAt'
+                    ],
+                    group: [groupByAlias, 'id', 'shop_name', 'statusChangedAt'],
+                    order: [[Sequelize.col('period'), 'ASC']],
+                    raw: true
+                });
+
+                // Chuyển đổi dữ liệu thành map
+                const shopMap = new Map();
+                shopData.forEach(item => {
+                    if (!shopMap.has(item.period)) {
+                        shopMap.set(item.period, []);
                     }
-                },
-                attributes: ['id', 'shop_name', 'statusChangedAt'],
-                raw: true
-            });
+                    shopMap.get(item.period).push({
+                        id: item.id,
+                        shop_name: item.shop_name,
+                        statusChangedAt: item.statusChangedAt
+                    });
+                });
+
+                // Tạo danh sách đầy đủ các ngày
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const day = d.getDate();
+                    const period = d.toISOString().split('T')[0]; // YYYY-MM-DD
+
+                    // Ngày tương lai trả về 0
+                    if (rangeYear === currentYear && rangeMonth === currentMonth && day > currentDay) {
+                        periods.push({
+                            period,
+                            totalNewShops: 0,
+                            newShops: []
+                        });
+                        continue;
+                    }
+
+                    const dailyShops = shopMap.get(period) || [];
+                    periods.push({
+                        period,
+                        totalNewShops: dailyShops.length,
+                        newShops: dailyShops
+                    });
+                }
+
+                newShops = periods.flatMap(period => period.newShops);
+            } else if (groupBy === 'month') {
+                // Truy vấn cửa hàng mới theo tháng
+                const shopData = await db.Shop.findAll({
+                    where: {
+                        status: ShopStatus.ACTIVE,
+                        statusChangedAt: {
+                            [Op.between]: [startDate, endDate]
+                        }
+                    },
+                    attributes: [
+                        [groupByExpression, 'period'],
+                        'id',
+                        'shop_name',
+                        'statusChangedAt'
+                    ],
+                    group: [groupByAlias, 'id', 'shop_name', 'statusChangedAt'],
+                    order: [[Sequelize.col('period'), 'ASC']],
+                    raw: true
+                });
+
+                const period = `${rangeYear}-${outputMonth}`;
+                const periodShops = shopData.filter(item => item.period === period).map(item => ({
+                    id: item.id,
+                    shop_name: item.shop_name,
+                    statusChangedAt: item.statusChangedAt
+                }));
+
+                periods = [{
+                    period,
+                    totalNewShops: periodShops.length,
+                    newShops: periodShops
+                }];
+
+                newShops = periodShops;
+            }
 
             return {
-                month: month || null,
+                month: outputMonth,
                 startDate,
                 endDate,
-                totalNewShops: newShops.length,
-                newShops: newShops.map(shop => ({
-                    id: shop.id,
-                    shop_name: shop.shop_name,
-                    statusChangedAt: shop.statusChangedAt
-                }))
+                newShops,
+                totalNewShops: periods.reduce((sum, period) => sum + period.totalNewShops, 0),
+                periods
             };
         }));
 
         // Tổng hợp (chỉ tính các tháng hợp lệ)
         const overview = {
+            newShops: monthlyStats.flatMap(stat => stat.newShops),
             totalNewShops: monthlyStats
                 .filter(stat => {
                     const statDate = new Date(stat.startDate);
@@ -602,7 +709,7 @@ export const fetchNewShopsStats = async ({ dateRanges }) => {
                     return statYear < currentYear || (statYear === currentYear && statMonth <= currentMonth);
                 })
                 .reduce((sum, stat) => sum + stat.totalNewShops, 0),
-            newShops: monthlyStats.flatMap(stat => stat.newShops)
+            periods: monthlyStats.flatMap(stat => stat.periods)
         };
 
         return ResponseModel.success('Thống kê cửa hàng mới', {
@@ -614,17 +721,19 @@ export const fetchNewShopsStats = async ({ dateRanges }) => {
     }
 };
 // => Theo năm (12 tháng)
-export const fetchInactiveShopsStats = async ({ dateRanges }) => {
+export const fetchInactiveShopsStats = async ({ dateRanges, groupBy = 'day' }) => {
     try {
         // Kiểm tra dateRanges
-        if (!dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0) {
-            return ResponseModel.error(400, 'Thiếu hoặc sai định dạng dateRanges');
+        if (!dateRanges || !Array.isArray(dateRanges) || !['day', 'month'].includes(groupBy)) {
+            throw ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges/groupBy', {
+                dateRanges,
+                groupBy
+            });
         }
 
-        // Lấy ngày hiện tại (20/05/2025)
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
-        const currentMonth = currentDate.getMonth() + 1; // Tháng từ 1-12
+        const currentMonth = currentDate.getMonth() + 1;
 
         // Thống kê cho từng tháng trong dateRanges
         const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
