@@ -1,7 +1,7 @@
 import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import db, { User, Shop, Cart, sequelize } from "../models";
+import db, { User, Shop, Cart, sequelize, Sequelize } from "../models";
 import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
@@ -533,3 +533,82 @@ export const editAccountDetails = async (user_id, info, file) => {
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
+/** Thống kê các cửa hàng mới **/
+export const fetchNewShopsStats = async ({ dateRanges }) => {
+    try {
+        // Kiểm tra dateRanges
+        if (!dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges');
+        }
+
+        // Lấy ngày hiện tại (20/05/2025)
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // Tháng từ 1-12
+
+        // Thống kê cho từng tháng trong dateRanges
+        const monthlyStats = await Promise.all(dateRanges.map(async (range) => {
+            const { startDate, endDate, month } = range;
+
+            // Kiểm tra tháng có hợp lệ không (không vượt quá tháng hiện tại)
+            const rangeDate = new Date(startDate);
+            const rangeYear = rangeDate.getFullYear();
+            const rangeMonth = rangeDate.getMonth() + 1;
+
+            // Nếu tháng trong tương lai, trả về kết quả rỗng
+            if (rangeYear > currentYear || (rangeYear === currentYear && rangeMonth > currentMonth)) {
+                return {
+                    month: month || null,
+                    startDate,
+                    endDate,
+                    totalNewShops: 0,
+                    newShops: []
+                };
+            }
+
+            // Lấy các cửa hàng mới cho tháng hợp lệ
+            const newShops = await db.Shop.findAll({
+                where: {
+                    status: ShopStatus.ACTIVE,
+                    statusChangedAt: {
+                        [Op.between]: [startDate, endDate]
+                    }
+                },
+                attributes: ['id', 'shop_name', 'statusChangedAt'],
+                raw: true
+            });
+
+            return {
+                month: month || null,
+                startDate,
+                endDate,
+                totalNewShops: newShops.length,
+                newShops: newShops.map(shop => ({
+                    id: shop.id,
+                    shop_name: shop.shop_name,
+                    statusChangedAt: shop.statusChangedAt
+                }))
+            };
+        }));
+
+        // Tổng hợp (chỉ tính các tháng hợp lệ)
+        const overview = {
+            totalNewShops: monthlyStats
+                .filter(stat => {
+                    const statDate = new Date(stat.startDate);
+                    const statYear = statDate.getFullYear();
+                    const statMonth = statDate.getMonth() + 1;
+                    return statYear < currentYear || (statYear === currentYear && statMonth <= currentMonth);
+                })
+                .reduce((sum, stat) => sum + stat.totalNewShops, 0),
+            newShops: monthlyStats.flatMap(stat => stat.newShops)
+        };
+
+        return ResponseModel.success('Thống kê cửa hàng mới', {
+            monthlyStats,
+            overview
+        });
+    } catch (error) {
+        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server');
+    }
+};

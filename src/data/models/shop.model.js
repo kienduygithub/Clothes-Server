@@ -62,6 +62,10 @@ module.exports = (sequelize, DataTypes) => {
         lock_until: {
             type: DataTypes.DATE,
             allowNull: true
+        },
+        statusChangedAt: {
+            type: DataTypes.DATE,
+            allowNull: true
         }
     }, {
         sequelize,

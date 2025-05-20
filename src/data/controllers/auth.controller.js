@@ -165,3 +165,16 @@ export const checkUserForShopRegistration = async (req, res) => {
     }
 }
 
+export const fetchNewShopsStats = async (req, res) => {
+    try {
+        const response = await authServices.fetchNewShopsStats(req.body);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+

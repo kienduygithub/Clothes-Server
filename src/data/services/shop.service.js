@@ -500,6 +500,7 @@ export const acceptRegisterShopById = async (shopId) => {
         }
 
         existShop.status = ShopStatus.ACTIVE;
+        existShop.statusChangedAt = new Date();
         await existShop.save({ transaction });
 
         sendActivateStoreMailer(
