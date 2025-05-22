@@ -12,7 +12,9 @@ import {
     editAccountDetails,
     fetchNewShopsStats,
     fetchOrderActivityStats,
-    fetchProductPerformanceStats
+    fetchProductPerformanceStats,
+    fetchShopRevenueStats,
+    fetchProductCategoryStats
 } from "../data/controllers/auth.controller";
 import {
     checkUserAuthentication,
@@ -88,6 +90,16 @@ AuthRouter.post(
 AuthRouter.post(
     '/admin/product-performance-stats',
     fetchProductPerformanceStats
+)
+
+AuthRouter.post(
+    '/admin/shop-revenue-stats',
+    fetchShopRevenueStats
+)
+
+AuthRouter.post(
+    '/admin/category-product-count',
+    fetchProductCategoryStats
 )
 
 export default AuthRouter;

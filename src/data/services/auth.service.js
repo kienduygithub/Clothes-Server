@@ -569,7 +569,7 @@ export const fetchNewShopsStats = async ({ dateRanges, groupBy = 'day' }) => {
             }
 
             // Nếu month không null, kiểm tra là số từ 1-12
-            if (month !== null && (typeof month !== 'number' || month < 1 || month > 12)) {
+            if (month && month !== null && (typeof month !== 'number' || month < 1 || month > 12)) {
                 ResponseModel.error(HttpErrors.BAD_REQUEST, 'Month phải là số từ 1 đến 12 hoặc null');
             }
 
@@ -1142,5 +1142,158 @@ export const fetchProductPerformanceStats = async ({ dateRanges, groupBy = 'day'
         });
     } catch (error) {
         return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server', error?.body);
+    }
+};
+// => Thống kê doanh thu của các cửa hàng
+export const fetchShopRevenueStats = async ({ dateRanges, groupBy = 'day' }) => {
+    try {
+        // Kiểm tra đầu vào
+        if (!dateRanges || !Array.isArray(dateRanges) || !['day', 'week', 'month'].includes(groupBy)) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges/groupBy', {
+                dateRanges,
+                groupBy
+            });
+        }
+
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentDay = currentDate.getDate();
+
+        // Xác định biểu thức groupBy
+        const groupByExpression = {
+            day: db.sequelize.fn('DATE', db.sequelize.col('OrderShop.createdAt')),
+            week: db.sequelize.fn('DATE_FORMAT', db.sequelize.col('OrderShop.createdAt'), '%Y-%u'),
+            month: db.sequelize.fn('DATE_FORMAT', db.sequelize.col('OrderShop.createdAt'), '%Y-%m')
+        }[groupBy];
+
+        // Thống kê cho từng khoảng thời gian trong dateRanges
+        const stats = await Promise.all(dateRanges.map(async (range) => {
+            const { startDate, endDate, month } = range;
+
+            // Kiểm tra tháng hợp lệ
+            const rangeDate = new Date(startDate);
+            const rangeYear = rangeDate.getFullYear();
+            const rangeMonth = rangeDate.getMonth() + 1;
+            if (rangeYear > currentYear || (rangeYear === currentYear && rangeMonth > currentMonth)) {
+                return {
+                    month: month || null,
+                    startDate,
+                    endDate,
+                    shopRevenues: []
+                };
+            }
+
+            // Truy vấn doanh thu theo cửa hàng, chỉ tính trạng thái completed
+            const revenueData = await db.OrderShop.findAll({
+                where: {
+                    createdAt: { [Op.between]: [startDate, endDate] },
+                    status: OrderStatus.COMPLETED
+                },
+                include: [{
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name']
+                }],
+                attributes: [
+                    [Sequelize.col('shop.shop_name'), 'shop_name'],
+                    [Sequelize.fn('SUM', Sequelize.col('OrderShop.final_total')), 'revenue']
+                ],
+                group: ['OrderShop.shop_id', 'shop.shop_name'],
+                raw: true
+            });
+
+            // Định dạng dữ liệu
+            const shopRevenues = revenueData.map(item => ({
+                shop_name: item.shop_name || 'Không xác định',
+                revenue: parseFloat(item.revenue || 0)
+            }));
+
+            return {
+                month: month || null,
+                startDate,
+                endDate,
+                shopRevenues
+            };
+        }));
+
+        // Tổng hợp
+        const overview = {
+            shopRevenues: stats.flatMap(stat => stat.shopRevenues)
+                .reduce((acc, curr) => {
+                    const existing = acc.find(item => item.shop_name === curr.shop_name);
+                    if (existing) {
+                        existing.revenue += curr.revenue;
+                    } else {
+                        acc.push({ ...curr });
+                    }
+                    return acc;
+                }, [])
+                .filter(item => item.revenue > 0) // Loại bỏ cửa hàng không có doanh thu
+        };
+
+        return ResponseModel.success('Thống kê doanh thu theo cửa hàng', { monthlyStats: stats, overview });
+    } catch (error) {
+        ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server', error?.body);
+    }
+};
+
+export const fetchProductCategoryStats = async ({ dateRanges, groupBy = 'day' }) => {
+    try {
+        // Kiểm tra đầu vào
+        if (!dateRanges || !Array.isArray(dateRanges) || !['day', 'week', 'month'].includes(groupBy)) {
+            return ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu hoặc sai định dạng dateRanges/groupBy', {
+                dateRanges,
+                groupBy
+            });
+        }
+
+        const parentCategories = await db.Category.findAll({
+            where: { parentId: null },
+            attributes: ['id', 'category_name']
+        });
+
+        const categoryStats = await Promise.all(parentCategories.map(async (parent) => {
+            // Lấy danh mục con của danh mục cha
+            const subCategories = await db.Category.findAll({
+                where: { parentId: parent.id },
+                attributes: ['id']
+            });
+
+            // Nếu không có danh mục con, trả về count = 0
+            if (subCategories.length === 0) {
+                return {
+                    category_name: parent.category_name || 'Không xác định',
+                    count: 0
+                };
+            }
+
+            // Danh sách ID của danh mục con
+            const subCategoryIds = subCategories.map(sub => sub.id);
+
+            // Đếm sản phẩm thuộc danh mục con
+            const productCount = await db.Product.count({
+                where: {
+                    categoryId: { [Op.in]: subCategoryIds }
+                }
+            });
+
+            return {
+                category_name: parent.category_name || 'Không xác định',
+                count: productCount
+            };
+        }));
+
+
+        // Tổng hợp
+        const overview = {
+            categoryStats: categoryStats
+        };
+
+        return ResponseModel.success('Thống kê sản phẩm theo danh mục cha', {
+            overview
+        });
+    } catch (error) {
+        ResponseModel.error(error?.status || 500, error?.message || 'Lỗi server', error?.body);
     }
 };

@@ -8,7 +8,7 @@ export const fetchAllUser = async () => {
     try {
         const users = await User.findAll({
             where: {
-                roles: ['Admin', 'Owner']
+                roles: ['Owner']
             },
         });
 
