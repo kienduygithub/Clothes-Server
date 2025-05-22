@@ -1464,9 +1464,7 @@ export const fetchShopOverview = async (shop_id, { dateRanges }) => {
                         as: 'order',
                         attributes: ['id', 'status'],
                         where: {
-                            status: {
-                                [Op.ne]: OrderStatus.CANCELED
-                            }
+                            status: OrderStatus.COMPLETED
                         }
                     }
                 ],

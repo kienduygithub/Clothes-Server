@@ -41,7 +41,7 @@ export const fetchListUnreviewPurchaseUser = async (user_id) => {
         const orders = await Order.findAll({
             where: {
                 user_id: user_id,
-                // status: OrderStatus.COMPLETED, /** Tạm thời chưa cần do chưa làm bên admin, nhớ comment lại **/
+                status: OrderStatus.COMPLETED, /** Tạm thời chưa cần do chưa làm bên admin, nhớ comment lại **/
             },
             include: [
                 {
