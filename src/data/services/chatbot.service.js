@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import db from '../models';
 import { Op } from 'sequelize';
+import { sequelize } from '../models';
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -9,8 +10,8 @@ const PRIMARY_MODEL = "gemini-1.5-flash";
 // Fallback models in case of quota issues - only use models available in v1beta
 const FALLBACK_MODELS = ["gemini-1.5-flash"]; // Removing unavailable models
 
-// System prompt for the chatbot
-const SYSTEM_PROMPT = `You are a helpful shopping assistant for an online clothing store. Your name is ClothesShop Assistant.
+// Base system prompt for the chatbot
+const BASE_SYSTEM_PROMPT = `You are a helpful shopping assistant for an online clothing store. Your name is ClothesShop Assistant.
 
 Follow these rules:
 1. Start every conversation with a friendly greeting.
@@ -18,15 +19,60 @@ Follow these rules:
 3. If you don't have information about something, say you don't know.
 4. Do not search for or mention external products or websites.
 5. Keep responses concise and helpful.
-6. When users ask about products, provide relevant details like name, price, sizes, colors, etc.
-7. Respond naturally to social phrases (like "thank you", "good job", "ok", etc.) with friendly Vietnamese responses like "Không có gì ạ", "Cảm ơn bạn", "Rất vui khi được giúp đỡ bạn", etc.
-8. Use conversational Vietnamese that matches how young people speak today, friendly but professional.
-9. If someone is just chatting with you without asking about products, engage them in a friendly way and try to bring the conversation back to shopping topics.
-10. Never output debug information or notes to self in your responses.
-11. Never output text in English or explain your limitations in responses.
-12. Never add comments like "At this point...", "I would need..." - just provide the information directly.
-13. If you don't have specific data about something, provide a general response without mentioning that you don't have access to a database.
-`;
+6. Respond naturally to social phrases (like "thank you", "ok", etc.) with friendly Vietnamese responses.
+7. Use conversational Vietnamese that matches how young people speak today, friendly but professional.
+8. Never output debug information or notes to self in your responses.
+9. Never output text in English or explain your limitations in responses.
+10. Never add comments like "At this point...", "I would need..." - just provide the information directly.
+11. If you don't have specific data about something, provide a general response without mentioning that you don't have access to a database.`;
+
+// Product-specific prompt
+const PRODUCT_SEARCH_PROMPT = `${BASE_SYSTEM_PROMPT}
+
+Khi trả lời về sản phẩm:
+
+1. Trả lời trực tiếp:
+   - Nếu tìm thấy: "Đây là [số lượng] sản phẩm phù hợp:"
+   - Nếu không tìm thấy: "Không tìm thấy sản phẩm [mô tả]. Vui lòng thử tìm kiếm khác."
+   - Nếu có category: "Các sản phẩm thuộc [tên category]:"
+
+2. Format sản phẩm:
+   - [Tên sản phẩm]
+   - Giá: [giá] VND
+   - Rating: [X/5 sao] ([số lượng] đánh giá)
+   - Size: [danh sách size]
+   - Màu: [danh sách màu]
+   - Shop: [tên shop]
+
+3. Quy tắc:
+   - KHÔNG hỏi thêm thông tin
+   - KHÔNG giải thích kết quả
+   - KHÔNG gợi ý tìm kiếm khác
+   - KHÔNG dùng từ "sản phẩm số X"
+   - Kết thúc bằng "Bạn có thể đặt hàng ngay 😊"`;
+
+// Shop-specific prompt
+const SHOP_SEARCH_PROMPT = `${BASE_SYSTEM_PROMPT}
+
+When showing shop information:
+1. Present shop details in a friendly, informative way
+2. Include shop name, contact info, and ratings if available
+3. Mention total number of products and reviews
+4. Highlight shop's specialties or popular items
+5. If showing shop products, present them as examples
+6. Include shop ratings and customer feedback if available
+7. Mention shop policies or special features`;
+
+// Social interaction prompt
+const SOCIAL_PROMPT = `${BASE_SYSTEM_PROMPT}
+
+For social interactions:
+1. Keep responses short and natural
+2. Match the user's tone and energy
+3. Use casual but polite Vietnamese
+4. Don't force the conversation back to shopping
+5. Respond to gratitude with warmth
+6. Use appropriate Vietnamese social phrases`;
 
 // Add temporary storage for guest sessions
 const guestSessions = {};
@@ -72,10 +118,10 @@ export const initChat = async (userId) => {
     }
 };
 
-// Process a user message and generate a response
+/** Xử lý message từ người dùng và trả về response **/
 export const processMessage = async (userId, userMessage) => {
     try {
-        // Get chat history or create new one
+        /** Lấy lịch sử chat => Không thấy thì tạo mới **/
         let [chatHistory] = await db.ChatHistory.findOrCreate({
             where: { user_id: userId },
             defaults: {
@@ -84,27 +130,27 @@ export const processMessage = async (userId, userMessage) => {
             }
         });
 
-        // Add user message to history
+        /** Thêm message người dùng vào lịch sử chat **/
         const messages = chatHistory.messages || [];
         messages.push({
             role: 'user',
             content: userMessage
         });
 
-        // Search for products or shops based on the user message
+        /** Tìm kiếm sản phẩm hoặc cửa hàng dựa trên message của người dùng **/
         const searchResults = await searchProducts(userMessage);
 
-        // Generate chatbot response with Gemini
+        /** Tạo response từ bot dựa trên message và kết quả tìm kiếm **/
         const botResponse = await generateBotResponse(messages, searchResults);
 
-        // Add bot response to history with search results
+        /** Thêm response từ bot vào lịch sử chat và kết quả tìm kiếm **/
         messages.push({
             role: 'assistant',
             content: botResponse,
             searchResults: searchResults
         });
 
-        // Update chat history
+        /** Cập nhật lịch sử chat **/
         chatHistory.messages = messages;
         await chatHistory.save();
 
@@ -118,7 +164,7 @@ export const processMessage = async (userId, userMessage) => {
     }
 };
 
-// Get chat history for a user
+/** Lấy lịch sử chat cho một người dùng **/
 export const getChatHistory = async (userId) => {
     try {
         const chatHistory = await db.ChatHistory.findOne({
@@ -138,40 +184,110 @@ export const getChatHistory = async (userId) => {
     }
 };
 
-// Search for products based on user message
-const searchProducts = async (userMessage) => {
+/** Xác định loại tìm kiếm từ message của người dùng **/
+const determineSearchType = (message) => {
+    const lowerMessage = message.toLowerCase();
+
+    /** Từ khóa social **/
+    const socialPhrases = [
+        'cảm ơn', 'thanks', 'thank', 'cám ơn', 'ok', 'oke', 'được', 'hay', 'tốt', 'good', 'nice',
+        'tuyệt vời', 'great', 'hello', 'hi', 'xin chào', 'chào', 'bye', 'tạm biệt',
+        'vâng', 'ừ', 'đúng', 'sai', 'không', 'yes', 'no', 'cool', 'wow', 'amazing',
+        'chuẩn', 'đỉnh', 'quá xịn', 'xuất sắc', 'quá đã', 'quá tốt', 'hiểu rồi'
+    ];
+
+    /** Từ khóa shop **/
+    const shopKeywords = [
+        'cửa hàng', 'shop', 'store', 'brand', 'thương hiệu', 'hiệu', 'tiệm',
+        'nơi bán', 'chỗ bán', 'hãng'
+    ];
+
+    /** Từ khóa sản phẩm **/
+    const productKeywords = [
+        'sản phẩm', 'mặt hàng', 'item', 'đồ', 'quần áo', 'trang phục',
+        'áo', 'quần', 'váy', 'đầm', 'giày', 'dép', 'túi', 'ví', 'mũ', 'nón', 'kính',
+        'vòng', 'dây', 'nhẫn', 'đồng hồ', 'phụ kiện', 'khăn', 'tất', 'vớ'
+    ];
+
+    /** Kiểm tra xem đây có phải là tương tác social không **/
+    if (socialPhrases.some(phrase => {
+        const regex = new RegExp(`(^|\\s)${phrase}(\\s|$|[,.!?;:])`, 'i');
+        return regex.test(lowerMessage);
+    }) && message.length < 20) {
+        return 'social';
+    }
+
+    /** Kiểm tra xem đây có phải là tìm kiếm shop không **/
+    const isShopQuery = shopKeywords.some(keyword => lowerMessage.includes(keyword));
+
+    /** Kiểm tra xem đây có phải là tìm kiếm sản phẩm không **/
+    const hasProductKeyword = productKeywords.some(keyword => lowerMessage.includes(keyword));
+
+    /** Nếu đây là tìm kiếm shop và có intent tìm kiếm sản phẩm **/
+    if (isShopQuery && hasProductKeyword) {
+        return 'shop_products';
+    }
+
+    /** Nếu đây là tìm kiếm shop **/
+    else if (isShopQuery) {
+        return 'shop_info';
+    }
+
+    /** Mặc định là tìm kiếm sản phẩm **/
+    else {
+        return 'product';
+    }
+};
+
+/** Tìm kiếm sản phẩm **/
+const searchProducts = async (searchTerms) => {
     try {
-        const searchTerms = extractSearchTerms(userMessage);
+        /** Subquery để tính rating trung bình **/
+        const subQueryRating = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
 
-        if (!searchTerms) {
-            return [];
-        }
+        const subQueryReviewCount = sequelize.literal(`(
+            SELECT COUNT(*)
+            FROM Reviews 
+            WHERE Reviews.product_id = Product.id
+        )`);
 
-        // Nếu chỉ là từ xã giao, trả về kết quả đặc biệt
-        if (searchTerms.isSocialOnly) {
-            return { type: 'social_only', data: [] };
-        }
-
-        // Check if this is a shop search
-        if (searchTerms.isShopSearch) {
-            return await searchShops(searchTerms);
-        }
-
-        // If not a shop search, continue with product search
-        // Create search query
         const query = {
+            attributes: {
+                include: [
+                    'id',
+                    'product_name',
+                    'origin',
+                    'gender',
+                    'description',
+                    'sold_quantity',
+                    'unit_price',
+                    'createdAt',
+                    [subQueryRating, 'rating'],
+                    [subQueryReviewCount, 'review_count']
+                ]
+            },
             include: [
                 {
                     model: db.Category,
                     as: 'category',
-                    include: [{
-                        model: db.Category,
-                        as: 'children'
-                    }]
+                    required: false,
+                    attributes: ['id', 'category_name', 'description', 'image_url'],
+                    include: [
+                        {
+                            model: db.Category,
+                            as: 'parent',
+                            attributes: ['id', 'category_name', 'description', 'image_url']
+                        }
+                    ]
                 },
                 {
                     model: db.ProductVariant,
                     as: 'variants',
+                    attributes: ['id', 'sku', 'stock_quantity', 'image_url'],
                     include: [
                         {
                             model: db.Size,
@@ -187,74 +303,126 @@ const searchProducts = async (userMessage) => {
                 },
                 {
                     model: db.ProductImages,
-                    as: 'product_images'
+                    as: 'product_images',
+                    attributes: ['id', 'image_url']
+                },
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url', 'contact_address', 'contact_email'],
+                    required: false
                 }
             ],
-            where: {}
+            where: {},
+            group: [
+                'Product.id',
+                'category.id',
+                'category->parent.id',
+                'variants.id',
+                'variants->size.id',
+                'variants->color.id',
+                'product_images.id',
+                'shop.id'
+            ],
+            having: {}
         };
 
-        // Add name search
         if (searchTerms.name) {
+            // Tìm theo tên sản phẩm
             query.where.product_name = {
                 [Op.like]: `%${searchTerms.name}%`
             };
         }
 
-        // Add gender filter
+        // Tìm theo category
+        if (searchTerms.categoryId) {
+            const categories = await db.Category.findAll({
+                where: {
+                    [Op.or]: [
+                        { id: searchTerms.categoryId }, // Category trực tiếp
+                        { parentId: searchTerms.categoryId } // Category con
+                    ]
+                }
+            });
+
+            if (categories.length > 0) {
+                query.where.categoryId = {
+                    [Op.in]: categories.map(c => c.id)
+                };
+            }
+        }
+
+        // Tìm theo giới tính
         if (searchTerms.gender) {
             query.where.gender = searchTerms.gender;
         }
 
-        // Add price range
-        if (searchTerms.minPrice && searchTerms.maxPrice) {
-            query.where.unit_price = {
-                [Op.between]: [searchTerms.minPrice, searchTerms.maxPrice]
-            };
-        } else if (searchTerms.minPrice) {
-            query.where.unit_price = {
-                [Op.gte]: searchTerms.minPrice
-            };
-        } else if (searchTerms.maxPrice) {
-            query.where.unit_price = {
-                [Op.lte]: searchTerms.maxPrice
-            };
+        // Tìm theo khoảng giá
+        if (searchTerms.minPrice || searchTerms.maxPrice) {
+            query.where.unit_price = {};
+            if (searchTerms.minPrice) {
+                query.where.unit_price[Op.gte] = searchTerms.minPrice;
+            }
+            if (searchTerms.maxPrice) {
+                query.where.unit_price[Op.lte] = searchTerms.maxPrice;
+            }
         }
 
-        // Perform the search
-        const products = await db.Product.findAll(query);
+        // Tìm theo rating
+        if (searchTerms.requiresGoodRating) {
+            query.having = sequelize.literal('rating >= 4.0');
+        }
 
-        // Filter by size and color if needed
-        let filteredProducts = products;
+        // Thực hiện tìm kiếm
+        let products = await db.Product.findAll(query);
 
+        // Lọc theo size và color nếu có yêu cầu
         if (searchTerms.size || searchTerms.color) {
-            filteredProducts = products.filter(product => {
+            products = products.filter(product => {
                 const variants = product.variants || [];
                 return variants.some(variant => {
                     const matchesSize = !searchTerms.size ||
-                        (variant.size && variant.size.size_code.toLowerCase().includes(searchTerms.size.toLowerCase()));
+                        (variant.size && variant.size.size_code.toLowerCase() === searchTerms.size.toLowerCase());
                     const matchesColor = !searchTerms.color ||
-                        (variant.color && variant.color.color_name.toLowerCase().includes(searchTerms.color.toLowerCase()));
+                        (variant.color && variant.color.color_name.toLowerCase() === searchTerms.color.toLowerCase());
                     return matchesSize && matchesColor;
                 });
             });
         }
 
-        // Format products for chatbot response
-        return { type: 'products', data: formatProductsForResponse(filteredProducts) };
+        // Sắp xếp kết quả theo rating và giá
+        products.sort((a, b) => {
+            const ratingA = a.getDataValue('rating') || 0;
+            const ratingB = b.getDataValue('rating') || 0;
+            if (ratingB !== ratingA) {
+                return ratingB - ratingA;
+            }
+            return a.unit_price - b.unit_price;
+        });
+
+        // Giới hạn số lượng kết quả
+        const limitedProducts = products.slice(0, 5);
+
+        return {
+            type: 'products',
+            data: formatProductsForResponse(limitedProducts),
+            total: products.length,
+            categoryInfo: searchTerms.categoryId ? await db.Category.findByPk(searchTerms.categoryId) : null
+        };
+
     } catch (error) {
         console.error('Product search error:', error);
         return { type: 'error', message: error.message };
     }
 };
 
-// Search for shops based on search terms
-const searchShops = async (searchTerms) => {
+/** Tìm kiếm shop **/
+const searchShops = async (searchTerms, includeProducts = false) => {
     try {
         const query = {
             where: {}
         };
 
-        // Search by shop name if provided
         if (searchTerms.shopName) {
             query.where.shop_name = {
                 [Op.like]: `%${searchTerms.shopName}%`
@@ -263,201 +431,117 @@ const searchShops = async (searchTerms) => {
 
         const shops = await db.Shop.findAll(query);
 
-        // Handle case where no shops found, but user wants shop products
-        if (shops.length === 0 && searchTerms.wantsShopProducts) {
-            console.log("Không tìm thấy shop cụ thể, tìm một số sản phẩm từ các shop khác nhau");
-
-            // Lấy một số shop có sẵn trong hệ thống
+        /** Nếu không tìm thấy shop nhưng yêu cầu sản phẩm **/
+        if (shops.length === 0 && includeProducts) {
             const fallbackShops = await db.Shop.findAll({ limit: 3 });
-
-            if (fallbackShops.length > 0) {
-                const result = {
-                    type: 'shops',
-                    data: fallbackShops.map(shop => ({
-                        id: shop.id,
-                        name: shop.shop_name,
-                        email: shop.contact_email,
-                        address: shop.contact_address,
-                        logo_url: shop.logo_url,
-                        products: [] // Sẽ chứa sản phẩm của shop
-                    }))
-                };
-
-                // Lấy sản phẩm cho mỗi shop
-                for (let i = 0; i < result.data.length; i++) {
-                    const shop = result.data[i];
-                    const products = await db.Product.findAll({
-                        where: { shop_id: shop.id },
-                        limit: 3,
-                        include: [
-                            {
-                                model: db.ProductImages,
-                                as: 'product_images',
-                            },
-                            {
-                                model: db.ProductVariant,
-                                as: 'variants',
-                                include: [
-                                    {
-                                        model: db.Size,
-                                        as: 'size',
-                                        attributes: ['id', 'size_code']
-                                    },
-                                    {
-                                        model: db.Color,
-                                        as: 'color',
-                                        attributes: ['id', 'color_name', 'color_code']
-                                    }
-                                ]
-                            }
-                        ]
-                    });
-                    shop.products = formatProductsForResponse(products);
-                }
-                return result;
-            }
-
-            // Nếu không tìm thấy shop, trả về kết quả rỗng
-            return { type: 'shops', data: [] };
+            return await formatShopResults(fallbackShops, true);
         }
 
-        // Kết quả trả về
-        const result = {
-            type: 'shops',
-            data: shops.map(shop => ({
-                id: shop.id,
-                name: shop.shop_name,
-                email: shop.contact_email,
-                address: shop.contact_address,
-                logo_url: shop.logo_url,
-                products: [] // Sẽ chứa sản phẩm của shop
-            }))
-        };
-
-        // Force sản phẩm nếu shop search nhưng wantsShopProducts = true
-        if (searchTerms.wantsShopProducts) {
-            // Lấy nhiều sản phẩm hơn vì người dùng muốn xem sản phẩm
-            const productLimit = 5;
-
-            // Lấy thêm sản phẩm của mỗi shop
-            for (let i = 0; i < result.data.length; i++) {
-                const shop = result.data[i];
-                // Tìm sản phẩm của shop
-                const products = await db.Product.findAll({
-                    where: { shop_id: shop.id },
-                    limit: productLimit,
-                    include: [
-                        {
-                            model: db.ProductImages,
-                            as: 'product_images',
-                        },
-                        {
-                            model: db.ProductVariant,
-                            as: 'variants',
-                            include: [
-                                {
-                                    model: db.Size,
-                                    as: 'size',
-                                    attributes: ['id', 'size_code']
-                                },
-                                {
-                                    model: db.Color,
-                                    as: 'color',
-                                    attributes: ['id', 'color_name', 'color_code']
-                                }
-                            ]
-                        },
-                    ]
-                });
-
-                // Format sản phẩm và thêm vào kết quả
-                shop.products = formatProductsForResponse(products);
-            }
-        }
-        // Xử lý thông tin shop nếu không phải tìm sản phẩm
-        else if (searchTerms.wantsShopInfo || !searchTerms.wantsShopProducts) {
-            // Lấy thêm sản phẩm nếu không chỉ định cụ thể yêu cầu info
-            const shouldIncludeProducts = !searchTerms.wantsShopInfo;
-
-            // Người dùng chỉ muốn thông tin shop, không cần sản phẩm
-            for (let i = 0; i < result.data.length; i++) {
-                const shop = result.data[i];
-
-                // Thêm dữ liệu bổ sung
-                try {
-                    // Đếm tổng số sản phẩm của shop
-                    const productCount = await db.Product.count({
-                        where: { shop_id: shop.id }
-                    });
-
-                    // Lấy rating trung bình nếu có
-                    const reviewStats = await db.Review.findOne({
-                        attributes: [
-                            [db.sequelize.fn('AVG', db.sequelize.col('star_point')), 'avg_rating'],
-                            [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'total_reviews']
-                        ],
-                        where: { shop_id: shop.id }
-                    });
-
-                    // Thêm thông tin bổ sung vào kết quả
-                    shop.total_products = productCount || 0;
-                    shop.avg_rating = reviewStats && reviewStats.dataValues.avg_rating
-                        ? parseFloat(reviewStats.dataValues.avg_rating).toFixed(1)
-                        : "Chưa có đánh giá";
-                    shop.total_reviews = reviewStats ? reviewStats.dataValues.total_reviews : 0;
-
-                    // Nếu không yêu cầu info cụ thể, thêm một vài sản phẩm
-                    if (shouldIncludeProducts) {
-                        const products = await db.Product.findAll({
-                            where: { shop_id: shop.id },
-                            limit: 2,
-                            include: [
-                                {
-                                    model: db.ProductImages,
-                                    as: 'product_images',
-                                },
-                                {
-                                    model: db.ProductVariant,
-                                    as: 'variants',
-                                    include: [
-                                        {
-                                            model: db.Size,
-                                            as: 'size',
-                                            attributes: ['id', 'size_code']
-                                        },
-                                        {
-                                            model: db.Color,
-                                            as: 'color',
-                                            attributes: ['id', 'color_name', 'color_code']
-                                        }
-                                    ]
-                                },
-                            ]
-                        });
-                        shop.products = formatProductsForResponse(products);
-                    }
-                } catch (err) {
-                    console.error('Error fetching additional shop info:', err);
-                }
-            }
-        }
-
-        return result;
+        return await formatShopResults(shops, includeProducts);
     } catch (error) {
         console.error('Shop search error:', error);
         return { type: 'error', message: error.message };
     }
 };
 
-// Extract search terms from user message
+/** Format kết quả shop **/
+const formatShopResults = async (shops, includeProducts = false) => {
+    const formattedShops = [];
+
+    for (const shop of shops) {
+        const shopData = {
+            id: shop.id,
+            name: shop.shop_name,
+            email: shop.contact_email,
+            address: shop.contact_address,
+            logo_url: shop.logo_url
+        };
+
+        /** Thêm thông tin shop khác **/
+        const [productCount, reviewStats] = await Promise.all([
+            db.Product.count({ where: { shop_id: shop.id } }),
+            db.Review.findOne({
+                attributes: [
+                    [db.sequelize.fn('AVG', db.sequelize.col('star_point')), 'avg_rating'],
+                    [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'total_reviews']
+                ],
+                where: { shop_id: shop.id }
+            })
+        ]);
+
+        shopData.total_products = productCount || 0;
+        shopData.avg_rating = reviewStats && reviewStats.dataValues.avg_rating
+            ? parseFloat(reviewStats.dataValues.avg_rating).toFixed(1)
+            : "Chưa có đánh giá";
+        shopData.total_reviews = reviewStats ? reviewStats.dataValues.total_reviews : 0;
+
+        /** Nếu yêu cầu sản phẩm **/
+        if (includeProducts) {
+            const products = await db.Product.findAll({
+                where: { shop_id: shop.id },
+                limit: 3,
+                include: [
+                    {
+                        model: db.ProductImages,
+                        as: 'product_images',
+                    },
+                    {
+                        model: db.ProductVariant,
+                        as: 'variants',
+                        include: [
+                            {
+                                model: db.Size,
+                                as: 'size',
+                                attributes: ['id', 'size_code']
+                            },
+                            {
+                                model: db.Color,
+                                as: 'color',
+                                attributes: ['id', 'color_name', 'color_code']
+                            }
+                        ]
+                    }
+                ]
+            });
+            shopData.products = formatProductsForResponse(products);
+        }
+
+        formattedShops.push(shopData);
+    }
+
+    return { type: 'shops', data: formattedShops };
+};
+
+/** Hàm tìm kiếm chính **/
+const performSearch = async (userMessage) => {
+    const searchTerms = extractSearchTerms(userMessage);
+    if (!searchTerms) return null;
+
+    const searchType = determineSearchType(userMessage);
+
+    switch (searchType) {
+        case 'social':
+            return { type: 'social_only', data: [] };
+        case 'shop_products':
+            return await searchShops(searchTerms, true);
+        case 'shop_info':
+            return await searchShops(searchTerms, false);
+        case 'product':
+            return await searchProducts(searchTerms);
+        default:
+            return null;
+    }
+};
+
+/** Tách từ khóa tìm kiếm từ message **/
 const extractSearchTerms = (message) => {
-    // Convert message to lowercase for easier matching
+    /** Chuyển message thành chữ thường để dễ dàng so sánh **/
     const lowerMessage = message.toLowerCase();
 
     // Object to store search terms
     const searchTerms = {};
 
-    // Kiểm tra các từ khóa xã giao (có thể lưu ý để bot trả lời theo cách tự nhiên)
+    /** Kiểm tra các từ khóa xã giao **/
     const socialPhrases = [
         'cảm ơn', 'thanks', 'thank', 'cám ơn', 'ok', 'oke', 'được', 'hay', 'tốt', 'good', 'nice',
         'tuyệt vời', 'great', 'hello', 'hi', 'xin chào', 'chào', 'bye', 'tạm biệt',
@@ -465,28 +549,32 @@ const extractSearchTerms = (message) => {
         'chuẩn', 'đỉnh', 'quá xịn', 'xuất sắc', 'quá đã', 'quá tốt', 'hiểu rồi'
     ];
 
-    // Phát hiện từ khóa xã giao riêng lẻ
+    /** Phát hiện từ khóa xã giao riêng lẻ **/
     const isSocialPhrase = socialPhrases.some(phrase => {
-        // Kiểm tra xem message có chứa đúng từ đó không (cách nhau bởi dấu cách hoặc đầu/cuối chuỗi)
+        /** Kiểm tra xem message có chứa đúng từ đó không (cách nhau bởi dấu cách hoặc đầu/cuối chuỗi) **/
         const regex = new RegExp(`(^|\\s)${phrase}(\\s|$|[,.!?;:])`, 'i');
         return regex.test(lowerMessage);
     });
 
-    // Nếu chỉ có từ xã giao và không có từ khóa khác, đánh dấu là social_only
+    /** Nếu chỉ có từ xã giao và không có từ khóa khác, đánh dấu là social_only **/
     if (isSocialPhrase && lowerMessage.length < 20) {
         searchTerms.isSocialOnly = true;
         return searchTerms;
     }
 
-    // Define các loại từ khóa
-    const shopKeywords = ['cửa hàng', 'shop', 'store', 'brand', 'thương hiệu', 'hiệu', 'tiệm', 'nơi bán', 'chỗ bán', 'hãng'];
+    /** Định nghĩa các loại từ khóa **/
+    const shopKeywords = [
+        'cửa hàng', 'shop', 'store',
+        'tiệm', 'nơi bán', 'chỗ bán',
+        'hãng', 'brand', 'thương hiệu',
+    ];
 
     const productKeywords = [
         'sản phẩm', 'mặt hàng', 'item', 'đồ', 'quần áo', 'trang phục',
         'áo', 'quần', 'váy', 'đầm', 'giày', 'dép', 'túi', 'ví', 'mũ', 'nón', 'kính',
         'vòng', 'dây', 'nhẫn', 'đồng hồ', 'phụ kiện', 'khăn', 'tất', 'vớ',
         'bán', 'mua', 'order', 'đặt hàng', 'có bán', 'đang bán', 'mẫu mã', 'sản xuất',
-        'collection', 'bộ sưu tập', 'dòng', 'loại'
+        'collection', 'bộ sưu tập', 'dòng', 'loại', 'mẫu', 'mẫu mã', 'mẫu mã sản phẩm',
     ];
 
     const infoKeywords = [
@@ -515,14 +603,14 @@ const extractSearchTerms = (message) => {
         'bán những gì'
     ];
 
-    // Check 1: Tìm kiếm shop products theo pattern đặc thù
+    /** Check 1: Tìm kiếm shop products theo pattern đặc thù **/
     for (const pattern of shopProductPatterns) {
         const regex = new RegExp(pattern, 'i');
         if (regex.test(lowerMessage)) {
             searchTerms.isShopSearch = true;
             searchTerms.wantsShopProducts = true;
 
-            // Extract shop name
+            /** Tách tên shop **/
             const shopMatches = [
                 /sản phẩm của (\w+\s?\w*)/i,
                 /đồ của (\w+\s?\w*)/i,
@@ -543,26 +631,26 @@ const extractSearchTerms = (message) => {
         }
     }
 
-    // Check 2: Tiếp tục check theo cách thông thường nếu chưa tìm thấy
+    /** Check 2: Tiếp tục check theo cách thông thường nếu chưa tìm thấy **/
     if (!searchTerms.isShopSearch && shopKeywords.some(keyword => lowerMessage.includes(keyword))) {
         searchTerms.isShopSearch = true;
 
-        // Phân biệt giữa tìm sản phẩm của shop và thông tin shop
+        /** Phân biệt giữa tìm sản phẩm của shop và thông tin shop **/
         const hasProductIntent = productKeywords.some(keyword => lowerMessage.includes(keyword));
         const hasInfoIntent = infoKeywords.some(keyword => lowerMessage.includes(keyword));
 
         if (hasProductIntent) {
-            // Nếu có từ khóa liên quan đến sản phẩm, đánh dấu là tìm sản phẩm của shop
+            /** Nếu có từ khóa liên quan đến sản phẩm, đánh dấu là tìm sản phẩm của shop **/
             searchTerms.wantsShopProducts = true;
         } else if (hasInfoIntent || !hasProductIntent) {
-            // Nếu có từ khóa thông tin hoặc không có từ khóa sản phẩm, mặc định là tìm thông tin shop
+            /** Nếu có từ khóa thông tin hoặc không có từ khóa sản phẩm, mặc định là tìm thông tin shop **/
             searchTerms.wantsShopInfo = true;
         }
 
-        // Extract shop name using various patterns
+        /** Tách tên shop bằng các pattern khác nhau **/
         let shopName = null;
 
-        // Try matching after shop keywords
+        /** Thử tìm kiếm sau từ khóa shop **/
         for (const keyword of shopKeywords) {
             if (lowerMessage.includes(keyword)) {
                 const regex = new RegExp(`${keyword}\\s+([\\w\\s]+)`, 'i');
@@ -574,7 +662,7 @@ const extractSearchTerms = (message) => {
             }
         }
 
-        // Try matching after product of shop keywords
+        /** Thử tìm kiếm sau từ khóa sản phẩm của shop **/
         if (!shopName) {
             const productOfPatterns = ['của\\s+([\\w\\s]+)', 'từ\\s+([\\w\\s]+)', 'tại\\s+([\\w\\s]+)', 'ở\\s+([\\w\\s]+)'];
 
@@ -595,20 +683,26 @@ const extractSearchTerms = (message) => {
             searchTerms.wantsShopInfo = false;
         }
 
-        // If we found a shop name, clean it up
+        /** Nếu tìm thấy tên shop, làm sạch nó **/
         if (shopName) {
-            // Remove filler words
+            /** Loại bỏ từ lặp lại **/
             shopName = shopName.replace(/\s+(nào|đó|không|nhỉ|vậy|thế|ạ|a|nhé|nha|đi|ở|này)(\s+|$)/gi, ' ').trim();
-            // Remove punctuation at end
+            /** Loại bỏ dấu câu ở cuối **/
             shopName = shopName.replace(/[.,?!;:]+$/, '').trim();
             searchTerms.shopName = shopName;
         }
     }
 
-    // If not searching for shop, assume product search
+    /** Nếu không tìm kiếm shop, giả định tìm sản phẩm **/
     if (!searchTerms.isShopSearch) {
-        // Extract product name (enhanced approach with more keywords)
-        const nameKeywords = ['áo', 'quần', 'váy', 'đầm', 'giày', 'dép', 'túi', 'ví', 'mũ', 'nón', 'kính', 'trang phục', 'phụ kiện', 'vòng cổ', 'thắt lưng', 'đồng hồ', 'khăn'];
+        /** Tách tên sản phẩm **/
+        const nameKeywords = [
+            'áo', 'quần', 'váy', 'đầm',
+            'giày', 'dép', 'túi', 'ví',
+            'mũ', 'nón', 'kính', 'trang phục',
+            'phụ kiện', 'vòng cổ', 'thắt lưng', 'đồng hồ',
+            'khăn', 'tất', 'vớ'
+        ];
 
         for (const keyword of nameKeywords) {
             if (lowerMessage.includes(keyword)) {
@@ -623,15 +717,20 @@ const extractSearchTerms = (message) => {
             }
         }
 
-        // Extract size
+        /** Tách kích cỡ **/
         const sizeRegex = /\b(size|kích\s*cỡ|kích\s*thước)\s*(xs|s|m|l|xl|xxl|\d+)\b/i;
         const sizeMatch = message.match(sizeRegex);
         if (sizeMatch && sizeMatch[2]) {
             searchTerms.size = sizeMatch[2];
         }
 
-        // Extract color
-        const colorKeywords = ['đen', 'trắng', 'đỏ', 'xanh', 'vàng', 'cam', 'tím', 'hồng', 'nâu', 'xám', 'bạc', 'vàng gold', 'xanh dương', 'xanh lá'];
+        /** Tách màu sắc **/
+        const colorKeywords = [
+            'đen', 'trắng', 'đỏ', 'xanh',
+            'vàng', 'cam', 'tím', 'hồng',
+            'nâu', 'xám', 'bạc', 'vàng gold',
+            'xanh dương', 'xanh lá'
+        ];
         for (const color of colorKeywords) {
             if (lowerMessage.includes(color)) {
                 searchTerms.color = color;
@@ -639,32 +738,32 @@ const extractSearchTerms = (message) => {
             }
         }
 
-        // Extract gender
+        /** Tách giới tính **/
         if (lowerMessage.includes('nam')) searchTerms.gender = 'Male';
         else if (lowerMessage.includes('nữ')) searchTerms.gender = 'Female';
         else if (lowerMessage.includes('unisex')) searchTerms.gender = 'Unisex';
         else if (lowerMessage.includes('trẻ em') || lowerMessage.includes('kid')) searchTerms.gender = 'Kids';
 
-        // Helper function to convert price strings to numerical values
+        /** Hàm chuyển đổi chuỗi giá thành giá trị số **/
         const convertPrice = (priceStr) => {
             priceStr = priceStr.trim().toLowerCase();
             let multiplier = 1;
 
-            // Check for k, nghìn, ngàn (thousands)
+            /** Kiểm tra k, nghìn, ngàn (nghìn) **/
             if (priceStr.endsWith('k') || priceStr.endsWith('nghìn') || priceStr.endsWith('ngàn')) {
                 multiplier = 1000;
                 priceStr = priceStr.replace(/k$|nghìn$|ngàn$/i, '').trim();
             }
-            // Check for tr, triệu (millions)
+            /** Kiểm tra tr, triệu (triệu) **/
             else if (priceStr.endsWith('tr') || priceStr.endsWith('triệu')) {
                 multiplier = 1000000;
                 priceStr = priceStr.replace(/tr$|triệu$/i, '').trim();
             }
 
-            // Remove commas, dots in numbers
+            /** Loại bỏ dấu phẩy, chấm trong số **/
             priceStr = priceStr.replace(/\./g, '').replace(/,/g, '');
 
-            // Parse the number
+            /** Parse số **/
             const num = parseFloat(priceStr);
             if (!isNaN(num)) {
                 return num * multiplier;
@@ -672,14 +771,14 @@ const extractSearchTerms = (message) => {
             return null;
         };
 
-        // Improved price extraction patterns
+        /** Mẫu tách giá nâng cao **/
         // 1. Standard format: dưới/từ X đến Y
         const rangeRegex = /(dưới|under|less than|không quá)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(từ|from)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)/i;
 
-        // 2. Direct price mentions: 100k, 100 nghìn, 1tr, 1.5 triệu, etc.
+        /** Mẫu tách giá trị trực tiếp: 100k, 100 nghìn, 1tr, 1.5 triệu, etc. **/
         const directPriceRegex = /\b(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\b/i;
 
-        // First try range regex
+        /** Thử tìm kiếm dải giá trước tiên **/
         const rangeMatch = lowerMessage.match(rangeRegex);
         if (rangeMatch) {
             if (rangeMatch[1] && rangeMatch[2]) {  // "dưới X"
@@ -692,26 +791,48 @@ const extractSearchTerms = (message) => {
                 searchTerms.maxPrice = convertPrice(rangeMatch[13]);
             }
         }
-        // If no range found, look for direct price mentions if accompanied by price-related words
+        /** Nếu không tìm thấy dải giá, tìm kiếm giá trị trực tiếp nếu đi kèm với từ liên quan đến giá **/
         else if (lowerMessage.match(/(giá|price|cost|tiền|khoảng|tầm|khoảng chừng|tầm khoảng)/i)) {
             const priceMatches = [...lowerMessage.matchAll(/\b(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\b/gi)];
             if (priceMatches.length === 1) {
-                // Only one price mentioned - assume it's "around this price"
+                /** Chỉ có một giá được đề cập - giả sử đó là "xung quanh giá này" **/
                 const price = convertPrice(priceMatches[0][0]);
                 if (price) {
-                    // Create a reasonable range around this price
+                    /** Tạo một dải giá hợp lý xung quanh giá này **/
                     searchTerms.minPrice = Math.max(0, price * 0.8); // 20% below
                     searchTerms.maxPrice = price * 1.2; // 20% above
                 }
             } else if (priceMatches.length >= 2) {
-                // Multiple prices - assume it's a range
+                /** Nhiều giá được đề cập - giả sử đó là dải giá **/
                 const prices = priceMatches.map(match => convertPrice(match[0])).filter(p => p !== null);
                 if (prices.length >= 2) {
+                    /** Sắp xếp giá tăng dần **/
                     prices.sort((a, b) => a - b);
+                    /** Đặt giá trị tối thiểu và tối đa **/
                     searchTerms.minPrice = prices[0];
                     searchTerms.maxPrice = prices[prices.length - 1];
                 }
             }
+        }
+    }
+
+    /** Thêm nhận diện từ khóa về chất lượng **/
+    const qualityKeywords = [
+        'đẹp', 'tốt', 'chất lượng', 'cao cấp',
+        'xịn', 'sang', 'chính hãng', 'chính hãng 100%'
+    ];
+    searchTerms.requiresGoodRating = qualityKeywords.some(keyword =>
+        lowerMessage.includes(keyword)
+    );
+
+    /** Thêm xử lý khoảng giá dạng "từ X đến Y" **/
+    const priceRangeMatch = message.match(/từ\s*(\d+)\s*(k|nghìn|ngàn|triệu|tr)?\s*đến\s*(\d+)\s*(k|nghìn|ngàn|triệu|tr)?/i);
+    if (priceRangeMatch) {
+        const startAmount = convertPrice(priceRangeMatch[1] + (priceRangeMatch[2] || ''));
+        const endAmount = convertPrice(priceRangeMatch[3] + (priceRangeMatch[4] || ''));
+        if (startAmount && endAmount) {
+            searchTerms.minPrice = startAmount;
+            searchTerms.maxPrice = endAmount;
         }
     }
 
@@ -725,7 +846,8 @@ const formatProductsForResponse = (products) => {
     }
 
     return products.map(product => {
-        // Extract available sizes and colors
+        // Tách và sắp xếp variants theo size và color
+        const variants = new Map(); // Map để nhóm variants theo color
         const sizes = new Set();
         const colors = new Set();
 
@@ -733,107 +855,125 @@ const formatProductsForResponse = (products) => {
             product.variants.forEach(variant => {
                 if (variant.size) sizes.add(variant.size.size_code);
                 if (variant.color) colors.add(variant.color.color_name);
+
+                // Nhóm variants theo color
+                if (variant.color) {
+                    if (!variants.has(variant.color.color_name)) {
+                        variants.set(variant.color.color_name, {
+                            color: {
+                                name: variant.color.color_name,
+                                code: variant.color.color_code
+                            },
+                            sizes: new Set(),
+                            image: variant.image_url,
+                            stock: 0
+                        });
+                    }
+                    const colorVariant = variants.get(variant.color.color_name);
+                    if (variant.size) colorVariant.sizes.add(variant.size.size_code);
+                    colorVariant.stock += variant.stock_quantity || 0;
+                }
             });
         }
 
-        // Format product data (without descriptions to keep responses shorter)
-        // Use only the first image URL if available
-        const image_url = product.product_images && product.product_images.length > 0 ?
-            product.product_images[0].image_url : null;
+        // Convert variants Map to array and sort sizes
+        const formattedVariants = Array.from(variants.values()).map(v => ({
+            ...v,
+            sizes: Array.from(v.sizes).sort()
+        }));
 
+        // Format product data
         return {
             id: product.id,
             name: product.product_name,
             price: product.unit_price,
+            origin: product.origin,
             gender: product.gender,
-            category: product.category ? product.category.category_name : 'Unknown',
-            sizes: Array.from(sizes),
-            colors: Array.from(colors),
-            image_url: image_url
+            description: product.description,
+            sold_quantity: product.sold_quantity,
+            rating: product.getDataValue('rating') ?
+                parseFloat(product.getDataValue('rating')).toFixed(1) : null,
+            review_count: product.getDataValue('review_count') || 0,
+            category: product.category ? {
+                id: product.category.id,
+                name: product.category.category_name,
+                description: product.category.description,
+                image_url: product.category.image_url,
+                parent: product.category.parent ? {
+                    id: product.category.parent.id,
+                    name: product.category.parent.category_name,
+                    description: product.category.parent.description,
+                    image_url: product.category.parent.image_url
+                } : null
+            } : null,
+            shop: product.shop ? {
+                id: product.shop.id,
+                name: product.shop.shop_name,
+                logo_url: product.shop.logo_url,
+                address: product.shop.contact_address,
+                email: product.shop.contact_email
+            } : null,
+            sizes: Array.from(sizes).sort(),
+            colors: Array.from(colors).sort(),
+            variants: formattedVariants,
+            image_url: product.product_images[0].image_url,
+            created_at: product.createdAt,
+            stock_quantity: formattedVariants.reduce((sum, v) => sum + v.stock, 0)
         };
     });
 };
 
-// Generate bot response with Gemini with fallback and retry logic
 const generateBotResponse = async (messages, searchResults) => {
-    // Generate context for the chatbot
-    let systemContext = SYSTEM_PROMPT;
+    /** Chọn prompt phù hợp dựa trên kết quả tìm kiếm **/
+    let systemContext = BASE_SYSTEM_PROMPT;
 
-    if (searchResults && searchResults.type === 'social_only') {
-        // Xử lý đặc biệt với câu xã giao
-        systemContext += "\n\nThe user has sent a short social message (like 'thank you', 'ok', etc.). Respond naturally in a friendly, casual Vietnamese tone. Don't try to bring the conversation back to shopping unless it makes sense. Just acknowledge their message naturally as a friend would.";
-    } else if (searchResults && searchResults.type === 'products' && searchResults.data.length > 0) {
-        // Handle product results
+    if (searchResults) {
+        switch (searchResults.type) {
+            case 'social_only':
+                systemContext = SOCIAL_PROMPT;
+                break;
+            case 'products':
+                systemContext = PRODUCT_SEARCH_PROMPT;
+                break;
+            case 'shops':
+                systemContext = SHOP_SEARCH_PROMPT;
+                break;
+        }
+    }
+
+    /** Thêm kết quả tìm kiếm vào context **/
+    if (searchResults && searchResults.type === 'products' && searchResults.data.length > 0) {
         systemContext += "\n\nBelow are the products that match the user's search criteria:\n";
         searchResults.data.forEach((product, index) => {
             systemContext += `\nProduct ${index + 1}:\n`;
             systemContext += `- Tên: ${product.name}\n`;
-            systemContext += `- Giá: ${product.price} VND\n`;
-
-            if (product.gender) {
-                systemContext += `- Giới tính: ${product.gender}\n`;
-            }
-
-            if (product.category) {
-                systemContext += `- Danh mục: ${product.category}\n`;
-            }
-
-            if (product.sizes && product.sizes.length > 0) {
-                systemContext += `- Kích cỡ có sẵn: ${product.sizes.join(', ')}\n`;
-            }
-
-            if (product.colors && product.colors.length > 0) {
-                systemContext += `- Màu sắc có sẵn: ${product.colors.join(', ')}\n`;
-            }
-
-            if (product.image_url) {
-                systemContext += `- Hình ảnh: ${product.image_url}\n`;
-            }
+            systemContext += `- Giá: ${product.price} VNĐ\n`;
+            if (product.gender) systemContext += `- Giới tính: ${product.gender}\n`;
+            if (product.category) systemContext += `- Danh mục: ${product.category}\n`;
+            if (product.sizes?.length > 0) systemContext += `- Kích cỡ có sẵn: ${product.sizes.join(', ')}\n`;
+            if (product.colors?.length > 0) systemContext += `- Màu sắc có sẵn: ${product.colors.join(', ')}\n`;
+            if (product.image_url) systemContext += `- Hình ảnh: ${product.image_url}\n`;
         });
     } else if (searchResults && searchResults.type === 'shops' && searchResults.data.length > 0) {
-        // Handle shop results
         systemContext += "\n\nBelow are the shops that match the user's search criteria:\n";
         searchResults.data.forEach((shop, index) => {
             systemContext += `\nShop ${index + 1}:\n`;
             systemContext += `- Tên: ${shop.name}\n`;
             if (shop.email) systemContext += `- Email: ${shop.email}\n`;
             if (shop.address) systemContext += `- Địa chỉ: ${shop.address}\n`;
-            if (shop.logo_url) systemContext += `- Logo: ${shop.logo_url}\n`;
-
-            // Nếu có thông tin đánh giá, hiển thị
             if (shop.avg_rating) systemContext += `- Đánh giá: ${shop.avg_rating}\n`;
             if (shop.total_reviews) systemContext += `- Số lượng đánh giá: ${shop.total_reviews}\n`;
             if (shop.total_products) systemContext += `- Số lượng sản phẩm: ${shop.total_products}\n`;
 
-            // Thêm thông tin về sản phẩm nổi bật của shop (nếu có)
-            if (shop.products && shop.products.length > 0) {
+            if (shop.products?.length > 0) {
                 systemContext += `- Một số sản phẩm nổi bật:\n`;
                 shop.products.forEach((product, pIndex) => {
                     systemContext += `  + Sản phẩm ${pIndex + 1}: ${product.name} - ${product.price} VND\n`;
-                    if (product.sizes && product.sizes.length > 0) {
-                        systemContext += `    Size: ${product.sizes.join(', ')}\n`;
-                    }
-                    if (product.colors && product.colors.length > 0) {
-                        systemContext += `    Màu: ${product.colors.join(', ')}\n`;
-                    }
+                    if (product.sizes?.length > 0) systemContext += `    Size: ${product.sizes.join(', ')}\n`;
+                    if (product.colors?.length > 0) systemContext += `    Màu: ${product.colors.join(', ')}\n`;
                 });
             }
         });
-
-        // Hướng dẫn cách phản hồi dựa trên loại thông tin shop
-        const shopData = searchResults.data[0]; // Lấy shop đầu tiên để kiểm tra
-
-        if (shopData.total_products !== undefined && shopData.products.length === 0) {
-            // Đây là tìm kiếm thông tin shop, không kèm sản phẩm
-            systemContext += "\n\nUser is asking for shop information only. Focus on details about the shop like contact information, ratings, history, or policies. DO NOT apologize for not having product details, as the user is specifically looking for shop information.";
-        } else if (shopData.products && shopData.products.length > 0) {
-            // Đây là tìm kiếm sản phẩm của shop
-            systemContext += "\n\nUser is asking for products from this shop. Highlight the available products and mention that these are just examples, and there may be more products available from this shop.";
-        }
-    } else if (messages[messages.length - 1].content.toLowerCase().includes('tìm') ||
-        messages[messages.length - 1].content.toLowerCase().includes('kiếm') ||
-        messages[messages.length - 1].content.toLowerCase().includes('mua')) {
-        systemContext += "\n\nKhông tìm thấy kết quả nào phù hợp với tiêu chí tìm kiếm của người dùng.";
     }
 
     // The prompt format consistent across all models
@@ -851,44 +991,44 @@ const generateBotResponse = async (messages, searchResults) => {
         4. Do not include system phrases like "Dưới đây là", "Tôi thấy", etc.
     `;
 
-    // Start with primary model, then try fallbacks
+    /** Bắt đầu với model chính, sau đó thử các model fallback **/
     const modelsToTry = [PRIMARY_MODEL, ...FALLBACK_MODELS];
 
-    // Track errors to report if all models fail
+    /** Track lỗi để check nếu tất cả các model thất bại **/
     const errors = [];
 
-    // Try each model in sequence until one works
+    /** Thử từng model theo thứ tự cho đến khi một model hoạt động **/
     for (const modelName of modelsToTry) {
         try {
             console.log(`Trying model: ${modelName}`);
             const model = genAI.getGenerativeModel({ model: modelName });
 
-            // Use simple generateContent to avoid complex conversation structure
+            /** Sử dụng generateContent đơn giản để tránh cấu trúc cuộc hội thoại phức tạp **/
             const result = await model.generateContent(prompt);
             return result.response.text();
         } catch (error) {
             console.error(`Error with model ${modelName}:`, error.message);
             errors.push(`${modelName}: ${error.message}`);
 
-            // If it's not a quota error, or we're on the last model, don't continue
+            /** Nếu không phải lỗi hạn mức, hoặc chúng ta đang ở model cuối cùng, không tiếp tục **/
             if (!error.message.includes('quota') && !error.message.includes('429') && modelName === modelsToTry[modelsToTry.length - 1]) {
                 throw error;
             }
 
-            // Otherwise try the next model
+            /** Nếu không phải lỗi hạn mức, tiếp tục với model tiếp theo **/
             console.log(`Falling back to next model...`);
         }
     }
 
-    // If we get here, all models failed
+    /** Coi như tất cả các model đều thất bại **/
     console.error('All models failed:', errors.join('; '));
     return "Xin lỗi, hiện tại tôi đang gặp sự cố kết nối. Vui lòng thử lại sau. (Các mô hình AI đã thử: " + modelsToTry.join(', ') + ")";
 };
 
-// Process a message from guest user (no history storage)
+/** Xử lý tin nhắn từ người dùng khách (không lưu trữ lịch sử) **/
 export const processGuestMessage = async (userMessage, sessionId) => {
     try {
-        // Create or get temporary chat history for this guest session
+        /** Tạo hoặc lấy lịch sử trò chuyện tạm thời cho phiên khách này **/
         if (!sessionId) {
             sessionId = `guest-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
         }
@@ -897,7 +1037,7 @@ export const processGuestMessage = async (userMessage, sessionId) => {
         if (!guestSessions[sessionId]) {
             guestSessions[sessionId] = {
                 messages: [
-                    // Add initial greeting
+                    /** Thêm lời chào ban đầu **/
                     {
                         role: 'assistant',
                         content: 'Xin chào! Tôi là ClothesShop Assistant. Tôi có thể giúp bạn tìm kiếm quần áo, phụ kiện và trả lời các câu hỏi về sản phẩm của chúng tôi.'
@@ -906,35 +1046,35 @@ export const processGuestMessage = async (userMessage, sessionId) => {
                 lastAccessed: Date.now()
             };
 
-            // Set timeout to clean up this session
+            /** Đặt timeout để xóa phiên khách này **/
             setTimeout(() => {
                 delete guestSessions[sessionId];
             }, GUEST_SESSION_TIMEOUT);
         }
 
-        // Update last accessed time
+        /** Cập nhật thời gian truy cập **/
         guestSessions[sessionId].lastAccessed = Date.now();
 
-        // Add user message to temporary session
+        /** Thêm tin nhắn người dùng vào phiên khách tạm thời **/
         guestSessions[sessionId].messages.push({
             role: 'user',
             content: userMessage
         });
 
-        // Search for products or shops based on the user message
+        /** Tìm kiếm sản phẩm hoặc cửa hàng dựa trên tin nhắn của người dùng **/
         const searchResults = await searchProducts(userMessage);
 
-        // Generate chatbot response with Gemini
+        /** Tạo response từ bot với Gemini **/
         const botResponse = await generateBotResponse(guestSessions[sessionId].messages, searchResults);
 
-        // Add bot response to temporary session with search results
+        /** Thêm response từ bot vào phiên khách tạm thời với kết quả tìm kiếm **/
         guestSessions[sessionId].messages.push({
             role: 'assistant',
             content: botResponse,
             searchResults: searchResults
         });
 
-        // Return response and search results (but don't store anything permanently)
+        /** Trả về response và kết quả tìm kiếm (nhưng không lưu trữ bất cứ điều gì vĩnh viễn) **/
         return {
             message: botResponse,
             searchResults: searchResults,
@@ -947,7 +1087,7 @@ export const processGuestMessage = async (userMessage, sessionId) => {
     }
 };
 
-// Get temporary guest chat history
+/** Lấy lịch sử trò chuyện khách tạm thời **/
 export const getGuestChatHistory = (sessionId) => {
     if (!sessionId || !guestSessions[sessionId]) {
         return {
@@ -959,7 +1099,7 @@ export const getGuestChatHistory = (sessionId) => {
         };
     }
 
-    // Update last accessed time
+    /** Cập nhật thời gian truy cập **/
     guestSessions[sessionId].lastAccessed = Date.now();
 
     return {
@@ -976,14 +1116,11 @@ export const createSession = async (userId, title) => {
         title: title || 'Cuộc hội thoại mới'
     });
 
-    // Thêm tin nhắn chào khi tạo session mới
+    // Không thêm tin nhắn chào nữa
     await db.ChatHistory.create({
         user_id: userId || null,
         session_id: session.session_id,
-        messages: JSON.stringify([{
-            role: 'assistant',
-            content: 'Xin chào! Tôi là ClothesShop Assistant. Tôi có thể giúp bạn tìm kiếm quần áo, phụ kiện và trả lời các câu hỏi về sản phẩm của chúng tôi. Bạn muốn tìm kiếm sản phẩm gì hôm nay?'
-        }])
+        messages: JSON.stringify([]) // Mảng rỗng
     });
 
     return { sessionId: session.session_id, title: session.title, createdAt: session.createdAt };
@@ -998,7 +1135,7 @@ export const getSessions = async (userId, sessionIds) => {
         results = await db.ChatSession.findAll({ where: { session_id: { [Op.in]: ids } } });
     }
 
-    // Map lại để đảm bảo luôn có sessionId (dùng session_id)
+    /** Map lại để đảm bảo luôn có sessionId (dùng session_id) **/
     return results.map(session => {
         const sessionData = session.toJSON ? session.toJSON() : session;
         return {
@@ -1013,7 +1150,7 @@ export const getChatHistoryBySession = async (sessionId) => {
         where: { session_id: sessionId },
         order: [['createdAt', 'ASC']]
     });
-    // Flatten messages
+
     let messages = [];
     histories.forEach(h => {
         try {
@@ -1022,15 +1159,7 @@ export const getChatHistoryBySession = async (sessionId) => {
         } catch (e) { }
     });
 
-    // Nếu không có tin nhắn, thêm tin nhắn chào mặc định
-    if (messages.length === 0) {
-        messages = [{
-            role: 'assistant',
-            content: 'Xin chào! Tôi là ClothesShop Assistant. Tôi có thể giúp bạn tìm kiếm quần áo, phụ kiện và trả lời các câu hỏi về sản phẩm của chúng tôi. Bạn muốn tìm kiếm sản phẩm gì hôm nay?'
-        }];
-    }
-
-    // Map lại format cho FE
+    // Không thêm tin nhắn chào mặc định nữa
     const mapped = (messages || []).map((msg, idx) => ({
         id: msg.id || `${msg.role}-${idx}-${Date.now()}`,
         text: msg.content,
@@ -1041,7 +1170,7 @@ export const getChatHistoryBySession = async (sessionId) => {
 };
 
 export const sendMessageToSession = async (sessionId, userId, userMessage) => {
-    // Lấy lịch sử chat hiện tại
+    /** Lấy lịch sử chat hiện tại **/
     const histories = await db.ChatHistory.findAll({
         where: { session_id: sessionId },
         order: [['createdAt', 'ASC']]
@@ -1053,18 +1182,18 @@ export const sendMessageToSession = async (sessionId, userId, userMessage) => {
             messages = messages.concat(arr);
         } catch (e) { }
     });
-    // Thêm tin nhắn user
+    /** Thêm tin nhắn user **/
     messages.push({ role: 'user', content: userMessage });
 
-    // Gọi AI hoặc search thực tế
+    /** Gọi AI hoặc search thực tế **/
     const searchResults = await searchProducts(userMessage); // dùng lại hàm searchProducts nếu có
     const botResponse = await generateBotResponse(messages, searchResults); // dùng lại hàm generateBotResponse nếu có
 
-    // Tin nhắn mới từ bot
+    /** Tin nhắn mới từ bot **/
     const botMessage = { role: 'assistant', content: botResponse, searchResults };
     messages.push(botMessage);
 
-    // Lưu lại bản ghi mới
+    /** Lưu lại bản ghi mới **/
     await db.ChatHistory.create({
         user_id: userId || null,
         session_id: sessionId,
@@ -1074,7 +1203,7 @@ export const sendMessageToSession = async (sessionId, userId, userMessage) => {
         ])
     });
 
-    // Chỉ trả về tin nhắn mới, không trả về toàn bộ lịch sử
+    /** Chỉ trả về tin nhắn mới, không trả về toàn bộ lịch sử **/
     return {
         messages: [
             { role: 'user', content: userMessage },
