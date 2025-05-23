@@ -239,6 +239,51 @@ const determineSearchType = (message) => {
     }
 };
 
+/** Tìm danh mục dựa trên từ khóa **/
+const findCategories = async (keyword) => {
+    try {
+        // Tìm tất cả danh mục có tên chứa từ khóa
+        const categories = await db.Category.findAll({
+            where: {
+                category_name: {
+                    [Op.like]: `%${keyword}%`
+                }
+            },
+            include: [
+                {
+                    model: db.Category,
+                    as: 'parent',
+                    attributes: ['id', 'category_name']
+                },
+                {
+                    model: db.Category,
+                    as: 'children',
+                    attributes: ['id', 'category_name']
+                }
+            ]
+        });
+
+        // Tập hợp tất cả ID danh mục liên quan
+        const categoryIds = new Set();
+        categories.forEach(category => {
+            categoryIds.add(category.id);
+            // Nếu là danh mục cha, thêm ID của các danh mục con
+            if (category.children && category.children.length > 0) {
+                category.children.forEach(child => categoryIds.add(child.id));
+            }
+            // Nếu là danh mục con, thêm ID của danh mục cha
+            if (category.parent) {
+                categoryIds.add(category.parent.id);
+            }
+        });
+
+        return Array.from(categoryIds);
+    } catch (error) {
+        console.error('Error finding categories:', error);
+        return [];
+    }
+};
+
 /** Tìm kiếm sản phẩm **/
 const searchProducts = async (searchTerms) => {
     try {
@@ -274,7 +319,7 @@ const searchProducts = async (searchTerms) => {
                 {
                     model: db.Category,
                     as: 'category',
-                    required: false,
+                    required: true,
                     attributes: ['id', 'category_name', 'description', 'image_url'],
                     include: [
                         {
@@ -327,29 +372,54 @@ const searchProducts = async (searchTerms) => {
             having: {}
         };
 
-        if (searchTerms.name) {
-            // Tìm theo tên sản phẩm
-            query.where.product_name = {
-                [Op.like]: `%${searchTerms.name}%`
+        // Tìm kiếm theo danh mục và tên sản phẩm
+        if (searchTerms.categoryKeyword) {
+            const categoryIds = await findCategories(searchTerms.categoryKeyword);
+            if (categoryIds.length > 0) {
+                query.where = {
+                    ...query.where,
+                    [Op.or]: [
+                        {
+                            categoryId: {
+                                [Op.in]: categoryIds
+                            }
+                        },
+                        sequelize.where(
+                            sequelize.col('category.category_name'),
+                            'LIKE',
+                            `%${searchTerms.categoryKeyword}%`
+                        )
+                    ]
+                };
+            }
+
+            // Thêm điều kiện tìm theo tên sản phẩm nếu có categoryKeyword
+            query.where = {
+                ...query.where,
+                [Op.or]: [
+                    ...(query.where[Op.or] || []),
+                    {
+                        product_name: {
+                            [Op.like]: `%${searchTerms.categoryKeyword}%`
+                        }
+                    }
+                ]
             };
         }
 
-        // Tìm theo category
-        if (searchTerms.categoryId) {
-            const categories = await db.Category.findAll({
-                where: {
-                    [Op.or]: [
-                        { id: searchTerms.categoryId }, // Category trực tiếp
-                        { parentId: searchTerms.categoryId } // Category con
-                    ]
-                }
-            });
-
-            if (categories.length > 0) {
-                query.where.categoryId = {
-                    [Op.in]: categories.map(c => c.id)
-                };
-            }
+        // Tìm theo tên sản phẩm (nếu có)
+        if (searchTerms.name && searchTerms.name !== searchTerms.categoryKeyword) {
+            query.where = {
+                ...query.where,
+                [Op.or]: [
+                    ...(query.where[Op.or] || []),
+                    {
+                        product_name: {
+                            [Op.like]: `%${searchTerms.name}%`
+                        }
+                    }
+                ]
+            };
         }
 
         // Tìm theo giới tính
@@ -373,7 +443,7 @@ const searchProducts = async (searchTerms) => {
             query.having = sequelize.literal('rating >= 4.0');
         }
 
-        // Thực hiện tìm kiếm
+        /** Thực hiện tìm kiếm **/
         let products = await db.Product.findAll(query);
 
         // Lọc theo size và color nếu có yêu cầu
@@ -407,7 +477,7 @@ const searchProducts = async (searchTerms) => {
             type: 'products',
             data: formatProductsForResponse(limitedProducts),
             total: products.length,
-            categoryInfo: searchTerms.categoryId ? await db.Category.findByPk(searchTerms.categoryId) : null
+            categoryInfo: searchTerms.categoryKeyword ? { name: searchTerms.categoryKeyword } : null
         };
 
     } catch (error) {
@@ -563,6 +633,27 @@ const extractSearchTerms = (message) => {
     }
 
     /** Định nghĩa các loại từ khóa **/
+    const categoryKeywords = {
+        'áo': ['áo', 'áo thun', 'áo sơ mi', 'áo khoác', 'áo len', 'áo hoodie'],
+        'quần': ['quần', 'quần jean', 'quần kaki', 'quần short', 'quần tây'],
+        'váy': ['váy', 'đầm', 'chân váy', 'váy công sở', 'váy dự tiệc'],
+        'giày dép': ['giày', 'dép', 'sandal', 'giày thể thao', 'giày cao gót'],
+        'phụ kiện': ['phụ kiện', 'túi', 'ví', 'thắt lưng', 'mũ', 'nón', 'kính', 'trang sức']
+    };
+
+    /** Tìm danh mục từ từ khóa **/
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+        for (const keyword of keywords) {
+            if (lowerMessage.includes(keyword)) {
+                searchTerms.categoryKeyword = category;
+                searchTerms.name = keyword; // Lưu từ khóa cụ thể làm tên tìm kiếm
+                break;
+            }
+        }
+        if (searchTerms.categoryKeyword) break;
+    }
+
+    /** Định nghĩa các loại từ khóa khác **/
     const shopKeywords = [
         'cửa hàng', 'shop', 'store',
         'tiệm', 'nơi bán', 'chỗ bán',
