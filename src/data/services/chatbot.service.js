@@ -930,12 +930,24 @@ export const sendMessageToSession = async (sessionId, userId, userMessage) => {
             searchResults: searchResults
         };
 
-        // Lưu cả tin nhắn user và bot vào history
-        await db.ChatHistory.create({
-            user_id: userId || null,
-            session_id: sessionId,
-            messages: JSON.stringify([userMsg, botMsg])
-        });
+        // Lưu tin nhắn vào history
+        if (userId) {
+            // Nếu là user đã đăng nhập, lưu vào ChatHistory
+            await db.ChatHistory.create({
+                user_id: userId,
+                session_id: sessionId,
+                messages: JSON.stringify([userMsg, botMsg])
+            });
+        } else {
+            // Nếu là khách, lưu vào GuestChatHistory
+            await db.sequelize.query(`
+                INSERT INTO chathistories (session_id, messages, createdAt, updatedAt)
+                VALUES (?, ?, NOW(), NOW())
+            `, {
+                replacements: [sessionId, JSON.stringify([userMsg, botMsg])],
+                type: db.sequelize.QueryTypes.INSERT
+            });
+        }
 
         return {
             messages: [userMsg, botMsg]
