@@ -152,45 +152,18 @@ export const initChat = async (userId) => {
     }
 };
 
-/** Xử lý message từ người dùng và trả về response **/
+/** Xử lý message từ người dùng đã đăng nhập **/
 export const processMessage = async (userId, userMessage) => {
     try {
-        /** Lấy lịch sử chat => Không thấy thì tạo mới **/
-        let [chatHistory] = await db.ChatHistory.findOrCreate({
-            where: { user_id: userId },
-            defaults: {
-                user_id: userId,
-                messages: []
-            }
-        });
-
-        /** Thêm message người dùng vào lịch sử chat **/
-        const messages = chatHistory.messages || [];
-        messages.push({
-            role: 'user',
-            content: userMessage
-        });
-
-        /** Tìm kiếm sản phẩm hoặc cửa hàng dựa trên message của người dùng **/
-        const searchResults = await searchProducts(userMessage);
+        /** Tìm kiếm sản phẩm dựa trên message của người dùng **/
+        const searchTerms = await extractSearchTerms(userMessage);
+        const searchResults = await searchProducts(searchTerms);
 
         /** Tạo response từ bot dựa trên message và kết quả tìm kiếm **/
-        const botResponse = await generateBotResponse(messages, searchResults);
-
-        /** Thêm response từ bot vào lịch sử chat và kết quả tìm kiếm **/
-        messages.push({
-            role: 'assistant',
-            content: botResponse,
-            searchResults: searchResults
-        });
-
-        /** Cập nhật lịch sử chat **/
-        chatHistory.messages = messages;
-        await chatHistory.save();
+        const botResponse = await generateBotResponse([{ role: 'user', content: userMessage }], searchResults);
 
         return {
             message: botResponse,
-            chatHistory: messages,
             searchResults: searchResults
         };
     } catch (error) {
@@ -321,6 +294,15 @@ const findCategories = async (keyword) => {
 /** Tìm kiếm sản phẩm **/
 const searchProducts = async (searchTerms) => {
     try {
+        // Log để debug
+        console.log('Search terms:', searchTerms);
+
+        // Kiểm tra searchTerms
+        if (!searchTerms || typeof searchTerms !== 'object') {
+            console.error('Invalid searchTerms:', searchTerms);
+            return { type: 'error', message: 'Invalid search terms' };
+        }
+
         /** Subquery để tính rating trung bình **/
         const subQueryRating = sequelize.literal(`(
             SELECT AVG(rating)
@@ -353,7 +335,7 @@ const searchProducts = async (searchTerms) => {
                 {
                     model: db.Category,
                     as: 'category',
-                    required: true,
+                    required: false,
                     attributes: ['id', 'category_name', 'description', 'image_url'],
                     include: [
                         {
@@ -406,70 +388,46 @@ const searchProducts = async (searchTerms) => {
             having: {}
         };
 
-        // Tìm kiếm theo danh mục và tên sản phẩm
-        if (searchTerms.categoryKeyword) {
-            const categoryIds = await findCategories(searchTerms.categoryKeyword);
-            if (categoryIds.length > 0) {
-                query.where = {
-                    ...query.where,
-                    [Op.or]: [
-                        {
-                            categoryId: {
-                                [Op.in]: categoryIds
-                            }
-                        },
-                        sequelize.where(
-                            sequelize.col('category.category_name'),
-                            'LIKE',
-                            `%${searchTerms.categoryKeyword}%`
-                        )
-                    ]
-                };
-            }
-
-            // Thêm điều kiện tìm theo tên sản phẩm nếu có categoryKeyword
-            query.where = {
-                ...query.where,
-                [Op.or]: [
-                    ...(query.where[Op.or] || []),
-                    {
-                        product_name: {
-                            [Op.like]: `%${searchTerms.categoryKeyword}%`
-                        }
-                    }
-                ]
+        // Xử lý tìm kiếm theo danh mục
+        if (searchTerms.categoryIds && searchTerms.categoryIds.length > 0) {
+            query.where.categoryId = {
+                [Op.in]: searchTerms.categoryIds
             };
         }
 
-        // Tìm theo tên sản phẩm (nếu có)
-        if (searchTerms.name && searchTerms.name !== searchTerms.categoryKeyword) {
-            query.where = {
-                ...query.where,
-                [Op.or]: [
-                    ...(query.where[Op.or] || []),
-                    {
-                        product_name: {
-                            [Op.like]: `%${searchTerms.name}%`
-                        }
-                    }
-                ]
-            };
+        // Tìm theo tên sản phẩm
+        if (searchTerms.name) {
+            if (!query.where[Op.and]) {
+                query.where[Op.and] = [];
+            }
+            query.where[Op.and].push({
+                product_name: {
+                    [Op.like]: `%${searchTerms.name}%`
+                }
+            });
         }
 
         // Tìm theo giới tính
         if (searchTerms.gender) {
-            query.where.gender = searchTerms.gender;
+            if (!query.where[Op.and]) {
+                query.where[Op.and] = [];
+            }
+            query.where[Op.and].push({ gender: searchTerms.gender });
         }
 
         // Tìm theo khoảng giá
         if (searchTerms.minPrice || searchTerms.maxPrice) {
-            query.where.unit_price = {};
+            const priceCondition = {};
             if (searchTerms.minPrice) {
-                query.where.unit_price[Op.gte] = searchTerms.minPrice;
+                priceCondition[Op.gte] = searchTerms.minPrice;
             }
             if (searchTerms.maxPrice) {
-                query.where.unit_price[Op.lte] = searchTerms.maxPrice;
+                priceCondition[Op.lte] = searchTerms.maxPrice;
             }
+            if (!query.where[Op.and]) {
+                query.where[Op.and] = [];
+            }
+            query.where[Op.and].push({ unit_price: priceCondition });
         }
 
         // Tìm theo rating
@@ -477,8 +435,12 @@ const searchProducts = async (searchTerms) => {
             query.having = sequelize.literal('rating >= 4.0');
         }
 
+        // console.log('Search query:', JSON.stringify(query, null, 2)); // Debug log
+
         /** Thực hiện tìm kiếm **/
         let products = await db.Product.findAll(query);
+
+        console.log('Found products before filtering:', products.length); // Debug log
 
         // Lọc theo size và color nếu có yêu cầu
         if (searchTerms.size || searchTerms.color) {
@@ -493,6 +455,8 @@ const searchProducts = async (searchTerms) => {
                 });
             });
         }
+
+        console.log('Found products after filtering:', products.length); // Debug log
 
         // Sắp xếp kết quả theo rating và giá
         products.sort((a, b) => {
@@ -510,8 +474,7 @@ const searchProducts = async (searchTerms) => {
         return {
             type: 'products',
             data: formatProductsForResponse(limitedProducts),
-            total: products.length,
-            categoryInfo: searchTerms.categoryKeyword ? { name: searchTerms.categoryKeyword } : null
+            total: products.length
         };
 
     } catch (error) {
@@ -616,312 +579,181 @@ const formatShopResults = async (shops, includeProducts = false) => {
     return { type: 'shops', data: formattedShops };
 };
 
-/** Hàm tìm kiếm chính **/
-const performSearch = async (userMessage) => {
-    const searchTerms = await extractSearchTerms(userMessage);
-    if (!searchTerms) return null;
-
-    const searchType = determineSearchType(userMessage);
-
-    switch (searchType) {
-        case 'social':
-            return { type: 'social_only', data: [] };
-        case 'shop_products':
-            return await searchShops(searchTerms, true);
-        case 'shop_info':
-            return await searchShops(searchTerms, false);
-        case 'product':
-            return await searchProducts(searchTerms);
-        default:
-            return null;
-    }
-};
-
 /** Tách từ khóa tìm kiếm từ message **/
 const extractSearchTerms = async (message) => {
     if (!message || typeof message !== 'string') {
         return {
+            categoryIds: [],
             name: '',
             isSocialOnly: false
         };
     }
 
-    /** Chuyển message thành chữ thường để dễ dàng so sánh **/
     const lowerMessage = message.toLowerCase();
-
-    // Object to store search terms
     const searchTerms = {
+        categoryIds: [],
         name: '',
-        isSocialOnly: false
+        keywords: '',
+        isShopSearch: false,
+        isSocialOnly: false,
+        requiresGoodRating: false
     };
 
-    /** Kiểm tra các từ khóa xã giao **/
+    // Kiểm tra từ khóa xã giao
     const socialPhrases = [
         'cảm ơn', 'thanks', 'thank', 'cám ơn', 'ok', 'oke', 'được', 'hay', 'tốt', 'good', 'nice',
         'tuyệt vời', 'great', 'hello', 'hi', 'xin chào', 'chào', 'bye', 'tạm biệt',
         'vâng', 'ừ', 'đúng', 'sai', 'không', 'yes', 'no', 'cool', 'wow', 'amazing',
         'chuẩn', 'đỉnh', 'quá xịn', 'xuất sắc', 'quá đã', 'quá tốt', 'hiểu rồi'
     ];
-
-    /** Phát hiện từ khóa xã giao riêng lẻ **/
     const isSocialPhrase = socialPhrases.some(phrase => {
-        /** Kiểm tra xem message có chứa đúng từ đó không (cách nhau bởi dấu cách hoặc đầu/cuối chuỗi) **/
         const regex = new RegExp(`(^|\\s)${phrase}(\\s|$|[,.!?;:])`, 'i');
         return regex.test(lowerMessage);
     });
-
-    /** Nếu chỉ có từ xã giao và không có từ khóa khác, đánh dấu là social_only **/
     if (isSocialPhrase && lowerMessage.length < 20) {
         searchTerms.isSocialOnly = true;
         return searchTerms;
     }
 
-    /** Định nghĩa các loại từ khóa **/
+    // Kiểm tra tìm kiếm shop
     const shopKeywords = [
-        'cửa hàng', 'shop', 'store',
-        'tiệm', 'nơi bán', 'chỗ bán',
-        'hãng', 'brand', 'thương hiệu',
+        'cửa hàng', 'shop', 'store', 'brand', 'thương hiệu', 'hiệu', 'tiệm',
+        'nơi bán', 'chỗ bán', 'hãng'
     ];
-
-    const productKeywords = [
-        'sản phẩm', 'mặt hàng', 'item', 'đồ', 'quần áo', 'trang phục',
-        'áo', 'quần', 'váy', 'đầm', 'giày', 'dép', 'túi', 'ví', 'mũ', 'nón', 'kính',
-        'vòng', 'dây', 'nhẫn', 'đồng hồ', 'phụ kiện', 'khăn', 'tất', 'vớ',
-    ];
-
-    const infoKeywords = [
-        'thông tin', 'chi tiết', 'giới thiệu', 'mô tả', 'tổng quan', 'profile',
-        'địa chỉ', 'liên hệ', 'contact', 'hotline', 'email', 'số điện thoại', 'website',
-        'fanpage', 'facebook', 'instagram', 'mạng xã hội', 'socials',
-        'thành lập', 'lịch sử', 'xuất xứ', 'nguồn gốc', 'giờ mở cửa', 'nơi sản xuất',
-        'chất lượng', 'uy tín', 'đánh giá', 'review', 'feedback', 'nhận xét', 'phản hồi',
-        'chính sách', 'bảo hành', 'đổi trả', 'giao hàng', 'thanh toán', 'delivery', 'shipping',
-        'giấy phép', 'chứng nhận', 'thông tin liên hệ', 'quy mô', 'nhân viên', 'danh tiếng',
-        'mấy giờ mở cửa', 'họ bán gì', 'họ là ai'
-    ];
-
-    // Kiểm tra các pattern phổ biến về sản phẩm của shop
-    const shopProductPatterns = [
-        'sản phẩm của (cửa hàng|shop|thương hiệu|hiệu|tiệm|hãng)',
-        'các sản phẩm của',
-        'mặt hàng của',
-        'đồ của',
-        'bán gì',
-        'có những gì',
-        'có gì',
-        'sản xuất gì',
-        'có sản phẩm gì',
-        'có mặt hàng gì',
-        'bán những gì'
-    ];
-
-    /** Check 1: Tìm kiếm shop products theo pattern đặc thù **/
-    for (const pattern of shopProductPatterns) {
-        const regex = new RegExp(pattern, 'i');
-        if (regex.test(lowerMessage)) {
-            searchTerms.isShopSearch = true;
-            searchTerms.wantsShopProducts = true;
-
-            /** Tách tên shop **/
-            const shopMatches = [
-                /sản phẩm của (\w+\s?\w*)/i,
-                /đồ của (\w+\s?\w*)/i,
-                /hàng của (\w+\s?\w*)/i,
-                /cửa hàng (\w+\s?\w*) bán/i,
-                /shop (\w+\s?\w*) bán/i
-            ];
-
-            for (const shopRegex of shopMatches) {
-                const match = message.match(shopRegex);
-                if (match && match[1]) {
-                    searchTerms.shopName = match[1].trim();
-                    break;
-                }
-            }
-
-            break;
-        }
-    }
-
-    /** Check 2: Tiếp tục check theo cách thông thường nếu chưa tìm thấy **/
-    if (!searchTerms.isShopSearch && shopKeywords.some(keyword => lowerMessage.includes(keyword))) {
+    if (shopKeywords.some(keyword => lowerMessage.includes(keyword))) {
         searchTerms.isShopSearch = true;
-
-        /** Phân biệt giữa tìm sản phẩm của shop và thông tin shop **/
-        const hasProductIntent = productKeywords.some(keyword => lowerMessage.includes(keyword));
-        const hasInfoIntent = infoKeywords.some(keyword => lowerMessage.includes(keyword));
-
-        if (hasProductIntent) {
-            /** Nếu có từ khóa liên quan đến sản phẩm, đánh dấu là tìm sản phẩm của shop **/
-            searchTerms.wantsShopProducts = true;
-        } else if (hasInfoIntent || !hasProductIntent) {
-            /** Nếu có từ khóa thông tin hoặc không có từ khóa sản phẩm, mặc định là tìm thông tin shop **/
-            searchTerms.wantsShopInfo = true;
+        const shopNameMatch = message.match(new RegExp(`(${shopKeywords.join('|')})\\s+([\\w\\s]+)`, 'i'));
+        if (shopNameMatch && shopNameMatch[2]) {
+            searchTerms.shopName = shopNameMatch[2].trim();
         }
-
-        /** Tách tên shop bằng các pattern khác nhau **/
-        let shopName = null;
-
-        /** Thử tìm kiếm sau từ khóa shop **/
-        for (const keyword of shopKeywords) {
-            if (lowerMessage.includes(keyword)) {
-                const regex = new RegExp(`${keyword}\\s+([\\w\\s]+)`, 'i');
-                const match = message.match(regex);
-                if (match && match[1]) {
-                    shopName = match[1].trim();
-                    break;
-                }
-            }
-        }
-
-        /** Thử tìm kiếm sau từ khóa sản phẩm của shop **/
-        if (!shopName) {
-            const productOfPatterns = ['của\\s+([\\w\\s]+)', 'từ\\s+([\\w\\s]+)', 'tại\\s+([\\w\\s]+)', 'ở\\s+([\\w\\s]+)'];
-
-            for (const pattern of productOfPatterns) {
-                const regex = new RegExp(pattern, 'i');
-                const match = message.match(regex);
-                if (match && match[1]) {
-                    shopName = match[1].trim();
-                    break;
-                }
-            }
-        }
-
-        // Check 3: Nếu không tìm thấy tên shop cụ thể nhưng có từ khóa sản phẩm và cửa hàng
-        // thì giả định muốn xem tất cả sản phẩm của một cửa hàng bất kỳ
-        if (!shopName && hasProductIntent && lowerMessage.includes('sản phẩm') && shopKeywords.some(kw => lowerMessage.includes(kw))) {
-            searchTerms.wantsShopProducts = true;
-            searchTerms.wantsShopInfo = false;
-        }
-
-        /** Nếu tìm thấy tên shop, làm sạch nó **/
-        if (shopName) {
-            /** Loại bỏ từ lặp lại **/
-            shopName = shopName.replace(/\s+(nào|đó|không|nhỉ|vậy|thế|ạ|a|nhé|nha|đi|ở|này)(\s+|$)/gi, ' ').trim();
-            /** Loại bỏ dấu câu ở cuối **/
-            shopName = shopName.replace(/[.,?!;:]+$/, '').trim();
-            searchTerms.shopName = shopName;
-        }
+        return searchTerms;
     }
 
     try {
-        /** Lấy danh sách màu sắc từ database **/
-        const colorKeywords = await getColorKeywords();
+        // Lấy danh sách danh mục
+        const categories = await db.Category.findAll({
+            attributes: ['id', 'category_name', 'parentId']
+        });
 
-        /** Tìm kiếm màu sắc trong tin nhắn **/
-        for (const color of colorKeywords) {
-            if (lowerMessage.includes(color)) {
-                searchTerms.color = color;
+        // Tạo map từ khóa danh mục
+        const categoryKeywords = new Map();
+        categories.forEach(category => {
+            const keyword = category.category_name.toLowerCase();
+            categoryKeywords.set(keyword, {
+                id: category.id,
+                parentId: category.parentId
+            });
+        });
+
+        // Tìm tên sản phẩm
+        const productNamePatterns = [
+            /(?:sản phẩm|mặt hàng|món hàng|đồ|item)\s+(?:tên|gọi|là|có tên|tên là|gọi là)\s+(?:(?:tôi|cần|tìm|là)\s+)*([^ ]+(?:\s+[^ ]+)*)(?:\s|$|\?|\.)/i,
+            /(?:tìm|kiếm|có|bán|cần|muốn mua)\s+(?:sản phẩm|mặt hàng|món hàng|đồ|item)\s+["']([^"']+)["']/i,
+            /["']([^"']+)["']\s+(?:có|còn|được|không|chưa|bán|nhỉ|nữa|vậy)(?:\s|$|\?|\.)/i,
+            /tên\s+["']([^"']+)["']/i,
+            /(?:sản phẩm|mặt hàng|món hàng|đồ|item)\s+([^ ]+(?:\s+[^ ]+)*)(?:\s|$|\?|\.)/i,
+            /(?:tôi\s*(?:đang\s*)?tìm)\s+([^ ]+(?:\s+[^ ]+)*)(?:\s|$|\?|\.)/i
+        ];
+
+        let foundExactName = false;
+        for (const pattern of productNamePatterns) {
+            const match = lowerMessage.match(pattern);
+            if (match && match[1]) {
+                searchTerms.name = match[1].trim();
+                foundExactName = true;
                 break;
             }
         }
 
-        /** Lấy danh sách danh mục từ database **/
-        const categories = await db.Category.findAll({
-            attributes: ['id', 'category_name'],
-            include: [
-                {
-                    model: db.Category,
-                    as: 'children',
-                    attributes: ['id', 'category_name']
-                }
-            ]
-        });
+        // Tìm danh mục
+        const words = lowerMessage.split(/\s+/);
+        let remainingWords = [...words];
+        let foundCategories = new Set();
 
-        /** Tạo map danh mục và từ khóa liên quan **/
-        const categoryKeywords = {};
-        categories.forEach(category => {
-            const mainCategory = category.category_name.toLowerCase();
-            const childCategories = category.children.map(child => child.category_name.toLowerCase());
-            categoryKeywords[mainCategory] = [mainCategory, ...childCategories];
-        });
-
-        /** Tìm danh mục từ từ khóa **/
-        for (const [category, keywords] of Object.entries(categoryKeywords)) {
-            for (const keyword of keywords) {
-                if (lowerMessage.includes(keyword)) {
-                    searchTerms.categoryKeyword = category;
-                    searchTerms.name = keyword;
+        for (let i = 0; i < words.length; i++) {
+            for (let j = words.length; j > i; j--) {
+                const phrase = words.slice(i, j).join(' ');
+                if (categoryKeywords.has(phrase)) {
+                    const catInfo = categoryKeywords.get(phrase);
+                    searchTerms.categoryIds.push(catInfo.id);
+                    if (!catInfo.parentId) {
+                        categories
+                            .filter(cat => cat.parentId === catInfo.id)
+                            .forEach(child => searchTerms.categoryIds.push(child.id));
+                    }
+                    const matchedWords = phrase.split(/\s+/);
+                    matchedWords.forEach(word => foundCategories.add(word));
                     break;
                 }
             }
-            if (searchTerms.categoryKeyword) break;
         }
 
+        // Lọc từ khóa
+        const stopWords = new Set(['tôi', 'cần', 'tìm', 'sản', 'phẩm', 'tên', 'là', 'mặt', 'hàng', 'món', 'đồ', 'item', 'đang']);
+        remainingWords = remainingWords.filter(word => !foundCategories.has(word) && !stopWords.has(word));
+        const remainingPhrase = remainingWords.join(' ').trim();
+        if (!foundExactName && remainingPhrase) {
+            searchTerms.keywords = remainingPhrase;
+        }
+
+        // Tìm màu sắc
+        const colors = await db.Color.findAll({
+            attributes: ['id', 'color_name']
+        });
+        const colorKeywords = new Map();
+        colors.forEach(color => {
+            const keyword = color.color_name.toLowerCase();
+            colorKeywords.set(keyword, {
+                id: color.id,
+                name: color.color_name
+            });
+        });
+        for (let i = 0; i < words.length; i++) {
+            for (let j = words.length; j > i; j--) {
+                const phrase = words.slice(i, j).join(' ');
+                if (colorKeywords.has(phrase)) {
+                    searchTerms.color = colorKeywords.get(phrase).name;
+                    break;
+                }
+            }
+            if (searchTerms.color) break;
+        }
+
+        // Tách kích cỡ
+        const sizeRegex = /\b(size|kích\s*cỡ|kích\s*thước)\s*(xs|s|m|l|xl|xxl|\d+)\b/i;
+        const sizeMatch = message.match(sizeRegex);
+        if (sizeMatch && sizeMatch[2]) {
+            searchTerms.size = sizeMatch[2].toUpperCase();
+        }
+
+        // Tách giới tính
+        if (lowerMessage.includes('nam')) searchTerms.gender = 'Male';
+        else if (lowerMessage.includes('nữ')) searchTerms.gender = 'Female';
+        else if (lowerMessage.includes('unisex')) searchTerms.gender = 'Unisex';
+        else if (lowerMessage.includes('trẻ em') || lowerMessage.includes('kid')) searchTerms.gender = 'Kids';
+
+        // Tách giá
+        const priceRegex = /(dưới|under|less than|không quá)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(từ|from)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)/i;
+        const priceMatch = lowerMessage.match(priceRegex);
+        if (priceMatch) {
+            // Giả sử logic xử lý giá
+        }
+
+        // Kiểm tra yêu cầu chất lượng
+        const qualityKeywords = [
+            'đẹp', 'tốt', 'chất lượng', 'cao cấp',
+            'xịn', 'sang', 'chính hãng'
+        ];
+        searchTerms.requiresGoodRating = qualityKeywords.some(keyword =>
+            lowerMessage.includes(keyword)
+        );
+
+        console.log('Search terms:', searchTerms);
+        return searchTerms;
     } catch (error) {
-        console.error('Error fetching categories or colors:', error);
+        console.error('Error in extractSearchTerms:', error);
+        return searchTerms;
     }
-
-    /** Tách kích cỡ **/
-    const sizeRegex = /\b(size|kích\s*cỡ|kích\s*thước)\s*(xs|s|m|l|xl|xxl|\d+)\b/i;
-    const sizeMatch = message.match(sizeRegex);
-    if (sizeMatch && sizeMatch[2]) {
-        searchTerms.size = sizeMatch[2].toUpperCase();
-    }
-
-    /** Tách giới tính **/
-    if (lowerMessage.includes('nam')) searchTerms.gender = 'Male';
-    else if (lowerMessage.includes('nữ')) searchTerms.gender = 'Female';
-    else if (lowerMessage.includes('unisex')) searchTerms.gender = 'Unisex';
-    else if (lowerMessage.includes('trẻ em') || lowerMessage.includes('kid')) searchTerms.gender = 'Kids';
-
-    /** Hàm chuyển đổi chuỗi giá thành giá trị số **/
-    const convertPrice = (priceStr) => {
-        if (!priceStr) return null;
-
-        priceStr = priceStr.trim().toLowerCase();
-        let multiplier = 1;
-
-        /** Kiểm tra k, nghìn, ngàn (nghìn) **/
-        if (priceStr.endsWith('k') || priceStr.endsWith('nghìn') || priceStr.endsWith('ngàn')) {
-            multiplier = 1000;
-            priceStr = priceStr.replace(/k$|nghìn$|ngàn$/i, '').trim();
-        }
-        /** Kiểm tra tr, triệu (triệu) **/
-        else if (priceStr.endsWith('tr') || priceStr.endsWith('triệu')) {
-            multiplier = 1000000;
-            priceStr = priceStr.replace(/tr$|triệu$/i, '').trim();
-        }
-
-        /** Loại bỏ dấu phẩy, chấm trong số **/
-        priceStr = priceStr.replace(/\./g, '').replace(/,/g, '');
-
-        /** Parse số **/
-        const num = parseFloat(priceStr);
-        if (!isNaN(num)) {
-            return num * multiplier;
-        }
-        return null;
-    };
-
-    /** Mẫu tách giá nâng cao **/
-    const rangeRegex = /(dưới|under|less than|không quá)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(từ|from)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)/i;
-
-    const rangeMatch = lowerMessage.match(rangeRegex);
-    if (rangeMatch) {
-        if (rangeMatch[1] && rangeMatch[2]) {  // "dưới X"
-            searchTerms.maxPrice = convertPrice(rangeMatch[2]);
-        } else if (rangeMatch[4] && rangeMatch[5] && rangeMatch[8]) {  // "từ X đến Y"
-            searchTerms.minPrice = convertPrice(rangeMatch[5]);
-            searchTerms.maxPrice = convertPrice(rangeMatch[8]);
-        } else if (rangeMatch[10] && rangeMatch[13]) {  // "X đến Y"
-            searchTerms.minPrice = convertPrice(rangeMatch[10]);
-            searchTerms.maxPrice = convertPrice(rangeMatch[13]);
-        }
-    }
-
-    /** Thêm nhận diện từ khóa về chất lượng **/
-    const qualityKeywords = [
-        'đẹp', 'tốt', 'chất lượng', 'cao cấp',
-        'xịn', 'sang', 'chính hãng', 'chính hãng 100%'
-    ];
-    searchTerms.requiresGoodRating = qualityKeywords.some(keyword =>
-        lowerMessage.includes(keyword)
-    );
-
-    console.log('Extracted search terms:', searchTerms); // Debug log
-    return searchTerms;
 };
 
 // Format products for chatbot response
@@ -1110,61 +942,19 @@ const generateBotResponse = async (messages, searchResults) => {
     return "Xin lỗi, hiện tại tôi đang gặp sự cố kết nối. Vui lòng thử lại sau. (Các mô hình AI đã thử: " + modelsToTry.join(', ') + ")";
 };
 
-/** Xử lý tin nhắn từ người dùng khách (không lưu trữ lịch sử) **/
+/** Xử lý tin nhắn từ người dùng khách (không lưu session ở FE) **/
 export const processGuestMessage = async (userMessage, sessionId) => {
     try {
-        /** Tạo hoặc lấy lịch sử trò chuyện tạm thời cho phiên khách này **/
-        if (!sessionId) {
-            sessionId = `guest-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        }
+        /** Tìm kiếm sản phẩm dựa trên tin nhắn của người dùng **/
+        const searchTerms = await extractSearchTerms(userMessage);
+        const searchResults = await searchProducts(searchTerms);
 
-        // Initialize guest session if it doesn't exist
-        if (!guestSessions[sessionId]) {
-            guestSessions[sessionId] = {
-                messages: [
-                    /** Thêm lời chào ban đầu **/
-                    {
-                        role: 'assistant',
-                        content: 'Xin chào! Tôi là ClothesShop Assistant. Tôi có thể giúp bạn tìm kiếm quần áo, phụ kiện và trả lời các câu hỏi về sản phẩm của chúng tôi.'
-                    }
-                ],
-                lastAccessed: Date.now()
-            };
+        /** Tạo response từ bot **/
+        const botResponse = await generateBotResponse([{ role: 'user', content: userMessage }], searchResults);
 
-            /** Đặt timeout để xóa phiên khách này **/
-            setTimeout(() => {
-                delete guestSessions[sessionId];
-            }, GUEST_SESSION_TIMEOUT);
-        }
-
-        /** Cập nhật thời gian truy cập **/
-        guestSessions[sessionId].lastAccessed = Date.now();
-
-        /** Thêm tin nhắn người dùng vào phiên khách tạm thời **/
-        guestSessions[sessionId].messages.push({
-            role: 'user',
-            content: userMessage
-        });
-
-        /** Tìm kiếm sản phẩm hoặc cửa hàng dựa trên tin nhắn của người dùng **/
-        const searchResults = await searchProducts(userMessage);
-
-        /** Tạo response từ bot với Gemini **/
-        const botResponse = await generateBotResponse(guestSessions[sessionId].messages, searchResults);
-
-        /** Thêm response từ bot vào phiên khách tạm thời với kết quả tìm kiếm **/
-        guestSessions[sessionId].messages.push({
-            role: 'assistant',
-            content: botResponse,
-            searchResults: searchResults
-        });
-
-        /** Trả về response và kết quả tìm kiếm (nhưng không lưu trữ bất cứ điều gì vĩnh viễn) **/
         return {
             message: botResponse,
-            searchResults: searchResults,
-            sessionId: sessionId,
-            chatHistory: guestSessions[sessionId].messages
+            searchResults: searchResults
         };
     } catch (error) {
         console.error('Error processing guest message:', error);
@@ -1172,64 +962,112 @@ export const processGuestMessage = async (userMessage, sessionId) => {
     }
 };
 
-/** Lấy lịch sử trò chuyện khách tạm thời **/
-export const getGuestChatHistory = (sessionId) => {
-    if (!sessionId || !guestSessions[sessionId]) {
-        return {
-            messages: [{
-                role: 'assistant',
-                content: 'Xin chào! Tôi là ClothesShop Assistant. Tôi có thể giúp bạn tìm kiếm quần áo, phụ kiện và trả lời các câu hỏi về sản phẩm của chúng tôi.'
-            }],
-            sessionId: sessionId || `guest-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+/** Gửi tin nhắn vào một session cụ thể **/
+export const sendMessageToSession = async (sessionId, userId, userMessage) => {
+    try {
+        // Lấy lịch sử chat của session này
+        const histories = await db.ChatHistory.findAll({
+            where: { session_id: sessionId },
+            order: [['createdAt', 'ASC']]
+        });
+
+        // Tập hợp tất cả messages
+        let messages = [];
+        histories.forEach(h => {
+            try {
+                const arr = Array.isArray(h.messages) ? h.messages : JSON.parse(h.messages);
+                messages = messages.concat(arr);
+            } catch (e) {
+                console.error('Error parsing messages:', e);
+            }
+        });
+
+        // Thêm tin nhắn mới của user
+        const userMsg = { role: 'user', content: userMessage };
+        messages.push(userMsg);
+
+        // Tìm kiếm sản phẩm
+        const searchTerms = await extractSearchTerms(userMessage);
+        const searchResults = await searchProducts(searchTerms);
+
+        // Tạo response từ bot
+        const botResponse = await generateBotResponse(messages, searchResults);
+
+        // Tin nhắn từ bot
+        const botMsg = {
+            role: 'assistant',
+            content: botResponse,
+            searchResults: searchResults
         };
+
+        // Lưu cả tin nhắn user và bot vào history
+        await db.ChatHistory.create({
+            user_id: userId || null,
+            session_id: sessionId,
+            messages: JSON.stringify([userMsg, botMsg])
+        });
+
+        return {
+            messages: [userMsg, botMsg]
+        };
+    } catch (error) {
+        console.error('Error sending message to session:', error);
+        throw error;
     }
-
-    /** Cập nhật thời gian truy cập **/
-    guestSessions[sessionId].lastAccessed = Date.now();
-
-    return {
-        messages: guestSessions[sessionId].messages,
-        sessionId: sessionId
-    };
 };
 
+/** Tạo session mới **/
 export const createSession = async (userId, title) => {
-    const session_id = `guest-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const session_id = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    // Tạo session mới
     const session = await db.ChatSession.create({
         user_id: userId || null,
         session_id,
         title: title || 'Cuộc hội thoại mới'
     });
 
-    // Không thêm tin nhắn chào nữa
+    // Tạo history rỗng cho session này
     await db.ChatHistory.create({
         user_id: userId || null,
         session_id: session.session_id,
-        messages: JSON.stringify([]) // Mảng rỗng
+        messages: JSON.stringify([])
     });
 
-    return { sessionId: session.session_id, title: session.title, createdAt: session.createdAt };
+    return {
+        sessionId: session.session_id,
+        title: session.title,
+        createdAt: session.createdAt
+    };
 };
 
+/** Lấy danh sách session **/
 export const getSessions = async (userId, sessionIds) => {
-    let results = [];
+    let where = {};
+
     if (userId) {
-        results = await db.ChatSession.findAll({ where: { user_id: userId } });
+        // Nếu có userId -> lấy tất cả session của user đó
+        where.user_id = userId;
     } else if (sessionIds) {
+        // Nếu không có userId nhưng có sessionIds -> lấy các session cụ thể (cho khách)
         const ids = Array.isArray(sessionIds) ? sessionIds : sessionIds.split(',');
-        results = await db.ChatSession.findAll({ where: { session_id: { [Op.in]: ids } } });
+        where.session_id = { [Op.in]: ids };
     }
 
-    /** Map lại để đảm bảo luôn có sessionId (dùng session_id) **/
-    return results.map(session => {
-        const sessionData = session.toJSON ? session.toJSON() : session;
-        return {
-            ...sessionData,
-            sessionId: sessionData.session_id // Đảm bảo luôn có sessionId từ session_id
-        };
+    const sessions = await db.ChatSession.findAll({
+        where,
+        order: [['createdAt', 'DESC']]
     });
+
+    return sessions.map(session => ({
+        sessionId: session.session_id,
+        title: session.title,
+        createdAt: session.createdAt,
+        userId: session.user_id
+    }));
 };
 
+/** Lấy lịch sử chat của một session **/
 export const getChatHistoryBySession = async (sessionId) => {
     const histories = await db.ChatHistory.findAll({
         where: { session_id: sessionId },
@@ -1241,58 +1079,15 @@ export const getChatHistoryBySession = async (sessionId) => {
         try {
             const arr = Array.isArray(h.messages) ? h.messages : JSON.parse(h.messages);
             messages = messages.concat(arr);
-        } catch (e) { }
+        } catch (e) {
+            console.error('Error parsing messages:', e);
+        }
     });
 
-    // Không thêm tin nhắn chào mặc định nữa
-    const mapped = (messages || []).map((msg, idx) => ({
+    return messages.map((msg, idx) => ({
         id: msg.id || `${msg.role}-${idx}-${Date.now()}`,
         text: msg.content,
         isUser: msg.role === 'user',
-        searchResults: msg.searchResults || undefined
+        searchResults: msg.searchResults
     }));
-    return mapped;
-};
-
-export const sendMessageToSession = async (sessionId, userId, userMessage) => {
-    /** Lấy lịch sử chat hiện tại **/
-    const histories = await db.ChatHistory.findAll({
-        where: { session_id: sessionId },
-        order: [['createdAt', 'ASC']]
-    });
-    let messages = [];
-    histories.forEach(h => {
-        try {
-            const arr = Array.isArray(h.messages) ? h.messages : JSON.parse(h.messages);
-            messages = messages.concat(arr);
-        } catch (e) { }
-    });
-    /** Thêm tin nhắn user **/
-    messages.push({ role: 'user', content: userMessage });
-
-    /** Gọi AI hoặc search thực tế **/
-    const searchResults = await searchProducts(userMessage); // dùng lại hàm searchProducts nếu có
-    const botResponse = await generateBotResponse(messages, searchResults); // dùng lại hàm generateBotResponse nếu có
-
-    /** Tin nhắn mới từ bot **/
-    const botMessage = { role: 'assistant', content: botResponse, searchResults };
-    messages.push(botMessage);
-
-    /** Lưu lại bản ghi mới **/
-    await db.ChatHistory.create({
-        user_id: userId || null,
-        session_id: sessionId,
-        messages: JSON.stringify([
-            { role: 'user', content: userMessage },
-            botMessage
-        ])
-    });
-
-    /** Chỉ trả về tin nhắn mới, không trả về toàn bộ lịch sử **/
-    return {
-        messages: [
-            { role: 'user', content: userMessage },
-            botMessage
-        ]
-    };
 };
