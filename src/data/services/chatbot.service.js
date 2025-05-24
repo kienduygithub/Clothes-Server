@@ -2,83 +2,79 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import db from '../models';
 import { Op } from 'sequelize';
 import { sequelize } from '../models';
+import { TRAINING_DATA } from './training.data';
 
-// Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// Default model is gemini-1.5-pro
 const PRIMARY_MODEL = "gemini-1.5-flash";
-// Fallback models in case of quota issues - only use models available in v1beta
-const FALLBACK_MODELS = ["gemini-1.5-flash"]; // Removing unavailable models
+const FALLBACK_MODELS = ["gemini-1.5-flash"];
 
-// Base system prompt for the chatbot
-const BASE_SYSTEM_PROMPT = `You are a helpful shopping assistant for an online clothing store. Your name is ClothesShop Assistant.
+const BASE_SYSTEM_PROMPT = `
+    You are a helpful shopping assistant for an online clothing store. Your name is ClothesShop Assistant.
 
-Follow these rules:
-1. Start every conversation with a friendly greeting.
-2. Only answer questions related to shopping and the products in our database.
-3. If you don't have information about something, say you don't know.
-4. Do not search for or mention external products or websites.
-5. Keep responses concise and helpful.
-6. Respond naturally to social phrases (like "thank you", "ok", etc.) with friendly Vietnamese responses.
-7. Use conversational Vietnamese that matches how young people speak today, friendly but professional.
-8. Never output debug information or notes to self in your responses.
-9. Never output text in English or explain your limitations in responses.
-10. Never add comments like "At this point...", "I would need..." - just provide the information directly.
-11. If you don't have specific data about something, provide a general response without mentioning that you don't have access to a database.`;
-
-// Product-specific prompt
-const PRODUCT_SEARCH_PROMPT = `${BASE_SYSTEM_PROMPT}
-
-Khi trả lời về sản phẩm:
-
-1. Trả lời trực tiếp:
-   - Nếu tìm thấy: "Đây là [số lượng] sản phẩm phù hợp:"
-   - Nếu không tìm thấy: "Không tìm thấy sản phẩm [mô tả]. Vui lòng thử tìm kiếm khác."
-   - Nếu có category: "Các sản phẩm thuộc [tên category]:"
-
-2. Format sản phẩm:
-   - [Tên sản phẩm]
-   - Giá: [giá] VND
-   - Rating: [X/5 sao] ([số lượng] đánh giá)
-   - Size: [danh sách size]
-   - Màu: [danh sách màu]
-   - Shop: [tên shop]
-
-3. Quy tắc:
-   - KHÔNG hỏi thêm thông tin
-   - KHÔNG giải thích kết quả
-   - KHÔNG gợi ý tìm kiếm khác
-   - KHÔNG dùng từ "sản phẩm số X"
+    Follow these rules:
+    1. Start every conversation with a friendly greeting.
+    2. Only answer questions related to shopping and the products in our database.
+    3. If you don't have information about something, say you don't know.
+    4. Do not search for or mention external products or websites.
+    5. Keep responses concise and helpful.
+    6. Respond naturally to social phrases (like "thank you", "ok", etc.) with friendly Vietnamese responses.
+    7. Use conversational Vietnamese that matches how young people speak today, friendly but professional.
+    8. Never output debug information or notes to self in your responses.
+    9. Never output text in English or explain your limitations in responses.
+    10. Never add comments like "At this point...", "I would need..." - just provide the information directly.
+    11. If you don't have specific data about something, provide a general response without mentioning that you don't have access to a database.
 `;
 
-// Shop-specific prompt
-const SHOP_SEARCH_PROMPT = `${BASE_SYSTEM_PROMPT}
+const PRODUCT_SEARCH_PROMPT = `
+    ${BASE_SYSTEM_PROMPT}
 
-When showing shop information:
-1. Present shop details in a friendly, informative way
-2. Include shop name, contact info, and ratings if available
-3. Mention total number of products and reviews
-4. Highlight shop's specialties or popular items
-5. If showing shop products, present them as examples
-6. Include shop ratings and customer feedback if available
-7. Mention shop policies or special features`;
+    Khi trả lời về sản phẩm:
 
-// Social interaction prompt
-const SOCIAL_PROMPT = `${BASE_SYSTEM_PROMPT}
+    1. Trả lời trực tiếp:
+    - Nếu tìm thấy: "Đây là [số lượng] sản phẩm phù hợp:"
+    - Nếu không tìm thấy: "Không tìm thấy sản phẩm [mô tả]. Vui lòng thử tìm kiếm khác."
+    - Nếu có category: "Các sản phẩm thuộc [tên category]:"
 
-For social interactions:
-1. Keep responses short and natural
-2. Match the user's tone and energy
-3. Use casual but polite Vietnamese
-4. Don't force the conversation back to shopping
-5. Respond to gratitude with warmth
-6. Use appropriate Vietnamese social phrases`;
+    2. Format sản phẩm:
+    - [Tên sản phẩm]
+    - Giá: [giá] VNĐ
+    - Rating: [X/5 sao] ([số lượng] đánh giá) (nếu có thì mới hiển thị)
+    - Size: [danh sách size]
+    - Màu: [danh sách màu]
+    - Shop: [tên shop]
 
-// Add temporary storage for guest sessions
-const guestSessions = {};
-const GUEST_SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes timeout
+    3. Quy tắc:
+    - KHÔNG hỏi thêm thông tin
+    - KHÔNG giải thích kết quả
+    - KHÔNG gợi ý tìm kiếm khác
+    - KHÔNG dùng từ "sản phẩm số X"
+`;
 
-// Initialize or get an existing chat history
+const SHOP_SEARCH_PROMPT = `
+    ${BASE_SYSTEM_PROMPT}
+
+    When showing shop information:
+    1. Present shop details in a friendly, informative way
+    2. Include shop name, contact info, and ratings if available
+    3. Mention total number of products and reviews
+    4. Highlight shop's specialties or popular items
+    5. If showing shop products, present them as examples
+    6. Include shop ratings and customer feedback if available
+    7. Mention shop policies or special features
+`;
+
+const SOCIAL_PROMPT = `
+    ${BASE_SYSTEM_PROMPT}
+
+    For social interactions:
+    1. Keep responses short and natural
+    2. Match the user's tone and energy
+    3. Use casual but polite Vietnamese
+    4. Don't force the conversation back to shopping
+    5. Respond to gratitude with warmth
+    6. Use appropriate Vietnamese social phrases
+`;
+
 export const initChat = async (userId) => {
     try {
         // Check if user exists
@@ -157,13 +153,216 @@ export const getChatHistory = async (userId) => {
     }
 };
 
+/** Tách từ khóa tìm kiếm từ message **/
+const extractSearchTermsWithGemini = async (message) => {
+    try {
+        // 1. Tạo examples string từ TRAINING_DATA
+        const examplesString = TRAINING_DATA.map(example => (`
+            Input: "${example.query}"
+            Output: ${JSON.stringify(example.extraction, null, 2)}
+        `)).join('\n\n');
+
+        // 2. Tạo prompt với examples và context
+        const prompt = `
+            Phân tích yêu cầu tìm kiếm sản phẩm thời trang và trích xuất các thông tin quan trọng.
+
+            Dưới đây là một số ví dụ về cách phân tích:
+
+            ${examplesString}
+
+            Bây giờ, hãy phân tích yêu cầu sau:
+            Input: "${message}"
+
+            Trả về kết quả dưới dạng JSON với các trường:
+            {
+                "category_name": "", // Danh mục chính của sản phẩm (ví dụ: áo, quần, váy/đầm...)
+                "name": "", // Tên đầy đủ/cụ thể của sản phẩm
+                "keywords": "", // Từ khóa tìm kiếm chung
+                "color": "", // Tên màu sắc
+                "size": "", // Size (S/M/L/XL/XXL)
+                "gender": "", // Giới tính (Male/Female/Unisex/Kids)
+                "minPrice": null, // Giá tối thiểu (VND)
+                "maxPrice": null, // Giá tối đa (VND)
+                "requiresGoodRating": false // true nếu yêu cầu đánh giá tốt/chất lượng cao
+            }
+
+            Quy tắc:
+            1. Chuyển đổi tất cả giá tiền (ví dụ "500k", "1 triệu", "1000000", "100tr") sang VNĐ
+            2. Chuẩn hóa giới tính ("nam" -> Male, "nữ" -> Female, "unisex" -> Unisex, "kids" -> Kids)
+            3. Chỉ trích xuất màu sắc cụ thể
+            4. Chỉ bao gồm các trường được đề cập rõ ràng
+            5. Làm sạch các giá trị khỏi stopwords
+            6. Để minPrice/maxPrice là null khi không có giới hạn giá tương ứng
+            7. Với "dưới X", maxPrice = X và minPrice = null
+            8. Với "từ X", minPrice = X và maxPrice = null
+            9. Với "từ X đến Y", minPrice = X và maxPrice = Y
+            10. Set requiresGoodRating = true khi có các từ khóa: "tốt", "chất lượng cao", "đánh giá cao", "uy tín", "nổi tiếng"
+            11. Luôn cố gắng trích xuất category_name là danh mục chính (áo, quần, váy...) từ câu hỏi
+            12. Nếu có tên sản phẩm cụ thể, điền vào trường name
+
+            Ví dụ:
+            - "Cho tôi tất cả áo" -> category_name: "áo", name: ""
+            - "Tìm áo da mùa đông" -> category_name: "áo da", name: "áo da mùa đông"
+            - "Tìm áo khoác da màu đen" -> category_name: "áo khoác", name: "áo khoác da", color: "đen"
+
+            Trả về JSON theo format sau (chỉ điền các trường được đề cập trong input):
+        `;
+
+        // 3. Gọi Gemini API
+        const model = genAI.getGenerativeModel({ model: PRIMARY_MODEL });
+        const result = await model.generateContent(prompt);
+        const response = result.response.text();
+
+        // 4. Parse kết quả JSON
+        let geminiResults = {};
+        try {
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                geminiResults = JSON.parse(jsonMatch[0]);
+            }
+        } catch (error) {
+            console.error('Error parsing Gemini response:', error);
+            return null;
+        }
+        console.log(geminiResults);
+        // 5. Validate và clean kết quả
+        const cleanedResults = {
+            categoryIds: [], // Sẽ được điền sau
+            name: geminiResults.name || '',
+            keywords: geminiResults.keywords || '',
+            color: geminiResults.color || '',
+            size: geminiResults.size || '',
+            gender: geminiResults.gender || '',
+            minPrice: geminiResults.minPrice,
+            maxPrice: geminiResults.maxPrice,
+            requiresGoodRating: geminiResults.requiresGoodRating || false,
+            isShopSearch: false,
+            isSocialOnly: false
+        };
+
+        // 6. Tìm categoryIds dựa trên category_name hoặc name
+        if (geminiResults.category_name) {
+            // Tìm kiếm theo category (toàn bộ sản phẩm của danh mục)
+            const categories = await db.Category.findAll({
+                attributes: ['id', 'category_name', 'parentId']
+            });
+
+            const searchTerm = geminiResults.category_name.toLowerCase();
+
+            // Tìm match chính xác trước
+            const exactMatch = categories.find(
+                cat => cat.category_name.toLowerCase() === searchTerm
+            );
+
+            if (exactMatch) {
+                cleanedResults.categoryIds = [exactMatch.id];
+                // Nếu là category cha, thêm tất cả category con
+                if (!exactMatch.parentId) {
+                    categories.forEach(cat => {
+                        if (cat.parentId === exactMatch.id) {
+                            cleanedResults.categoryIds.push(cat.id);
+                        }
+                    });
+                } else {
+                    cleanedResults.categoryIds.push(exactMatch.parentId);
+                }
+            } else {
+                // Nếu không có match chính xác, tìm partial matches
+                // 1. Tìm các category có tên chứa searchTerm
+                const directMatches = categories.filter(
+                    cat => cat.category_name.toLowerCase().includes(searchTerm)
+                );
+
+                // 2. Tìm parent categories của các matches
+                const parentIds = new Set(
+                    directMatches
+                        .map(cat => cat.parentId)
+                        .filter(id => id !== null)
+                );
+
+                // 3. Tìm các category con khác của cùng parent (siblings)
+                const siblingIds = new Set();
+                parentIds.forEach(parentId => {
+                    categories
+                        .filter(cat => cat.parentId === parentId)
+                        .forEach(sibling => siblingIds.add(sibling.id));
+                });
+
+                // 4. Kết hợp tất cả matches
+                const allMatches = new Set([
+                    ...directMatches.map(cat => cat.id),
+                    ...parentIds,
+                    ...siblingIds
+                ]);
+
+                cleanedResults.categoryIds = Array.from(allMatches);
+            }
+
+            cleanedResults.name = geminiResults.name;
+        }
+
+        return cleanedResults;
+    } catch (error) {
+        console.error('Error in Gemini extraction:', error);
+        return null;
+    }
+};
+
+const extractSearchTerms = async (message) => {
+    if (!message || typeof message !== 'string') {
+        return {
+            categoryIds: [],
+            name: '',
+            isSocialOnly: false
+        };
+    }
+
+    let lowerMessage = message.toLowerCase();
+
+    // Kiểm tra từ khóa xã giao
+    const socialPhrases = [
+        'cảm ơn', 'thanks', 'thank', 'cám ơn', 'ok', 'oke', 'được', 'hay', 'tốt', 'good', 'nice',
+        'tuyệt vời', 'great', 'hello', 'hi', 'xin chào', 'chào', 'bye', 'tạm biệt',
+        'vâng', 'ừ', 'đúng', 'sai', 'không', 'yes', 'no', 'cool', 'wow', 'amazing',
+        'chuẩn', 'đỉnh', 'quá xịn', 'xuất sắc', 'quá đã', 'quá tốt', 'hiểu rồi'
+    ];
+
+    const isSocialPhrase = socialPhrases.some(phrase => {
+        const regex = new RegExp(`(^|\\s)${phrase}(\\s|$|[,.!?;:])`, 'i');
+        return regex.test(lowerMessage);
+    });
+
+    if (isSocialPhrase && lowerMessage.length < 20) {
+        return {
+            categoryIds: [],
+            name: '',
+            isSocialOnly: true
+        };
+    }
+
+    try {
+        const searchTerms = await extractSearchTermsWithGemini(message);
+
+        if (searchTerms) {
+            return searchTerms;
+        }
+
+        return {
+            categoryIds: [],
+            name: message,
+            isSocialOnly: false
+        };
+    } catch (error) {
+        console.error('Error in extractSearchTerms:', error);
+        return searchTerms;
+    }
+};
+
 /** Tìm kiếm sản phẩm **/
 const searchProducts = async (searchTerms) => {
     try {
         // Log để debug
         console.log('Search terms:', searchTerms);
-
-        // Kiểm tra searchTerms
         if (!searchTerms || typeof searchTerms !== 'object') {
             console.error('Invalid searchTerms:', searchTerms);
             return { type: 'error', message: 'Invalid search terms' };
@@ -323,8 +522,6 @@ const searchProducts = async (searchTerms) => {
             query.having = sequelize.literal('rating >= 4.0');
         }
 
-        // console.log('Search query:', JSON.stringify(query, null, 2)); // Debug log
-
         /** Thực hiện tìm kiếm **/
         let products = await db.Product.findAll(query);
 
@@ -406,358 +603,6 @@ const searchShops = async (searchTerms, includeProducts = false) => {
     } catch (error) {
         console.error('Shop search error:', error);
         return { type: 'error', message: error.message };
-    }
-};
-
-/** Format kết quả shop **/
-const formatShopResults = async (shops, includeProducts = false) => {
-    const formattedShops = [];
-
-    for (const shop of shops) {
-        const shopData = {
-            id: shop.id,
-            name: shop.shop_name,
-            email: shop.contact_email,
-            address: shop.contact_address,
-            logo_url: shop.logo_url
-        };
-
-        /** Thêm thông tin shop khác **/
-        const [productCount, reviewStats] = await Promise.all([
-            db.Product.count({ where: { shop_id: shop.id } }),
-            db.Review.findOne({
-                attributes: [
-                    [db.sequelize.fn('AVG', db.sequelize.col('star_point')), 'avg_rating'],
-                    [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'total_reviews']
-                ],
-                where: { shop_id: shop.id }
-            })
-        ]);
-
-        shopData.total_products = productCount || 0;
-        shopData.avg_rating = reviewStats && reviewStats.dataValues.avg_rating
-            ? parseFloat(reviewStats.dataValues.avg_rating).toFixed(1)
-            : "Chưa có đánh giá";
-        shopData.total_reviews = reviewStats ? reviewStats.dataValues.total_reviews : 0;
-
-        /** Nếu yêu cầu sản phẩm **/
-        if (includeProducts) {
-            const products = await db.Product.findAll({
-                where: { shop_id: shop.id },
-                limit: 3,
-                include: [
-                    {
-                        model: db.ProductImages,
-                        as: 'product_images',
-                    },
-                    {
-                        model: db.ProductVariant,
-                        as: 'variants',
-                        include: [
-                            {
-                                model: db.Size,
-                                as: 'size',
-                                attributes: ['id', 'size_code']
-                            },
-                            {
-                                model: db.Color,
-                                as: 'color',
-                                attributes: ['id', 'color_name', 'color_code']
-                            }
-                        ]
-                    }
-                ]
-            });
-            shopData.products = formatProductsForResponse(products);
-        }
-
-        formattedShops.push(shopData);
-    }
-
-    return { type: 'shops', data: formattedShops };
-};
-
-/** Tách từ khóa tìm kiếm từ message **/
-const extractSearchTerms = async (message) => {
-    if (!message || typeof message !== 'string') {
-        return {
-            categoryIds: [],
-            name: '',
-            isSocialOnly: false
-        };
-    }
-
-    let processedMessage = message.toLowerCase();
-    const searchTerms = {
-        categoryIds: [],
-        name: '',
-        keywords: '',
-        isShopSearch: false,
-        isSocialOnly: false,
-        requiresGoodRating: false
-    };
-
-    // Kiểm tra từ khóa xã giao
-    const socialPhrases = [
-        'cảm ơn', 'thanks', 'thank', 'cám ơn', 'ok', 'oke', 'được', 'hay', 'tốt', 'good', 'nice',
-        'tuyệt vời', 'great', 'hello', 'hi', 'xin chào', 'chào', 'bye', 'tạm biệt',
-        'vâng', 'ừ', 'đúng', 'sai', 'không', 'yes', 'no', 'cool', 'wow', 'amazing',
-        'chuẩn', 'đỉnh', 'quá xịn', 'xuất sắc', 'quá đã', 'quá tốt', 'hiểu rồi'
-    ];
-
-    const isSocialPhrase = socialPhrases.some(phrase => {
-        const regex = new RegExp(`(^|\\s)${phrase}(\\s|$|[,.!?;:])`, 'i');
-        return regex.test(processedMessage);
-    });
-
-    if (isSocialPhrase && processedMessage.length < 20) {
-        searchTerms.isSocialOnly = true;
-        return searchTerms;
-    }
-
-    // Kiểm tra tìm kiếm shop
-    const shopKeywords = [
-        'cửa hàng', 'shop', 'store', 'brand', 'thương hiệu', 'hiệu', 'tiệm',
-        'nơi bán', 'chỗ bán', 'hãng'
-    ];
-
-    if (shopKeywords.some(keyword => processedMessage.includes(keyword))) {
-        searchTerms.isShopSearch = true;
-        const shopNameMatch = message.match(new RegExp(`(${shopKeywords.join('|')})\\s+([\\w\\s]+)`, 'i'));
-        if (shopNameMatch && shopNameMatch[2]) {
-            searchTerms.shopName = shopNameMatch[2].trim();
-        }
-        return searchTerms;
-    }
-
-    try {
-        // Tách giá
-        const priceKeywords = [
-            'dưới', 'under', 'less than', 'không quá',
-            'từ', 'from', 'đến', 'to',
-            'k', 'nghìn', 'ngàn', 'triệu', 'tr',
-            'giá', 'price', 'khoảng', 'tầm', 'range'
-        ];
-        const priceRegex = /(dưới|under|less than|không quá)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(từ|from)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)|(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)\s*(đến|to)\s*(\d+[k\s]*|[\d.,]+\s*(nghìn|ngàn|k|triệu|tr)?)/i;
-
-        const priceMatch = processedMessage.match(priceRegex);
-        if (priceMatch) {
-            const parsePrice = (priceText) => {
-                if (!priceText) return null;
-                priceText = priceText.toLowerCase().trim()
-                    .replace(/\s+/g, '')
-                    .replace(/,/g, '');
-                let multiplier = 1;
-                let number;
-                if (priceText.includes('tr') || priceText.includes('triệu')) {
-                    multiplier = 1000000;
-                    number = parseFloat(priceText.replace(/(tr|triệu)/, ''));
-                } else if (priceText.includes('k') || priceText.includes('nghìn') || priceText.includes('ngàn')) {
-                    multiplier = 1000;
-                    number = parseFloat(priceText.replace(/(k|nghìn|ngàn)/, ''));
-                } else {
-                    number = parseFloat(priceText);
-                }
-                return number * multiplier;
-            };
-
-            if (priceMatch[1]) {
-                searchTerms.maxPrice = parsePrice(priceMatch[2]);
-            } else if (priceMatch[4]) {
-                searchTerms.minPrice = parsePrice(priceMatch[5]);
-                searchTerms.maxPrice = parsePrice(priceMatch[8]);
-            } else if (priceMatch[10]) {
-                searchTerms.minPrice = parsePrice(priceMatch[10]);
-                searchTerms.maxPrice = parsePrice(priceMatch[13]);
-            }
-
-            if (searchTerms.minPrice && searchTerms.maxPrice && searchTerms.minPrice > searchTerms.maxPrice) {
-                [searchTerms.minPrice, searchTerms.maxPrice] = [searchTerms.maxPrice, searchTerms.minPrice];
-            }
-
-            const pricePattern = priceMatch[0];
-            processedMessage = processedMessage.replace(pricePattern, ' ').trim();
-            const messageWords = processedMessage.split(/\s+/);
-            processedMessage = messageWords
-                .filter(word => !priceKeywords.includes(word))
-                .join(' ')
-                .trim();
-        }
-
-        // Lấy danh mục
-        const categories = await db.Category.findAll({
-            attributes: ['id', 'category_name', 'parentId']
-        });
-
-        // Tạo map từ khóa danh mục
-        const categoryKeywords = new Map();
-        categories.forEach(category => {
-            const keyword = category.category_name.toLowerCase();
-            categoryKeywords.set(keyword, {
-                id: category.id,
-                parentId: category.parentId
-            });
-        });
-
-        // Tìm màu sắc
-        const colors = await db.Color.findAll({
-            attributes: ['id', 'color_name']
-        });
-        const colorKeywords = new Map();
-        colors.forEach(color => {
-            const keyword = color.color_name.toLowerCase();
-            colorKeywords.set(keyword, {
-                id: color.id,
-                name: color.color_name
-            });
-        });
-
-        // Tìm kích cỡ trước để tránh nhầm lẫn
-        const sizeRegex = /\b(size|kích\s*cỡ|kích\s*thước|cỡ)\s*(xs|s|m|l|xl|xxl|\d{1,3})\b/i;
-        const sizeMatch = processedMessage.match(sizeRegex);
-        if (sizeMatch && sizeMatch[2]) {
-            searchTerms.size = sizeMatch[2].toUpperCase();
-            processedMessage = processedMessage.replace(sizeRegex, ' ').trim();
-        }
-
-        // Tìm màu sắc
-        const words = processedMessage.split(/\s+/).filter(word => word);
-        for (let i = 0; i < words.length; i++) {
-            for (let j = words.length; j > i; j--) {
-                const phrase = words.slice(i, j).join(' ');
-                if (colorKeywords.has(phrase)) {
-                    searchTerms.color = colorKeywords.get(phrase).name;
-                    const colorWords = phrase.split(/\s+/);
-                    colorWords.forEach(word => {
-                        processedMessage = processedMessage.replace(new RegExp(`\\b${word}\\b`, 'g'), '');
-                    });
-                    break;
-                }
-            }
-            if (searchTerms.color) break;
-        }
-        // Loại bỏ từ "màu" nếu có
-        processedMessage = processedMessage.replace(/\bmàu\b/g, '').trim();
-
-        // Cập nhật words sau khi lọc
-        const updatedWords = processedMessage.split(/\s+/).filter(word => word);
-        console.log('updatedWords: ', updatedWords);
-        // Tìm tên sản phẩm
-        const productNamePatterns = [
-            /(?:sản phẩm|mặt hàng|món hàng|đồ|item)\s+(?:tên|gọi|là|có tên|tên là|gọi là)\s+(?:(?:tôi|cần|tìm|là)\s+)*([^ ]+(?:\s+[^ ]+)*)(?:\s|$|\?|\.)/i,
-            /(?:tìm|kiếm|có|bán|cần|muốn mua)\s+(?:sản phẩm|mặt hàng|món hàng|đồ|item)\s+["']([^"']+)["']/i,
-            /["']([^"']+)["']\s+(?:có|còn|được|không|chưa|bán|nhỉ|nữa|vậy)(?:\s|$|\?|\.)/i,
-            /tên\s+["']([^"']+)["']/i,
-            /(?:sản phẩm|mặt hàng|món hàng|đồ|item)\s+([^ ]+(?:\s+[^ ]+)*)(?:\s|$|\?|\.)/i,
-            /(?:tôi\s*(?:đang\s*)?(?:tìm|cần|kiếm))\s+([^ ]+(?:\s+[^ ]+)*)(?:\s|$|\?|\.)/i
-        ];
-
-        let foundExactName = false;
-        const stopWords = new Set(['tôi', 'cần', 'tìm', 'sản', 'phẩm', 'tên', 'là', 'mặt', 'hàng', 'món', 'đồ', 'item', 'đang', 'các', 'loại', 'màu', 'size', 'kích', 'cỡ', 'thước', ...priceKeywords]);
-        for (const pattern of productNamePatterns) {
-            const match = message.toLowerCase().match(pattern); // Sử dụng message gốc để tránh lỗi xử lý chuỗi
-            if (match && match[1]) {
-                const potentialName = match[1].trim();
-                const nameWords = potentialName.toLowerCase().split(/\s+/);
-                const finalWords = nameWords.filter(word =>
-                    !stopWords.has(word) &&
-                    (!searchTerms.color || !searchTerms.color.toLowerCase().split(/\s+/).includes(word)) &&
-                    (!searchTerms.size || word !== searchTerms.size.toLowerCase())
-                );
-                const cleanedName = finalWords.join(' ').trim();
-                if (cleanedName) {
-                    searchTerms.name = cleanedName;
-                    console.log('cleanedName: ', searchTerms.name);
-                    foundExactName = true;
-                    break;
-                }
-            }
-        }
-
-        // Tìm danh mục
-        let remainingWords = [...updatedWords];
-        let foundCategories = new Set();
-        if (!foundExactName || processedMessage.includes('loại') || processedMessage.includes('danh mục')) {
-            let longestCategoryPhrase = '';
-            let longestCategoryId = null;
-            for (let i = 0; i < updatedWords.length; i++) {
-                for (let j = updatedWords.length; j > i; j--) {
-                    const phrase = updatedWords.slice(i, j).join(' ');
-                    if (categoryKeywords.has(phrase) && phrase.length > longestCategoryPhrase.length) {
-                        longestCategoryPhrase = phrase;
-                        longestCategoryId = categoryKeywords.get(phrase).id;
-                    }
-                }
-            }
-            if (longestCategoryPhrase) {
-                const catInfo = categoryKeywords.get(longestCategoryPhrase);
-                searchTerms.categoryIds = [catInfo.id];
-                const addChildCategories = (parentId) => {
-                    const children = categories.filter(cat => cat.parentId === parentId);
-                    children.forEach(child => {
-                        searchTerms.categoryIds.push(child.id);
-                        addChildCategories(child.id);
-                    });
-                };
-                addChildCategories(catInfo.id);
-            } else if (!foundExactName) {
-                for (let i = 0; i < updatedWords.length; i++) {
-                    for (let j = updatedWords.length; j > i; j--) {
-                        const phrase = updatedWords.slice(i, j).join(' ');
-                        if (categoryKeywords.has(phrase)) {
-                            const catInfo = categoryKeywords.get(phrase);
-                            searchTerms.categoryIds.push(catInfo.id);
-                            const addChildCategories = (parentId) => {
-                                const children = categories.filter(cat => cat.parentId === parentId);
-                                children.forEach(child => {
-                                    searchTerms.categoryIds.push(child.id);
-                                    addChildCategories(child.id);
-                                });
-                            };
-                            addChildCategories(catInfo.id);
-                            phrase.split(/\s+/).forEach(word => foundCategories.add(word));
-                            break;
-                        }
-                    }
-                }
-            }
-        } else if (foundExactName) {
-            searchTerms.categoryIds = []; // Xóa categoryIds nếu đã gán name
-        }
-
-        // Lọc từ khóa
-        remainingWords = remainingWords.filter(word =>
-            !foundCategories.has(word) &&
-            !stopWords.has(word) &&
-            (!searchTerms.color || !searchTerms.color.toLowerCase().split(/\s+/).includes(word)) &&
-            (!searchTerms.size || word !== searchTerms.size.toLowerCase()) &&
-            (!searchTerms.name || !searchTerms.name.toLowerCase().split(/\s+/).includes(word))
-        );
-        const remainingPhrase = remainingWords.join(' ').trim();
-        if (!foundExactName && remainingPhrase) {
-            searchTerms.keywords = remainingPhrase;
-        }
-
-        // Tách giới tính
-        if (processedMessage.includes('nam')) searchTerms.gender = 'Male';
-        else if (processedMessage.includes('nữ')) searchTerms.gender = 'Female';
-        else if (processedMessage.includes('unisex')) searchTerms.gender = 'Unisex';
-        else if (processedMessage.includes('trẻ em') || processedMessage.includes('kid')) searchTerms.gender = 'Kids';
-
-        // Kiểm tra yêu cầu chất lượng
-        const qualityKeywords = [
-            'đẹp', 'tốt', 'chất lượng', 'cao cấp',
-            'xịn', 'sang', 'chính hãng'
-        ];
-        searchTerms.requiresGoodRating = qualityKeywords.some(keyword =>
-            processedMessage.includes(keyword)
-        );
-
-        console.log('Search terms:', searchTerms);
-        return searchTerms;
-    } catch (error) {
-        console.error('Error in extractSearchTerms:', error);
-        return searchTerms;
     }
 };
 
@@ -843,6 +688,74 @@ const formatProductsForResponse = (products) => {
             stock_quantity: formattedVariants.reduce((sum, v) => sum + v.stock, 0)
         };
     });
+};
+
+/** Format kết quả shop **/
+const formatShopResults = async (shops, includeProducts = false) => {
+    const formattedShops = [];
+
+    for (const shop of shops) {
+        const shopData = {
+            id: shop.id,
+            name: shop.shop_name,
+            email: shop.contact_email,
+            address: shop.contact_address,
+            logo_url: shop.logo_url
+        };
+
+        /** Thêm thông tin shop khác **/
+        const [productCount, reviewStats] = await Promise.all([
+            db.Product.count({ where: { shop_id: shop.id } }),
+            db.Review.findOne({
+                attributes: [
+                    [db.sequelize.fn('AVG', db.sequelize.col('star_point')), 'avg_rating'],
+                    [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'total_reviews']
+                ],
+                where: { shop_id: shop.id }
+            })
+        ]);
+
+        shopData.total_products = productCount || 0;
+        shopData.avg_rating = reviewStats && reviewStats.dataValues.avg_rating
+            ? parseFloat(reviewStats.dataValues.avg_rating).toFixed(1)
+            : "Chưa có đánh giá";
+        shopData.total_reviews = reviewStats ? reviewStats.dataValues.total_reviews : 0;
+
+        /** Nếu yêu cầu sản phẩm **/
+        if (includeProducts) {
+            const products = await db.Product.findAll({
+                where: { shop_id: shop.id },
+                limit: 3,
+                include: [
+                    {
+                        model: db.ProductImages,
+                        as: 'product_images',
+                    },
+                    {
+                        model: db.ProductVariant,
+                        as: 'variants',
+                        include: [
+                            {
+                                model: db.Size,
+                                as: 'size',
+                                attributes: ['id', 'size_code']
+                            },
+                            {
+                                model: db.Color,
+                                as: 'color',
+                                attributes: ['id', 'color_name', 'color_code']
+                            }
+                        ]
+                    }
+                ]
+            });
+            shopData.products = formatProductsForResponse(products);
+        }
+
+        formattedShops.push(shopData);
+    }
+
+    return { type: 'shops', data: formattedShops };
 };
 
 const generateBotResponse = async (messages, searchResults) => {
