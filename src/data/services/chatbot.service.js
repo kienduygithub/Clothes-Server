@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import db from '../models';
 import { Op } from 'sequelize';
 import { sequelize } from '../models';
-import { TRAINING_DATA } from './training.data';
+import { TRAINING_DATA, VIETNAMESE_STOPWORDS } from './training.data';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const PRIMARY_MODEL = "gemini-1.5-flash";
@@ -153,9 +153,19 @@ export const getChatHistory = async (userId) => {
     }
 };
 
+const cleanVietnameseText = (text) => {
+    // Tách câu thành các từ
+    let words = text.toLowerCase().split(/\s+/);
+    // Loại bỏ stopwords
+    words = words.filter(word => !VIETNAMESE_STOPWORDS.includes(word));
+    // Nối lại thành câu
+    return words.join(' ').trim();
+};
+
 /** Tách từ khóa tìm kiếm từ message **/
 const extractSearchTermsWithGemini = async (message) => {
     try {
+        const cleanedMessage = cleanVietnameseText(message);
         // 1. Tạo examples string từ TRAINING_DATA
         const examplesString = TRAINING_DATA.map(example => (`
             Input: "${example.query}"
@@ -171,7 +181,7 @@ const extractSearchTermsWithGemini = async (message) => {
             ${examplesString}
 
             Bây giờ, hãy phân tích yêu cầu sau:
-            Input: "${message}"
+            Input: "${cleanedMessage}"
 
             Trả về kết quả dưới dạng JSON với các trường:
             {
@@ -187,18 +197,19 @@ const extractSearchTermsWithGemini = async (message) => {
             }
 
             Quy tắc:
-            1. Chuyển đổi tất cả giá tiền (ví dụ "500k", "1 triệu", "1000000", "100tr") sang VNĐ
-            2. Chuẩn hóa giới tính ("nam" -> Male, "nữ" -> Female, "unisex" -> Unisex, "kids" -> Kids)
-            3. Chỉ trích xuất màu sắc cụ thể
-            4. Chỉ bao gồm các trường được đề cập rõ ràng
-            5. Làm sạch các giá trị khỏi stopwords
-            6. Để minPrice/maxPrice là null khi không có giới hạn giá tương ứng
-            7. Với "dưới X", maxPrice = X và minPrice = null
-            8. Với "từ X", minPrice = X và maxPrice = null
-            9. Với "từ X đến Y", minPrice = X và maxPrice = Y
-            10. Set requiresGoodRating = true khi có các từ khóa: "tốt", "chất lượng cao", "đánh giá cao", "uy tín", "nổi tiếng"
-            11. Luôn cố gắng trích xuất category_name là danh mục chính (áo, quần, váy...) từ câu hỏi
-            12. Nếu có tên sản phẩm cụ thể, điền vào trường name
+            1. Sử dụng cleaned input để xác định category và name chính xác
+            2. Chuyển đổi tất cả giá tiền (ví dụ "500k", "1 triệu", "1000000", "100tr") sang VNĐ
+            3. Chuẩn hóa giới tính ("nam" -> Male, "nữ" -> Female, "unisex" -> Unisex, "kids" -> Kids)
+            4. Chỉ trích xuất màu sắc cụ thể
+            5. Chỉ bao gồm các trường được đề cập rõ ràng
+            6. Làm sạch các giá trị khỏi stopwords
+            7. Để minPrice/maxPrice là null khi không có giới hạn giá tương ứng
+            8. Với "dưới X", maxPrice = X và minPrice = null
+            9. Với "từ X", minPrice = X và maxPrice = null
+            10. Với "từ X đến Y", minPrice = X và maxPrice = Y
+            11. Set requiresGoodRating = true khi có các từ khóa: "tốt", "chất lượng cao", "đánh giá cao", "uy tín", "nổi tiếng"
+            12. Luôn cố gắng trích xuất category_name là danh mục chính (áo, quần, váy...) từ câu hỏi đã được làm sạch
+            13. Nếu có tên sản phẩm cụ thể, điền vào trường name từ câu hỏi đã được làm sạch
 
             Ví dụ:
             - "Cho tôi tất cả áo" -> category_name: "áo", name: ""

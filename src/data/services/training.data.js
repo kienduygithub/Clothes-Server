@@ -81,3 +81,30 @@ export const TRAINING_DATA = [
         }
     }
 ];
+
+export const VIETNAMESE_STOPWORDS = [
+    // Từ thúc giục
+    'đê', 'đi', 'mau', 'nào', 'lẹ', 'nhanh', 'hurry', 'quick', 'fast',
+    'lẹ nào', 'nhanh lên', 'mau lên', 'nhanh nào', 'lẹ lên', 'mau mau',
+    'nhanh chóng', 'gấp', 'gấp đi', 'nhanh tay', 'tranh thủ', 'vội',
+    'nhanh nhé', 'nhanh chứ', 'lẹ đi', 'mau đi', 'nhanh đi', 'gấp nào',
+
+    // Từ cảm thán/kết thúc câu
+    'nhé', 'ạ', 'nhá', 'thôi', 'đấy', 'này', 'đây', 'kìa', 'kia',
+    'nhỉ', 'nhở', 'đi nào', 'thế nhé', 'vậy nhé', 'nha', 'hen',
+    'đó', 'đó nhé', 'thế', 'vậy', 'thế nhá', 'vậy nha',
+
+    // Từ chỉ định/yêu cầu
+    'cho', 'tìm', 'kiếm', 'muốn', 'cần', 'được', 'với', 'và', 'hay', 'hoặc',
+    'giúp', 'xem', 'có', 'không', 'đang', 'sẽ', 'là', 'của', 'ra',
+    'tôi', 'mình', 'bạn', 'anh', 'chị', 'em', 'cho tôi', 'giúp tôi', 'tìm cho tôi',
+    'giúp mình', 'cho mình', 'tìm cho mình', 'xem cho', 'tìm giúp',
+
+    // Từ khẩn cấp/quan trọng
+    'gấp gấp', 'khẩn', 'ngay', 'liền', 'ngay lập tức', 'ngay bây giờ',
+    'ngay và luôn', 'càng sớm càng tốt', 'sớm', 'nhanh nhất có thể',
+
+    // Từ tiếng Anh thường gặp
+    'please', 'pls', 'plz', 'now', 'asap', 'urgent', 'help', 'find', 'search',
+    'show', 'give', 'need', 'want', 'looking', 'looking for'
+];
