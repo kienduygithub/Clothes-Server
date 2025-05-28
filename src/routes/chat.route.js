@@ -7,32 +7,32 @@ import { uploadServer } from '../common/middleware/upload.middleware';
 const ChatRouter = express.Router();
 
 ChatRouter.get(
-    '/conversations',
+    '/chat/conversations',
     checkUserAuthenticationMobile,
     ChatController.fetchConversations
 );
 
 ChatRouter.get(
-    '/history/:userId',
+    '/chat/history/:userId',
     checkUserAuthenticationMobile,
     ChatController.fetchChatHistory
 );
 
 ChatRouter.post(
-    '/send',
+    '/chat/send',
     checkUserAuthenticationMobile,
     uploadServer.array('chatAttachments', 5),
     ChatController.createMessage
 );
 
 ChatRouter.patch(
-    '/read/:messageId',
+    '/chat/read/:messageId',
     checkUserAuthenticationMobile,
     ChatController.markMessageAsRead
 );
 
 ChatRouter.patch(
-    '/read-conversation/:userId',
+    '/chat/read-conversation/:userId',
     checkUserAuthenticationMobile,
     ChatController.markConversationAsRead
 );
