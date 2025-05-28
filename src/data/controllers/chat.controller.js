@@ -7,14 +7,6 @@ export const fetchChatHistory = async (req, res) => {
         const { userId } = req.params;
         const { page = 1, limit = 20 } = req.query;
 
-        if (req.user.id !== parseInt(userId) && !req.user.shopId) {
-            ResponseModel.error(
-                HttpErrors.BAD_REQUEST,
-                'Unauthorized to view these messages',
-                {}
-            )
-        }
-
         const response = await ChatService.fetchChatHistory(
             req.user.id,
             parseInt(userId),
@@ -81,12 +73,31 @@ export const markConversationAsRead = async (req, res) => {
 export const createMessage = async (req, res) => {
     try {
         const { receiverId, message } = req.body;
+        console.log(message);
         const files = req.files;
         const response = await ChatService.createMessage(
             req.user.id,
             parseInt(receiverId),
             message,
             files
+        );
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        })
+    }
+}
+
+export const createConversation = async (req, res) => {
+    try {
+        const { shopOwnerId } = req.body;
+        const userId = req.user.id;
+        const response = await ChatService.createConversation(
+            userId,
+            parseInt(shopOwnerId)
         );
         return res.status(response.status).json(response);
     } catch (error) {

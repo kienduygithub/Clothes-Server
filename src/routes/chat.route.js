@@ -25,6 +25,12 @@ ChatRouter.post(
     ChatController.createMessage
 );
 
+ChatRouter.post(
+    '/chat/conversation',
+    checkUserAuthenticationMobile,
+    ChatController.createConversation
+);
+
 ChatRouter.patch(
     '/chat/read/:messageId',
     checkUserAuthenticationMobile,

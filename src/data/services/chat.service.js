@@ -31,9 +31,7 @@ export const fetchChatHistory = async (userId1, userId2, page = 1, limit = 20) =
                     attributes: ['id', 'name', 'image_url', 'shopId']
                 }
             ],
-            order: [['createdAt', 'DESC']],
-            limit,
-            offset
+            order: [['createdAt', 'ASC']],
         });
 
         return ResponseModel.success('Lịch sử hội thoại', {
@@ -196,12 +194,62 @@ export const createMessage = async (senderId, receiverId, message, files = null)
         }
 
         return ResponseModel.success('Tạo tin nhắn', {
-            chatInfo: chatInfo
+            chatInfo: chat
         })
     } catch (error) {
         if (files && files.length > 0) {
             await handleDeleteImages(files.map(file => `chat-attachments/${file.filename}`));
         }
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
+export const createConversation = async (userId, shopOwnerId) => {
+    const transaction = await sequelize.transaction();
+    try {
+        if (!shopOwnerId) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu thông tin cần thiết', {
+                shopOwnerId: shopOwnerId
+            })
+        }
+
+        const existingConversation = await Chat.findOne({
+            where: {
+                [Op.or]: [
+                    { senderId: userId, receiverId: shopOwnerId },
+                    { senderId: shopOwnerId, receiverId: userId }
+                ]
+            }
+        })
+
+        if (existingConversation) {
+            await transaction.commit();
+            return ResponseModel.success('Đã có cuộc trò chyện', {
+                chatInfo: existingConversation
+            })
+        }
+
+        const welcomeMessage = await Chat.create({
+            senderId: shopOwnerId,
+            receiverId: userId,
+            message: "Xin chào! Cảm ơn bạn đã quan tâm đến cửa hàng của chúng tôi. Chúng tôi có thể giúp gì cho bạn?",
+            messageType: 'text',
+            isRead: false,
+        }, { transaction });
+
+        /** Gửi socket nếu người nhận online **/
+        pushNotificationUser(userId, {
+            type: 'new_message',
+            data: welcomeMessage
+        });
+
+        await transaction.commit();
+
+        return ResponseModel.success('Tạo cuộc trò chuyện thành công', {
+            chatInfo: welcomeMessage
+        });
+    } catch (error) {
+        await transaction.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
