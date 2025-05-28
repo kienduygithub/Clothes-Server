@@ -68,6 +68,20 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'user_favorites',
                 onDelete: 'CASCADE'
             })
+
+            // Chat: Tin nhắn đã gửi
+            User.hasMany(models.Chat, {
+                foreignKey: 'senderId',
+                as: 'sent_messages',
+                onDelete: 'CASCADE',
+            });
+
+            // Chat: Tin nhắn đã nhận
+            User.hasMany(models.Chat, {
+                foreignKey: 'receiverId',
+                as: 'received_messages',
+                onDelete: 'CASCADE'
+            });
         }
     }
 
