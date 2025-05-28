@@ -34,6 +34,17 @@ module.exports = {
                 type: Sequelize.TEXT,
                 allowNull: false
             },
+            messageType: {
+                type: Sequelize.ENUM('text', 'image', 'file'),
+                allowNull: false,
+                defaultValue: 'text'
+            },
+            attachments: {
+                type: Sequelize.JSON,
+                allowNull: true,
+                defaultValue: null,
+                comment: 'Array of attachment objects containing url and type'
+            },
             // Trạng thái đã đọc
             isRead: {
                 type: Sequelize.BOOLEAN,

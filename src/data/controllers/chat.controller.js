@@ -81,10 +81,12 @@ export const markConversationAsRead = async (req, res) => {
 export const createMessage = async (req, res) => {
     try {
         const { receiverId, message } = req.body;
+        const files = req.files;
         const response = await ChatService.createMessage(
             req.user.id,
             parseInt(receiverId),
-            message
+            message,
+            files
         );
         return res.status(response.status).json(response);
     } catch (error) {

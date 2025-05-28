@@ -47,6 +47,15 @@ const storageServer = multer.diskStorage({
                 "../../assets/categories"
             );
             cb(null, uploadPath);
+        } else if (file.fieldname === 'chatAttachments') {
+            const uploadPath = path.resolve(
+                __dirname,
+                "../../assets/chat-attachments"
+            );
+            if (!fs.existsSync(uploadPath)) {
+                fs.mkdirSync(uploadPath, { recursive: true });
+            }
+            cb(null, uploadPath);
         } else {
             cb({
                 status: HttpErrors.NOT_FOUND,

@@ -6,6 +6,7 @@ import {
     ShopClient
 } from "../../common/utils/socket.service";
 import HttpErrors from "../../common/errors/http-errors";
+import { handleDeleteImages } from "../../common/middleware/upload.middleware";
 
 export const fetchChatHistory = async (userId1, userId2, page = 1, limit = 20) => {
     try {
@@ -147,18 +148,33 @@ export const markConversationAsRead = async (userId1, userId2) => {
     }
 }
 
-export const createMessage = async (senderId, receiverId, message) => {
+export const createMessage = async (senderId, receiverId, message, files = null) => {
     try {
         const receiver = await User.findByPk(receiverId);
         if (!receiver) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Receiver not found', {});
         }
 
+        let messageType = 'text';
+        let attachments = null;
+
+        if (files && files.length > 0) {
+            attachments = files.map(file => ({
+                url: `chat-attachments/${file.filename}`,
+                type: file.mimetype,
+                name: file.originalname,
+                size: file.size
+            }));
+            messageType = 'image';
+        }
+
         const chat = await Chat.create({
             senderId,
             receiverId,
             message,
-            isRead: false
+            messageType: messageType,
+            attachments: attachments,
+            isRead: false,
         });
 
         /** Gửi socket nếu người nhận online **/
@@ -183,6 +199,9 @@ export const createMessage = async (senderId, receiverId, message) => {
             chatInfo: chatInfo
         })
     } catch (error) {
+        if (files && files.length > 0) {
+            await handleDeleteImages(files.map(file => `chat-attachments/${file.filename}`));
+        }
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }

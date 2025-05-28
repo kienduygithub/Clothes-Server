@@ -3,6 +3,7 @@ import * as ChatController from "../data/controllers/chat.controller";
 import {
     checkUserAuthenticationMobile
 } from "../common/middleware/jwt.middleware";
+import { uploadServer } from '../common/middleware/upload.middleware';
 const ChatRouter = express.Router();
 
 ChatRouter.get(
@@ -20,6 +21,7 @@ ChatRouter.get(
 ChatRouter.post(
     '/send',
     checkUserAuthenticationMobile,
+    uploadServer.array('chatAttachments', 5),
     ChatController.createMessage
 );
 

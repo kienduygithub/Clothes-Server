@@ -40,6 +40,23 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT,
             allowNull: false
         },
+        messageType: {
+            type: DataTypes.ENUM('text', 'image', 'file'),
+            allowNull: false,
+            defaultValue: 'text'
+        },
+        attachments: {
+            type: DataTypes.JSON,
+            allowNull: true,
+            defaultValue: null,
+            get() {
+                const rawValue = this.getDataValue('attachments');
+                return rawValue ? JSON.parse(rawValue) : null;
+            },
+            set(value) {
+                this.setDataValue('attachments', value ? JSON.stringify(value) : null);
+            }
+        },
         isRead: {
             type: DataTypes.BOOLEAN,
             defaultValue: false
