@@ -1,5 +1,15 @@
 import { WebSocketServer } from 'ws';
 import db from '../../data/models';
+import { Op } from 'sequelize';
+
+export const WebSocketNotificationType = Object.freeze({
+    REGISTER: 'register',
+    LOGOUT: 'logout',
+    NEW_MESSAGE: 'new_message',
+    MESSAGE_READ: 'message_read',
+    CHECK_SHOP_STATUS: 'check_shop_status',
+    SHOP_STATUS: 'shop_status'
+})
 
 export const UserClient = new Map();
 
@@ -22,7 +32,8 @@ export const initWebSocket = (port = 3001) => {
 
             if (ws.shopId) {
                 ShopClient.delete(ws.shopId);
-                console.log(`User ${ws.shopId} disconnected`);
+                console.log(`Shop ${ws.shopId} disconnected`);
+                broadcastShopStatus(ws.shopId, false);
             }
         });
 
@@ -31,14 +42,17 @@ export const initWebSocket = (port = 3001) => {
                 const data = JSON.parse(message);
 
                 switch (data.type) {
-                    case 'register':
+                    case WebSocketNotificationType.REGISTER:
                         handleRegister(ws, data);
                         break;
-                    case 'logout':
+                    case WebSocketNotificationType.LOGOUT:
                         handleLogout(ws, data);
                         break;
-                    case 'read_message':
+                    case WebSocketNotificationType.MESSAGE_READ:
                         await handleReadMessage(ws, data);
+                        break;
+                    case WebSocketNotificationType.CHECK_SHOP_STATUS:
+                        handleCheckShopStatus(ws, data);
                         break;
                 }
 
@@ -75,6 +89,58 @@ export const pushNotificationUser = (user_id, message) => {
         }
     } else {
         console.log(`User is not connected`);
+    }
+}
+
+export const broadcastShopStatus = async (shopId, isOnline) => {
+    try {
+        /** 1. Tìm tất cả user có cuộc trò chuyện với cửa hàng **/
+        const shopUser = await db.User.findOne({
+            where: { shopId },
+            attributes: ['id']
+        });
+
+        if (!shopUser) {
+            console.log(`>>> No user found for shopId: ${shopId}`);
+            return;
+        }
+
+        const conversations = await db.Chat.findAll({
+            where: {
+                [Op.or]: [
+                    { senderId: shopUser.id },
+                    { receiverId: shopUser.id }
+                ]
+            }
+        });
+
+        /** 2. Tổng hợp tất cả senderId + receiverId **/
+        const userIds = new Set();
+        conversations.forEach(chat => {
+            if (chat.senderId !== chat.receiverId) {
+                // Chỉ thêm userId của người chứ không phải chủ shop
+                if (chat.senderId !== shopUser.id) {
+                    userIds.add(chat.senderId);
+                }
+                if (chat.receiverId !== shopUser.id) {
+                    userIds.add(chat.receiverId);
+                }
+            }
+        })
+
+        userIds.forEach(userId => {
+            const ws = UserClient.get(userId);
+            if (ws && ws.readyState === ws.OPEN) {
+                ws.send(JSON.stringify({
+                    type: WebSocketNotificationType.SHOP_STATUS,
+                    shopId: shopId,
+                    isOnline: isOnline
+                }));
+            }
+        })
+
+    } catch (error) {
+        console.log('>>> Error broadcasting shop status: ', error);
     }
 }
 
@@ -120,6 +186,7 @@ const handleRegister = (ws, data) => {
         ShopClient.set(data.shopId, ws);
         console.log(`Shop ${data.shopId} connected`);
         console.log('>>> Active shops: ', Array.from(ShopClient.keys()));
+        broadcastShopStatus(data.shopId, true); // Thông báo shop online
     }
 }
 
@@ -134,6 +201,7 @@ const handleLogout = (ws, data) => {
         ShopClient.delete(data.shopId);
         console.log(`Shop ${data.shopId} logged out`);
         console.log('>>> Active shops: ', Array.from(ShopClient.keys()));
+        broadcastShopStatus(data.shopId, false); // Thông báo shop offline
     }
 }
 
@@ -158,7 +226,7 @@ const handleReadMessage = async (ws, data) => {
             const senderWs = UserClient.get(chat.senderId) || ShopClient.get(chat.senderId);
             if (senderWs && senderWs.readyState === senderWs.OPEN) {
                 senderWs.send(JSON.stringify({
-                    type: 'message_read',
+                    type: WebSocketNotificationType.MESSAGE_READ,
                     data: { messageId }
                 }));
             }
@@ -167,4 +235,14 @@ const handleReadMessage = async (ws, data) => {
     } catch (error) {
         console.error('>>> Error marking message as read:', error);
     }
+}
+
+const handleCheckShopStatus = (ws, data) => {
+    const shopId = data.shopId;
+    const isOnline = ShopClient.has(shopId) && ShopClient.get(shopId).readyState === ShopClient.has(shopId).OPEN;
+    ws.send(JSON.stringify({
+        type: WebSocketNotificationType.SHOP_STATUS,
+        isOnline: isOnline,
+        shopId: shopId
+    }));
 }

@@ -31,3 +31,5 @@ export const NotificationActionType = Object.freeze({
     VIEW_REGISTRATION: 'VIEW_REGISTRATION',
     NONE: 'NONE'
 });
+
+
