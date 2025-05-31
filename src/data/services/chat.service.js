@@ -4,6 +4,7 @@ import { ResponseModel } from "../../common/errors/response";
 import {
     pushNotificationUser,
     ShopClient,
+    UserClient,
     WebSocketNotificationType
 } from "../../common/utils/socket.service";
 import HttpErrors from "../../common/errors/http-errors";
@@ -298,6 +299,36 @@ export const createMessage = async (
             { transaction }
         );
 
+        const chatDetail = await Chat.findByPk(chat.id, {
+            include: [
+                {
+                    model: db.User,
+                    as: 'sender',
+                    include: [
+                        {
+                            model: db.Shop,
+                            as: 'shop',
+                            required: false,
+                            attributes: ['id', 'shop_name', 'logo_url']
+                        }
+                    ]
+                },
+                {
+                    model: db.User,
+                    as: 'receiver',
+                    include: [
+                        {
+                            model: db.Shop,
+                            as: 'shop',
+                            required: false,
+                            attributes: ['id', 'shop_name', 'logo_url']
+                        }
+                    ]
+                }
+            ],
+            transaction: transaction
+        })
+
         // Cập nhật Conversation cho người gửi (senderId -> receiverId)
         await db.Conversation.upsert(
             {
@@ -323,7 +354,7 @@ export const createMessage = async (
         /** Gửi socket nếu người nhận online **/
         pushNotificationUser(receiverId, {
             type: WebSocketNotificationType.NEW_MESSAGE,
-            data: chat
+            data: chatDetail
         })
 
         /** Nếu là shop và offline thì tạo tin nhắn thông báo **/

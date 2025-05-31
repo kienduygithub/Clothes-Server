@@ -176,15 +176,14 @@ export const broadcastNotification = (message, excludeUserId = null) => {
 
 const handleRegister = (ws, data) => {
     if (data.userId) {
-        ws.userId = data.userId;
         UserClient.set(data.userId, ws);
         console.log(`User ${data.userId} connected`);
         console.log('>>> Active clients: ', Array.from(UserClient.keys()));
     }
 
-    if (data.shopId) {
-        ws.shopId = data.shopId;
+    if (data.shopId && data.ownerId) {
         ShopClient.set(data.shopId, ws);
+        UserClient.set(data.ownerId, ws);
         console.log(`Shop ${data.shopId} connected`);
         console.log('>>> Active shops: ', Array.from(ShopClient.keys()));
         broadcastShopStatus(data.shopId, true); // Thông báo shop online
@@ -200,6 +199,7 @@ const handleLogout = (ws, data) => {
 
     if (data.shopId) {
         ShopClient.delete(data.shopId);
+        UserClient.delete(data.ownerId);
         console.log(`Shop ${data.shopId} logged out`);
         console.log('>>> Active shops: ', Array.from(ShopClient.keys()));
         broadcastShopStatus(data.shopId, false); // Thông báo shop offline
@@ -240,7 +240,7 @@ const handleReadMessage = async (ws, data) => {
 
 const handleCheckShopStatus = (ws, data) => {
     const shopId = data.shopId;
-    const isOnline = ShopClient.has(shopId) && ShopClient.get(shopId).readyState === ShopClient.has(shopId).OPEN;
+    const isOnline = ShopClient.has(shopId) && ShopClient.get(shopId).readyState === ShopClient.get(shopId).OPEN;
     ws.send(JSON.stringify({
         type: WebSocketNotificationType.SHOP_STATUS,
         isOnline: isOnline,
