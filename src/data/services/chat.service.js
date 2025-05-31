@@ -65,7 +65,7 @@ export const fetchChatHistory = async (userId1, userId2, page = 1, limit = 20) =
         );
 
         // Đặt lại unreadCount của userId1 (người đang xem hội thoại)
-        await Conversation.update(
+        await db.Conversation.update(
             { unreadCount: 0 },
             {
                 where: {
@@ -186,7 +186,7 @@ export const markMessageAsRead = async (messageId, readerId) => {
         );
 
         // Cập nhật unreadCount trong Conversation
-        await Conversation.update(
+        await db.Conversation.update(
             { unreadCount: Sequelize.literal('unreadCount - 1') },
             {
                 where: {
@@ -234,7 +234,7 @@ export const markConversationAsRead = async (userId1, userId2) => {
         }
 
         // Cập nhật unreadCount trong Conversation
-        await Conversation.update(
+        await db.Conversation.update(
             { unreadCount: 0 },
             {
                 where: {
@@ -299,7 +299,7 @@ export const createMessage = async (
         );
 
         // Cập nhật Conversation cho người gửi (senderId -> receiverId)
-        await Conversation.upsert(
+        await db.Conversation.upsert(
             {
                 userId: senderId,
                 otherUserId: receiverId,
@@ -310,7 +310,7 @@ export const createMessage = async (
         );
 
         // Cập nhật Conversation cho người nhận (receiverId -> senderId)
-        await Conversation.upsert(
+        await db.Conversation.upsert(
             {
                 userId: receiverId,
                 otherUserId: senderId,
@@ -343,7 +343,7 @@ export const createMessage = async (
                 );
 
                 // Cập nhật lại Conversation cho người gửi
-                await Conversation.upsert(
+                await db.Conversation.upsert(
                     {
                         userId: senderId,
                         otherUserId: receiverId,
@@ -354,7 +354,7 @@ export const createMessage = async (
                 );
 
                 // Cập nhật lại Conversation cho người nhận (receiverId)
-                await Conversation.upsert(
+                await db.Conversation.upsert(
                     {
                         userId: receiverId,
                         otherUserId: senderId,
@@ -432,7 +432,7 @@ export const createConversation = async (userId, shopOwnerId) => {
             { transaction }
         );
 
-        await Conversation.upsert(
+        await db.Conversation.upsert(
             {
                 userId: shopOwnerId,
                 otherUserId: userId,
