@@ -1,17 +1,17 @@
 import { Op } from "sequelize";
-import { Chat, sequelize, User } from "../models";
+import db, { Chat, Sequelize, sequelize, User } from "../models";
 import { ResponseModel } from "../../common/errors/response";
 import {
     pushNotificationUser,
-    ShopClient
+    ShopClient,
+    WebSocketNotificationType
 } from "../../common/utils/socket.service";
 import HttpErrors from "../../common/errors/http-errors";
 import { handleDeleteImages } from "../../common/middleware/upload.middleware";
 
 export const fetchChatHistory = async (userId1, userId2, page = 1, limit = 20) => {
+    const transaction = await sequelize.transaction();
     try {
-        const offset = (page - 1) * limit;
-
         const messages = await Chat.findAndCountAll({
             where: {
                 [Op.or]: [
@@ -23,27 +23,66 @@ export const fetchChatHistory = async (userId1, userId2, page = 1, limit = 20) =
                 {
                     model: User,
                     as: 'sender',
-                    attributes: ['id', 'name', 'image_url', 'shopId']
+                    attributes: ['id', 'name', 'image_url', 'shopId'],
+                    include: [
+                        {
+                            model: db.Shop,
+                            as: 'shop',
+                            attributes: ['id', 'shop_name', 'logo_url'],
+                            required: false
+                        }
+                    ]
                 },
                 {
                     model: User,
                     as: 'receiver',
-                    attributes: ['id', 'name', 'image_url', 'shopId']
+                    attributes: ['id', 'name', 'image_url', 'shopId'],
+                    include: [
+                        {
+                            model: db.Shop,
+                            as: 'shop',
+                            attributes: ['id', 'shop_name', 'logo_url'],
+                            required: false
+                        }
+                    ]
                 }
             ],
             order: [['createdAt', 'ASC']],
+            transaction: transaction
         });
+
+        // Đánh dấu các tin nhắn từ userId2 gửi đến userId1 là đã đọc
+        await Chat.update(
+            { isRead: true },
+            {
+                where: {
+                    senderId: userId2,
+                    receiverId: userId1,
+                    isRead: false
+                },
+                transaction
+            }
+        );
+
+        // Đặt lại unreadCount của userId1 (người đang xem hội thoại)
+        await Conversation.update(
+            { unreadCount: 0 },
+            {
+                where: {
+                    userId: userId1,
+                    otherUserId: userId2
+                },
+                transaction
+            }
+        );
+
+        await transaction.commit();
 
         return ResponseModel.success('Lịch sử hội thoại', {
             messages: messages.rows,
-            paginate: {
-                currentPage: page,
-                limit: limit,
-                totalItems: messages.count,
-                totalPages: Math.ceil(messages.count / limit),
-            },
         })
     } catch (error) {
+        await transaction.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
@@ -51,58 +90,90 @@ export const fetchChatHistory = async (userId1, userId2, page = 1, limit = 20) =
 /** Output: Danh sách các cuộc trò chuyện của một user **/
 export const fetchConversations = async (userId) => {
     try {
-        /** 1. Lấy tin nhắn mới nhất của mỗi cuộc trò chuyện **/
-        const conversations = await Chat.findAll({
+        /** 1. Lấy tin nhắn mới nhất của mỗi cuộc trò chuyện bằng subquery **/
+        const conversations = await db.Conversation.findAll({
             where: {
-                [Op.or]: [
-                    { senderId: userId },
-                    { receiverId: userId }
-                ]
+                userId: userId
             },
             include: [
                 {
                     model: User,
-                    as: 'sender',
-                    attributes: ['id', 'name', 'image_url', 'shopId']
+                    as: 'otherUser',
+                    foreignKey: 'otherUserId',
+                    attributes: ['id', 'name', 'image_url', 'shopId'],
+                    include: [
+                        {
+                            model: db.Shop,
+                            as: 'shop',
+                            attributes: ['id', 'shop_name', 'logo_url'],
+                            required: false
+                        }
+                    ]
                 },
                 {
-                    model: User,
-                    as: 'receiver',
-                    attributes: ['id', 'name', 'image_url', 'shopId']
-                },
+                    model: db.Chat,
+                    as: 'lastMessage',
+                    include: [
+                        {
+                            model: db.User,
+                            as: 'sender',
+                            attributes: ['id', 'name', 'image_url', 'shopId'],
+                            include: [
+                                {
+                                    model: db.Shop,
+                                    as: 'shop',
+                                    attributes: ['id', 'shop_name', 'logo_url'],
+                                    required: false
+                                }
+                            ]
+                        },
+                        {
+                            model: db.User,
+                            as: 'receiver',
+                            attributes: ['id', 'name', 'image_url', 'shopId'],
+                            include: [
+                                {
+                                    model: db.Shop,
+                                    as: 'shop',
+                                    attributes: ['id', 'shop_name', 'logo_url'],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                }
             ],
-            order: [['createdAt', 'DESC']]
+            order: [['createdAt', 'DESC']],
         });
-        /** 2. Nhóm theo người trò chuyện và lấy tin nhắn mới nhất **/
-        const conversationMap = new Map();
-        conversations.forEach(chat => {
-            const otherUserId = chat.senderId === userId ? chat.receiverId : chat.senderId;
-            if (!conversationMap.has(otherUserId)) {
-                conversationMap.set(otherUserId, {
-                    otherUser: chat.senderId === userId ? chat.receiver : chat.sender,
-                    lastMessage: chat,
-                    unreadCount: chat.senderId !== userId && !chat.isRead ? 1 : 0
-                });
-            } else if (chat.ResponseModel !== userId && !chat.isRead) {
-                const conversation = conversationMap.get(otherUserId);
-                conversationMap.set(otherUserId, {
-                    ...conversation,
-                    unreadCount: conversation.unreadCount + 1
-                })
-            }
-        })
+
+        /** 2. Tính unreadCount và định dạng dữ liệu **/
+        const conversationList = conversations.map(conversation => ({
+            otherUser: conversation.otherUser,
+            lastMessage: conversation.lastMessage,
+            unreadCount: conversation.unreadCount
+        }));
 
         return ResponseModel.success('Danh sách trò chuyện', {
-            conversations: Array.from(conversationMap.values())
-        })
+            conversations: conversationList
+        });
     } catch (error) {
-        ResponseModel.error(error?.status, error?.message, error?.body);
+        console.error(error);
+        return ResponseModel.error(error?.status || 500, error?.message || 'Lỗi hệ thống', error?.body);
     }
-}
+};
 
 export const markMessageAsRead = async (messageId, readerId) => {
     const transaction = await sequelize.transaction();
     try {
+        const message = await Chat.findOne({
+            where: { id: messageId, receiverId: readerId },
+            transaction
+        });
+        if (!message) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Tin nhắn không tồn tại hoặc không thuộc về người đọc', {});
+        }
+
+        // Đánh dấu tin nhắn là đã đọc
         await Chat.update(
             { isRead: true },
             {
@@ -113,6 +184,23 @@ export const markMessageAsRead = async (messageId, readerId) => {
                 transaction
             }
         );
+
+        // Cập nhật unreadCount trong Conversation
+        await Conversation.update(
+            { unreadCount: Sequelize.literal('unreadCount - 1') },
+            {
+                where: {
+                    userId: readerId,
+                    otherUserId: message.senderId
+                },
+                transaction
+            }
+        );
+
+        pushNotificationUser(message.senderId, {
+            type: WebSocketNotificationType.MESSAGE_READ,
+            data: { messageId, readerId }
+        });
 
         await transaction.commit();
 
@@ -126,16 +214,41 @@ export const markMessageAsRead = async (messageId, readerId) => {
 export const markConversationAsRead = async (userId1, userId2) => {
     const transaction = await sequelize.transaction();
     try {
-        await Chat.update(
+        // Đánh dấu tất cả tin nhắn từ userId2 gửi đến userId1 là đã đọc
+        const updatedCount = await Chat.update(
             { isRead: true },
             {
                 where: {
                     receiverId: userId1,
-                    senderId: userId2
+                    senderId: userId2,
+                    isRead: false
                 },
                 transaction
             }
-        )
+        );
+
+        if (updatedCount[0] === 0) {
+            // Không có tin nhắn nào được cập nhật
+            await transaction.commit();
+            return ResponseModel.success('Đã đọc tất cả tin nhắn', {});
+        }
+
+        // Cập nhật unreadCount trong Conversation
+        await Conversation.update(
+            { unreadCount: 0 },
+            {
+                where: {
+                    userId: userId1,
+                    otherUserId: userId2
+                },
+                transaction
+            }
+        );
+
+        pushNotificationUser(userId2, {
+            type: WebSocketNotificationType.CONVERSATION_READ,
+            data: { userId1, userId2 }
+        });
 
         await transaction.commit();
 
@@ -146,15 +259,22 @@ export const markConversationAsRead = async (userId1, userId2) => {
     }
 }
 
-export const createMessage = async (senderId, receiverId, message, files = null) => {
+export const createMessage = async (
+    senderId,
+    receiverId,
+    message,
+    files = [],
+    isRead = false
+) => {
+    const transaction = await sequelize.transaction();
+    let attachments = null;
+    let messageType = 'text';
+
     try {
         const receiver = await User.findByPk(receiverId);
         if (!receiver) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Receiver not found', {});
         }
-
-        let messageType = 'text';
-        let attachments = null;
 
         if (files && files.length > 0) {
             attachments = files.map(file => ({
@@ -166,18 +286,43 @@ export const createMessage = async (senderId, receiverId, message, files = null)
             messageType = 'image';
         }
 
-        const chat = await Chat.create({
-            senderId,
-            receiverId,
-            message,
-            messageType: messageType,
-            attachments: attachments,
-            isRead: false,
-        });
+        const chat = await Chat.create(
+            {
+                senderId,
+                receiverId,
+                message: message || '',
+                messageType,
+                attachments,
+                isRead
+            },
+            { transaction }
+        );
+
+        // Cập nhật Conversation cho người gửi (senderId -> receiverId)
+        await Conversation.upsert(
+            {
+                userId: senderId,
+                otherUserId: receiverId,
+                lastMessageId: chat.id,
+                unreadCount: Sequelize.literal(`CASE WHEN userId = ${receiverId} THEN unreadCount + 1 ELSE unreadCount END`)
+            },
+            { transaction }
+        );
+
+        // Cập nhật Conversation cho người nhận (receiverId -> senderId)
+        await Conversation.upsert(
+            {
+                userId: receiverId,
+                otherUserId: senderId,
+                lastMessageId: chat.id,
+                unreadCount: Sequelize.literal(`CASE WHEN userId = ${receiverId} THEN unreadCount + 1 ELSE unreadCount END`)
+            },
+            { transaction }
+        );
 
         /** Gửi socket nếu người nhận online **/
         pushNotificationUser(receiverId, {
-            type: 'new_message',
+            type: WebSocketNotificationType.NEW_MESSAGE,
             data: chat
         })
 
@@ -185,18 +330,54 @@ export const createMessage = async (senderId, receiverId, message, files = null)
         if (receiver.shopId) {
             const shopWs = ShopClient.get(receiver.shopId);
             if (!shopWs || shopWs.readyState !== shopWs.OPEN) {
-                await createMessage(
-                    receiverId, // Shop gửi
-                    senderId, // Gửi cho người dùng ban đầu
-                    "Cửa hàng hiện đang Offline"
+                const offlineMessage = await Chat.create(
+                    {
+                        senderId: receiverId,
+                        receiverId: senderId,
+                        message: "Cửa hàng hiện đang Offline",
+                        messageType: 'text',
+                        attachments: null,
+                        isRead: false
+                    },
+                    { transaction }
                 );
+
+                // Cập nhật lại Conversation cho người gửi
+                await Conversation.upsert(
+                    {
+                        userId: senderId,
+                        otherUserId: receiverId,
+                        lastMessageId: offlineMessage.id,
+                        unreadCount: Sequelize.literal(`unreadCount + 1`)
+                    },
+                    { transaction }
+                );
+
+                // Cập nhật lại Conversation cho người nhận (receiverId)
+                await Conversation.upsert(
+                    {
+                        userId: receiverId,
+                        otherUserId: senderId,
+                        lastMessageId: offlineMessage.id,
+                        // Không tăng unreadCount vì đây là tin nhắn hệ thống từ chính receiverId
+                        unreadCount: Sequelize.literal(`unreadCount`)
+                    },
+                    { transaction }
+                );
+
+                pushNotificationUser(senderId, {
+                    type: WebSocketNotificationType.NEW_MESSAGE,
+                    data: offlineMessage
+                });
             }
         }
 
+        await transaction.commit();
         return ResponseModel.success('Tạo tin nhắn', {
             chatInfo: chat
         })
     } catch (error) {
+        await transaction.rollback();
         if (files && files.length > 0) {
             await handleDeleteImages(files.map(file => `chat-attachments/${file.filename}`));
         }
@@ -213,38 +394,61 @@ export const createConversation = async (userId, shopOwnerId) => {
             })
         }
 
-        const existingConversation = await Chat.findOne({
+        const existingConversation = await db.Conversation.findOne({
             where: {
                 [Op.or]: [
-                    { senderId: userId, receiverId: shopOwnerId },
-                    { senderId: shopOwnerId, receiverId: userId }
+                    { userId: userId, otherUserId: shopOwnerId },
+                    { userId: shopOwnerId, otherUserId: userId }
                 ]
             }
         })
 
         if (existingConversation) {
+            const lastMessage = await db.Chat.findByPk(existingConversation.lastMessageId);
             await transaction.commit();
             return ResponseModel.success('Đã có cuộc trò chyện', {
-                chatInfo: existingConversation
+                chatInfo: lastMessage
             })
         }
 
-        const welcomeMessage = await Chat.create({
-            senderId: shopOwnerId,
-            receiverId: userId,
-            message: "Xin chào! Cảm ơn bạn đã quan tâm đến cửa hàng của chúng tôi. Chúng tôi có thể giúp gì cho bạn?",
-            messageType: 'text',
-            isRead: false,
-        }, { transaction });
+        const welcomeMessage = await db.Chat.create(
+            {
+                senderId: shopOwnerId,
+                receiverId: userId,
+                message: "Xin chào! Cảm ơn bạn đã quan tâm đến cửa hàng của chúng tôi. Chúng tôi có thể giúp gì cho bạn?",
+                messageType: 'text',
+                isRead: false,
+            },
+            { transaction }
+        );
+
+        await db.Conversation.upsert(
+            {
+                userId: userId,
+                otherUserId: shopOwnerId,
+                lastMessageId: welcomeMessage.id,
+                unreadCount: 0
+            },
+            { transaction }
+        );
+
+        await Conversation.upsert(
+            {
+                userId: shopOwnerId,
+                otherUserId: userId,
+                lastMessageId: welcomeMessage.id,
+                unreadCount: 0
+            },
+            { transaction }
+        );
 
         /** Gửi socket nếu người nhận online **/
         pushNotificationUser(userId, {
-            type: 'new_message',
+            type: WebSocketNotificationType.NEW_MESSAGE,
             data: welcomeMessage
         });
 
         await transaction.commit();
-
         return ResponseModel.success('Tạo cuộc trò chuyện thành công', {
             chatInfo: welcomeMessage
         });

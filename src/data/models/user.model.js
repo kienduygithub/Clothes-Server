@@ -12,11 +12,6 @@ module.exports = (sequelize, DataTypes) => {
                 onDelete: 'CASCADE'
             });
             // Review
-            // User.belongsToMany(models.Product, {
-            //     through: models.Review,
-            //     foreignKey: 'user_id',
-            //     otherKey: 'product_id'
-            // });
             User.hasMany(models.Review, {
                 foreignKey: 'user_id',
                 as: 'reviews'
@@ -52,11 +47,6 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'user_id',
                 otherKey: 'coupon_id'
             });
-            //         // Quan hệ hasMany với UserCoupon (để truy vấn trực tiếp UserCoupon nếu cần)
-            //   User.hasMany(models.UserCoupon, {
-            //     foreignKey: 'user_id',
-            //     as: 'user_coupons',
-            //   }); Chưa cần
             /** User - Notification: 1 - N */
             User.hasMany(models.Notification, {
                 foreignKey: 'user_id',
@@ -80,6 +70,20 @@ module.exports = (sequelize, DataTypes) => {
             User.hasMany(models.Chat, {
                 foreignKey: 'receiverId',
                 as: 'received_messages',
+                onDelete: 'CASCADE'
+            });
+
+            // Conversation: Các cuộc trò chuyện của người dùng
+            User.hasMany(models.Conversation, {
+                foreignKey: 'userId',
+                as: 'conversations',
+                onDelete: 'CASCADE'
+            });
+
+            // Conversation: Người dùng là "otherUser" trong cuộc trò chuyện
+            User.hasMany(models.Conversation, {
+                foreignKey: 'otherUserId',
+                as: 'other_conversations',
                 onDelete: 'CASCADE'
             });
         }

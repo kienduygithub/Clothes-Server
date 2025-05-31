@@ -14,6 +14,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'receiver',
                 onDelete: 'CASCADE'
             });
+            Chat.hasMany(models.Conversation, {
+                foreignKey: 'lastMessageId',
+                as: 'conversations',
+                onDelete: 'SET NULL'
+            });
         }
     }
 

@@ -8,7 +8,8 @@ export const WebSocketNotificationType = Object.freeze({
     NEW_MESSAGE: 'new_message',
     MESSAGE_READ: 'message_read',
     CHECK_SHOP_STATUS: 'check_shop_status',
-    SHOP_STATUS: 'shop_status'
+    SHOP_STATUS: 'shop_status',
+    CONVERSATION_READ: 'conversation_read'
 })
 
 export const UserClient = new Map();

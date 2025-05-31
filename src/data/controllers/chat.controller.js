@@ -1,5 +1,4 @@
 import HttpErrors from "../../common/errors/http-errors";
-import { ResponseModel } from "../../common/errors/response";
 import * as ChatService from "../services/chat.service";
 
 export const fetchChatHistory = async (req, res) => {
@@ -73,7 +72,6 @@ export const markConversationAsRead = async (req, res) => {
 export const createMessage = async (req, res) => {
     try {
         const { receiverId, message } = req.body;
-        console.log(message);
         const files = req.files;
         const response = await ChatService.createMessage(
             req.user.id,
