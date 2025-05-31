@@ -31,8 +31,9 @@ export const initWebSocket = (port = 3001) => {
                 console.log(`User ${ws.userId} disconnected`);
             }
 
-            if (ws.shopId) {
+            if (ws.shopId && ws.ownerId) {
                 ShopClient.delete(ws.shopId);
+                UserClient.delete(ws.ownerId);
                 console.log(`Shop ${ws.shopId} disconnected`);
                 broadcastShopStatus(ws.shopId, false);
             }
@@ -176,12 +177,15 @@ export const broadcastNotification = (message, excludeUserId = null) => {
 
 const handleRegister = (ws, data) => {
     if (data.userId) {
+        ws.userId = data.userId; // Dùng để khi onclose (vì vấn đề gì đó)
         UserClient.set(data.userId, ws);
         console.log(`User ${data.userId} connected`);
         console.log('>>> Active clients: ', Array.from(UserClient.keys()));
     }
 
     if (data.shopId && data.ownerId) {
+        ws.shopId = data?.shopId;
+        ws.ownerId = data?.ownerId;
         ShopClient.set(data.shopId, ws);
         UserClient.set(data.ownerId, ws);
         console.log(`Shop ${data.shopId} connected`);
