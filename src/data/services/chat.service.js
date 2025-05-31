@@ -405,7 +405,7 @@ export const createMessage = async (
 
         await transaction.commit();
         return ResponseModel.success('Tạo tin nhắn', {
-            chatInfo: chat
+            chatInfo: chatDetail
         })
     } catch (error) {
         await transaction.rollback();
