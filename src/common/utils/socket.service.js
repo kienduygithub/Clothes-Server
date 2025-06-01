@@ -9,7 +9,9 @@ export const WebSocketNotificationType = Object.freeze({
     MESSAGE_READ: 'message_read',
     CHECK_SHOP_STATUS: 'check_shop_status',
     SHOP_STATUS: 'shop_status',
-    CONVERSATION_READ: 'conversation_read'
+    CONVERSATION_READ: 'conversation_read',
+    CHECK_USER_STATUS: 'check_user_status',
+    USER_STATUS: 'user_status'
 })
 
 export const UserClient = new Map();
@@ -29,6 +31,7 @@ export const initWebSocket = (port = 3001) => {
             if (ws.userId) {
                 UserClient.delete(ws.userId);
                 console.log(`User ${ws.userId} disconnected`);
+                broadcastUserStatus(ws.userId, false);
             }
 
             if (ws.shopId && ws.ownerId) {
@@ -55,6 +58,9 @@ export const initWebSocket = (port = 3001) => {
                         break;
                     case WebSocketNotificationType.CHECK_SHOP_STATUS:
                         handleCheckShopStatus(ws, data);
+                        break;
+                    case WebSocketNotificationType.CHECK_USER_STATUS:
+                        handleCheckUserStatus(ws, data);
                         break;
                 }
 
@@ -146,6 +152,43 @@ export const broadcastShopStatus = async (shopId, isOnline) => {
     }
 }
 
+export const broadcastUserStatus = async (userId, isOnline) => {
+    /** 1. Tìm tất cả các cuộc trò chuyện liên quan đến userId **/
+    const conversations = await db.Chat.findAll({
+        where: {
+            [Op.or]: [
+                { senderId: userId },
+                { receiverId: userId }
+            ]
+        }
+    });
+
+    /** 2. Tổng hợp tất cả userId liên quan (trừ chính userId) **/
+    const relatedUserIds = new Set();
+    conversations.forEach(chat => {
+        if (chat.senderId !== chat.receiverId) {
+            if (chat.senderId !== userId) {
+                relatedUserIds.add(chat.senderId);
+            }
+            if (chat.receiverId !== userId) {
+                relatedUserIds.add(chat.receiverId);
+            }
+        }
+    })
+
+    /** 3. Gửi thông báo trạng thái đến các user liên quan **/
+    relatedUserIds.forEach(relatedUserId => {
+        const ws = UserClient.get(relatedUserId);
+        if (ws && ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({
+                type: WebSocketNotificationType.USER_STATUS,
+                userId: userId,
+                isOnline: isOnline
+            }))
+        }
+    })
+}
+
 export const broadcastNotification = (message, excludeUserId = null) => {
     let successCount = 0;
     UserClient.forEach((ws, user_id) => {
@@ -181,6 +224,7 @@ const handleRegister = (ws, data) => {
         UserClient.set(data.userId, ws);
         console.log(`User ${data.userId} connected`);
         console.log('>>> Active clients: ', Array.from(UserClient.keys()));
+        broadcastUserStatus(data.userId, true);
     }
 
     if (data.shopId && data.ownerId) {
@@ -199,6 +243,7 @@ const handleLogout = (ws, data) => {
         UserClient.delete(data.userId);
         console.log(`User ${data.userId} logged out`);
         console.log('>>> Active clients: ', Array.from(UserClient.keys()));
+        broadcastUserStatus(data.userId, false);
     }
 
     if (data.shopId) {
@@ -249,5 +294,15 @@ const handleCheckShopStatus = (ws, data) => {
         type: WebSocketNotificationType.SHOP_STATUS,
         isOnline: isOnline,
         shopId: shopId
+    }));
+}
+
+const handleCheckUserStatus = (ws, data) => {
+    const userId = data.userId;
+    const isOnline = UserClient.has(userId) && UserClient.get(userId).readyState === UserClient.get(userId).OPEN;
+    ws.send(JSON.stringify({
+        type: WebSocketNotificationType.USER_STATUS,
+        userId: userId,
+        isOnline: isOnline
     }));
 }
