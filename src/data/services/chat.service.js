@@ -98,7 +98,7 @@ export const fetchConversations = async (userId) => {
             },
             include: [
                 {
-                    model: User,
+                    model: db.User,
                     as: 'otherUser',
                     foreignKey: 'otherUserId',
                     attributes: ['id', 'name', 'image_url', 'shopId'],
