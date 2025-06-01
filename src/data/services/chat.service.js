@@ -329,13 +329,21 @@ export const createMessage = async (
             transaction: transaction
         })
 
+        // Đếm số tin nhắn chưa đọc cho receiver
+        const unreadCount = await db.Chat.count({
+            where: {
+                receiverId,
+                isRead: false
+            }
+        });
+
         // Cập nhật Conversation cho người gửi (senderId -> receiverId)
         await db.Conversation.upsert(
             {
                 userId: senderId,
                 otherUserId: receiverId,
                 lastMessageId: chat.id,
-                unreadCount: Sequelize.literal(`CASE WHEN userId = ${receiverId} THEN unreadCount + 1 ELSE unreadCount END`)
+                unreadCount: 0 // Sender không có tin nhắn chưa đọc
             },
             { transaction }
         );
@@ -346,16 +354,20 @@ export const createMessage = async (
                 userId: receiverId,
                 otherUserId: senderId,
                 lastMessageId: chat.id,
-                unreadCount: Sequelize.literal(`CASE WHEN userId = ${receiverId} THEN unreadCount + 1 ELSE unreadCount END`)
+                unreadCount // Số tin nhắn chưa đọc thực tế
             },
             { transaction }
         );
 
-        /** Gửi socket nếu người nhận online **/
+        // Gửi socket NEW_MESSAGE cho cả sender và receiver
         pushNotificationUser(receiverId, {
             type: WebSocketNotificationType.NEW_MESSAGE,
             data: chatDetail
-        })
+        });
+        pushNotificationUser(senderId, {
+            type: WebSocketNotificationType.NEW_MESSAGE,
+            data: chatDetail
+        }); // Dùng để cập nhật unreadCount trong update conversation socket
 
         /** Nếu là shop và offline thì tạo tin nhắn thông báo **/
         if (receiver.shopId) {
@@ -373,13 +385,29 @@ export const createMessage = async (
                     { transaction }
                 );
 
+                const offlineChatDetail = await Chat.findByPk(offlineMessage.id, {
+                    include: [
+                        { model: db.User, as: 'sender' },
+                        { model: db.User, as: 'receiver' }
+                    ],
+                    transaction: transaction
+                });
+
+                // Đếm lại unreadCount sau khi thêm tin nhắn offline
+                const updatedUnreadCount = await db.Chat.count({
+                    where: {
+                        receiverId: senderId,
+                        isRead: false
+                    }
+                });
+
                 // Cập nhật lại Conversation cho người gửi
                 await db.Conversation.upsert(
                     {
                         userId: senderId,
                         otherUserId: receiverId,
                         lastMessageId: offlineMessage.id,
-                        unreadCount: Sequelize.literal(`unreadCount + 1`)
+                        unreadCount: updatedUnreadCount
                     },
                     { transaction }
                 );
@@ -390,15 +418,14 @@ export const createMessage = async (
                         userId: receiverId,
                         otherUserId: senderId,
                         lastMessageId: offlineMessage.id,
-                        // Không tăng unreadCount vì đây là tin nhắn hệ thống từ chính receiverId
-                        unreadCount: Sequelize.literal(`unreadCount`)
+                        unreadCount: 0 // Tin nhắn hệ thống, không tăng unreadCount cho receiver
                     },
                     { transaction }
                 );
 
                 pushNotificationUser(senderId, {
                     type: WebSocketNotificationType.NEW_MESSAGE,
-                    data: offlineMessage
+                    data: offlineChatDetail
                 });
             }
         }

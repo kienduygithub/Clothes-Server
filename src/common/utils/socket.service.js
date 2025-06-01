@@ -11,7 +11,8 @@ export const WebSocketNotificationType = Object.freeze({
     SHOP_STATUS: 'shop_status',
     CONVERSATION_READ: 'conversation_read',
     CHECK_USER_STATUS: 'check_user_status',
-    USER_STATUS: 'user_status'
+    USER_STATUS: 'user_status',
+    UPDATE_CONVERSATIONS: 'update_conversations'
 })
 
 export const UserClient = new Map();
@@ -61,6 +62,9 @@ export const initWebSocket = (port = 3001) => {
                         break;
                     case WebSocketNotificationType.CHECK_USER_STATUS:
                         handleCheckUserStatus(ws, data);
+                        break;
+                    case WebSocketNotificationType.NEW_MESSAGE: // Xử lý khi gửi tin nhắn
+                        await handleNewMessage(ws, data);
                         break;
                 }
 
@@ -306,3 +310,52 @@ const handleCheckUserStatus = (ws, data) => {
         isOnline: isOnline
     }));
 }
+
+const handleNewMessage = async (ws, data) => {
+    try {
+        const newMessage = data.data;
+        const senderId = newMessage.senderId;
+        const receiverId = newMessage.receiverId;
+
+        // Đếm số lượng tin nhắn chưa đọc trong cuộc hội thoại
+        const unreadMessages = await db.Chat.count({
+            where: {
+                senderId,
+                receiverId,
+                isRead: false
+            }
+        });
+
+        // Lấy tin nhắn mới nhất để cập nhật lastMessage
+        const conversation = await db.Chat.findOne({
+            where: {
+                [Op.or]: [
+                    { senderId, receiverId },
+                    { senderId: receiverId, receiverId: senderId }
+                ]
+            },
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (conversation) {
+            const updatedConversation = {
+                otherUserId: senderId === ws.userId ? receiverId : senderId,
+                lastMessage: newMessage,
+                unreadCount: senderId === ws.userId ? 0 : unreadMessages // Số tin nhắn chưa đọc thực tế
+            };
+
+            // Gửi thông báo cập nhật conversations cho cả sender và receiver
+            [senderId, receiverId].forEach(userId => {
+                const userWs = UserClient.get(userId);
+                if (userWs && userWs.readyState === userWs.OPEN) {
+                    userWs.send(JSON.stringify({
+                        type: WebSocketNotificationType.UPDATE_CONVERSATIONS,
+                        data: updatedConversation
+                    }));
+                }
+            });
+        }
+    } catch (error) {
+        console.error('>>> Error handling new message:', error);
+    }
+};
