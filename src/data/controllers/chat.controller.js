@@ -56,8 +56,8 @@ export const markConversationAsRead = async (req, res) => {
     try {
         const { userId } = req.params;
         const response = await ChatService.markConversationAsRead(
+            req.user.id,
             parseInt(userId),
-            req.user.id
         );
         return res.status(response.status).json(response);
     } catch (error) {
