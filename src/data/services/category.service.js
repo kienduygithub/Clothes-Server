@@ -24,7 +24,8 @@ export const fetchCategories = async () => {
             include: {
                 model: Category,
                 as: 'children'
-            }
+            },
+            order: [['createdAt', 'DESC']]
         })
 
         const payload = {
