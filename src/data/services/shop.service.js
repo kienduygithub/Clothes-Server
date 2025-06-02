@@ -73,30 +73,58 @@ export const fetchListShopNotPending = async () => {
         const response = await db.Shop.findAll({
             where: {
                 status: {
-                    [Op.not]: ShopStatus.PENDING
+                    [Op.not]: 'pending'
                 }
             },
             attributes: {
-                exclude: ['updatedAt']
+                exclude: ['updatedAt'],
+                include: [
+                    [
+                        Sequelize.literal(`(
+                            SELECT SUM(stock_quantity)
+                            FROM productvariants AS pv
+                            INNER JOIN products AS p ON pv.productId = p.id
+                            WHERE p.shopId = Shop.id
+                        )`),
+                        'totalStock'
+                    ]
+                ]
             },
             include: [
                 {
                     model: db.User,
                     as: 'user',
-                    attributes: ['id', 'name', 'email', 'phone', 'phone', 'address', 'gender'],
+                    attributes: ['id', 'name', 'email', 'phone', 'address', 'gender'],
                     required: false
+                },
+                {
+                    model: db.Product,
+                    as: 'products',
+                    attributes: [],
+                    required: false,
+                    include: [
+                        {
+                            model: db.ProductVariant,
+                            as: 'variants',
+                            attributes: [],
+                            required: false
+                        }
+                    ]
                 }
             ],
             order: [['createdAt', 'DESC']]
-        })
+        });
 
         return ResponseModel.success('Danh sách cửa hàng', {
-            shops: response
+            shops: response.map(shop => ({
+                ...shop.toJSON(),
+                total_stock: parseInt(shop.getDataValue('totalStock') || 0)
+            }))
         });
     } catch (error) {
-        ResponseModel.error(error?.status, error?.message, error?.body);
+        return ResponseModel.error(error?.status, error?.message, error?.body);
     }
-}
+};
 
 export const fetchRegisterShops = async () => {
     try {
