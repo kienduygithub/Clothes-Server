@@ -44,6 +44,11 @@ ProductRouter.get(
 );
 
 ProductRouter.get(
+    '/product/:shopId/:productId/relative',
+    ProductController.fetchListRelativeProductInShop
+)
+
+ProductRouter.get(
     '/product/:id',
     checkUserAuthentication,
     ProductController.fetchProductById

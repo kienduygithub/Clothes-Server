@@ -55,6 +55,20 @@ export const fetchProductMobiles = async (req, res) => {
     }
 }
 
+export const fetchListRelativeProductInShop = async (req, res) => {
+    try {
+        const { shopId, productId } = req.params;
+        const response = await productServices.fetchListRelativeProductInShop(shopId, productId);
+        return res.status(response?.status).json(response);
+    } catch (error) {
+        return res.status(error?.status).json({
+            status: error.status,
+            message: error?.message ?? 'UNKNOWN',
+            body: error?.body
+        });
+    }
+}
+
 export const fetchProductById = async (req, res) => {
     try {
         const productId = req.params.id;

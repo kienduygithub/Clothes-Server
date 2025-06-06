@@ -167,6 +167,70 @@ export const fetchProductMobiles = async () => {
     }
 }
 
+export const fetchListRelativeProductInShop = async (shopId, productId) => {
+    const t = await sequelize.transaction();
+    try {
+        const subQueryRating = sequelize.literal(`(
+            SELECT COALESCE(AVG(rating), 0)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        const products = await db.Product.findAll({
+            where: {
+                shopId: shopId,
+                id: {
+                    [Op.ne]: productId
+                }
+            },
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                'origin',
+                [subQueryRating, 'rating']
+            ],
+            include: [
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id']
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                    required: false
+                },
+                {
+                    model: db.Review,
+                    as: 'reviews',
+                    attributes: [],
+                    required: false
+                },
+            ],
+            group: [
+                'Product.id',
+                'shop.id',
+            ], // Bổ sung group theo review.id
+            subQuery: false, // Ngăn việc sinh subquery gây mất dữ liệu
+            transaction: t
+        });
+
+        const payload = {
+            products: products
+        }
+
+        await t.commit();
+
+        return ResponseModel.success('Danh sách Product mobile', payload);
+    } catch (error) {
+        await t.rollback();
+        throw error;
+    }
+}
+
 export const fetchProductMobilesByShopId = async (shop_id) => {
     const t = await sequelize.transaction();
     try {
