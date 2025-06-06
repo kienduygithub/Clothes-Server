@@ -27,7 +27,6 @@ export const initWebSocket = (port = 3001) => {
     });
 
     wss.on('connection', (ws) => {
-
         ws.on('close', () => {
             if (ws.userId) {
                 UserClient.delete(ws.userId);
@@ -317,7 +316,7 @@ const handleNewMessage = async (ws, data) => {
         const senderId = newMessage.senderId;
         const receiverId = newMessage.receiverId;
 
-        // Đếm số lượng tin nhắn chưa đọc trong cuộc hội thoại
+        // Đếm số lượng tin nhắn chưa đọc trong cuộc hội thoại của người phải đọc
         const unreadMessages = await db.Chat.count({
             where: {
                 senderId,
@@ -338,16 +337,19 @@ const handleNewMessage = async (ws, data) => {
         });
 
         if (conversation) {
+            console.log('>>> UserId (Người dùng)', ws.userId);
+            console.log('>>> OwnerId (Chủ cửa hàng)', ws.ownerId);
             const updatedConversation = {
-                otherUserId: senderId === ws.userId ? receiverId : senderId,
+                otherUserId: senderId === (ws.userId || ws.ownerId) ? receiverId : senderId,
                 lastMessage: newMessage,
-                unreadCount: senderId === ws.userId ? 0 : unreadMessages // Số tin nhắn chưa đọc thực tế
+                unreadCount: unreadMessages // Số tin nhắn chưa đọc thực tế
             };
 
             // Gửi thông báo cập nhật conversations cho cả sender và receiver
             [senderId, receiverId].forEach(userId => {
                 const userWs = UserClient.get(userId);
                 if (userWs && userWs.readyState === userWs.OPEN) {
+                    console.log(userId);
                     userWs.send(JSON.stringify({
                         type: WebSocketNotificationType.UPDATE_CONVERSATIONS,
                         data: updatedConversation

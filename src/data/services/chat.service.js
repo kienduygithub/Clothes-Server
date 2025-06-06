@@ -294,7 +294,7 @@ export const createMessage = async (
                 message: message || '',
                 messageType,
                 attachments,
-                isRead
+                isRead: false
             },
             { transaction }
         );
@@ -330,20 +330,21 @@ export const createMessage = async (
         })
 
         // Đếm số tin nhắn chưa đọc cho receiver
-        const unreadCount = await db.Chat.count({
+        const unreadCountForReceiver = await db.Chat.count({
             where: {
+                senderId,
                 receiverId,
                 isRead: false
-            }
+            },
+            transaction
         });
-
         // Cập nhật Conversation cho người gửi (senderId -> receiverId)
         await db.Conversation.upsert(
             {
                 userId: senderId,
                 otherUserId: receiverId,
                 lastMessageId: chat.id,
-                unreadCount: 0 // Sender không có tin nhắn chưa đọc
+                unreadCount: 0
             },
             { transaction }
         );
@@ -354,7 +355,7 @@ export const createMessage = async (
                 userId: receiverId,
                 otherUserId: senderId,
                 lastMessageId: chat.id,
-                unreadCount // Số tin nhắn chưa đọc thực tế
+                unreadCount: unreadCountForReceiver
             },
             { transaction }
         );
@@ -394,11 +395,13 @@ export const createMessage = async (
                 });
 
                 // Đếm lại unreadCount sau khi thêm tin nhắn offline
-                const updatedUnreadCount = await db.Chat.count({
+                const unreadCountForSender = await db.Chat.count({
                     where: {
                         receiverId: senderId,
+                        senderId: receiverId,
                         isRead: false
-                    }
+                    },
+                    transaction
                 });
 
                 // Cập nhật lại Conversation cho người gửi
@@ -407,7 +410,7 @@ export const createMessage = async (
                         userId: senderId,
                         otherUserId: receiverId,
                         lastMessageId: offlineMessage.id,
-                        unreadCount: updatedUnreadCount
+                        unreadCount: unreadCountForSender
                     },
                     { transaction }
                 );
@@ -418,7 +421,7 @@ export const createMessage = async (
                         userId: receiverId,
                         otherUserId: senderId,
                         lastMessageId: offlineMessage.id,
-                        unreadCount: 0 // Tin nhắn hệ thống, không tăng unreadCount cho receiver
+                        unreadCount: unreadCountForReceiver
                     },
                     { transaction }
                 );
