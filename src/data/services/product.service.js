@@ -236,7 +236,7 @@ export const fetchLatestProduct = async () => {
     try {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        console.log(startOfMonth);
+
         const subQueryRating = sequelize.literal(`(
             SELECT COALESCE(AVG(rating), 0)
             FROM Reviews
