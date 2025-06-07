@@ -24,6 +24,11 @@ ProductRouter.get(
 )
 
 ProductRouter.get(
+    '/product/latest/search-and-filter',
+    ProductController.searchAndFilterLatestProductsMobile
+)
+
+ProductRouter.get(
     '/product/:id/mobile',
     ProductController.fetchProductMobileById
 );
@@ -46,6 +51,11 @@ ProductRouter.get(
 ProductRouter.get(
     '/product/:shopId/:productId/relative',
     ProductController.fetchListRelativeProductInShop
+)
+
+ProductRouter.get(
+    '/product/latest',
+    ProductController.fetchLatestProduct
 )
 
 ProductRouter.get(

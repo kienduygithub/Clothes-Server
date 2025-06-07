@@ -231,6 +231,74 @@ export const fetchListRelativeProductInShop = async (shopId, productId) => {
     }
 }
 
+export const fetchLatestProduct = async () => {
+    const t = await sequelize.transaction();
+    try {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        console.log(startOfMonth);
+        const subQueryRating = sequelize.literal(`(
+            SELECT COALESCE(AVG(rating), 0)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id
+        )`);
+
+        const products = await db.Product.findAll({
+            where: {
+                createdAt: {
+                    [Op.gte]: startOfMonth,
+                    [Op.lte]: now
+                }
+            },
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                'origin',
+                [subQueryRating, 'rating']
+            ],
+            include: [
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id']
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                    required: false
+                },
+                {
+                    model: db.Review,
+                    as: 'reviews',
+                    attributes: [],
+                    required: false
+                },
+            ],
+            group: [
+                'Product.id',
+                'shop.id',
+            ], // Bổ sung group theo review.id
+            subQuery: false, // Ngăn việc sinh subquery gây mất dữ liệu
+            order: [['createdAt', 'DESC']],
+            transaction: t
+        });
+
+        const payload = {
+            products: products
+        }
+
+        await t.commit();
+
+        return ResponseModel.success('Danh sách Product mobile', payload);
+    } catch (error) {
+        await t.rollback();
+        throw error;
+    }
+}
+
 export const fetchProductMobilesByShopId = async (shop_id) => {
     const t = await sequelize.transaction();
     try {
@@ -1085,5 +1153,155 @@ export const searchAndFilterProductsByParentCategoryMobile = async (
         return ResponseModel.success('Kết quả tìm kiếm', payload);
     } catch (error) {
         throw ResponseModel.error(error?.status || HttpErrors.INTERNAL_SERVER_ERROR, error?.message || 'Lỗi không xác định', error?.body || {});
+    }
+}
+
+export const searchAndFilterLatestProductsMobile = async (
+    searchValue = '',
+    page = 1,
+    limit = 10,
+    origins = [],
+    categoryId = null,
+    sortPrice = 'ASC',
+    minPrice = 0,
+    maxPrice = Infinity,
+    minRatings = []
+) => {
+    try {
+
+        if (page < 1 || limit < 1) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Page và limit phải là số dương', { page, limit });
+        }
+
+        if (minPrice < 0 || maxPrice < minPrice) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Mức giá tìm kiếm không hợp lệ', {});
+        }
+
+        if (minRatings.length > 0 && minRatings.some(r => ![1, 2, 3, 4, 5].includes(r))) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Mức sao tìm kiếm không hợp lệ', {});
+        }
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const offset = (page - 1) * limit;
+
+        /** Điều kiện tìm kiếm */
+        const where = {
+            createdAt: {
+                [Op.gte]: startOfMonth,
+                [Op.lte]: now
+            }
+        };
+        if (searchValue) {
+            where.product_name = {
+                [Op.like]: `%${searchValue}%`
+            };
+        }
+
+        if (origins.length > 0) {
+            where.origin = {
+                [Op.in]: origins
+            }
+        }
+
+        if (minPrice > 0 || maxPrice < Infinity) {
+            where.unit_price = {
+                [Op.between]: [minPrice, maxPrice]
+            }
+        }
+
+        const categoryWhere = categoryId
+            ? {
+                id: categoryId,
+                parentId: {
+                    [Op.not]: null
+                }
+            }
+            : {}
+
+        const subQuertRating = sequelize.literal(`(
+            SELECT AVG(rating)
+            FROM Reviews
+            WHERE Reviews.product_id = Product.id    
+        )`);
+
+        /** Điều kiện lọc theo rating */
+        const having = minRatings.length > 0
+            ? sequelize.literal(`AVG(rating) IN (${minRatings.join(', ')})`)
+            : null;
+
+        const { count, rows } = await db.Product.findAndCountAll({
+            where,
+            attributes: [
+                'id',
+                'product_name',
+                'unit_price',
+                'sold_quantity',
+                'origin',
+                [subQuertRating, 'rating']
+            ],
+            include: [
+                {
+                    model: db.Shop,
+                    as: 'shop',
+                    attributes: ['id', 'shop_name', 'logo_url'],
+                    required: false
+                },
+                {
+                    model: db.ProductImages,
+                    as: 'product_images',
+                    attributes: ['id', 'image_url'],
+                    required: false
+                },
+                {
+                    model: db.Category,
+                    as: 'category',
+                    attributes: ['id', 'category_name', 'parentId'],
+                    where: categoryWhere,
+                    required: !!categoryId, // Chỉ yêu cầu JOIN nếu có categoryId
+                    include: {
+                        model: db.Category,
+                        as: 'parent',
+                        attributes: ['id', 'category_name'],
+                        required: false
+                    }
+                },
+                {
+                    model: db.Review,
+                    as: 'reviews',
+                    attributes: [],
+                    required: false
+                }
+            ],
+            limit,
+            offset,
+            distinct: 'Product.id',
+            order: [
+                ['unit_price', sortPrice.toUpperCase()],
+                ['createdAt', 'DESC']
+            ],
+            subQuery: false,
+            group: having ?
+                ['Product.id', 'shop.id', 'category.id']
+                : null,
+            having: having
+        });
+
+        const totalPages = Math.ceil(count.length ? count.length : (count / limit));
+
+        const payload = {
+            products: rows,
+            paginate: {
+                currentPage: page,
+                limit: limit,
+                totalItems: count.length ? count.length : count,
+                totalPages: totalPages
+            }
+        }
+
+        return ResponseModel.success('Kết quả tìm kiếm', payload);
+    } catch (error) {
+        ResponseModel.error(error?.status, error?.message, error?.body);
     }
 }
