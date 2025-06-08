@@ -25,6 +25,13 @@ export const fetchProductMobileById = async (productId) => {
                     model: db.Shop,
                     as: 'shop',
                     attributes: ['id', 'shop_name', 'logo_url', 'contact_address'],
+                    include: [
+                        {
+                            model: db.User,
+                            as: 'user',
+                            attributes: ['id', 'name']
+                        }
+                    ]
                 },
                 {
                     model: db.Category,
@@ -49,6 +56,8 @@ export const fetchProductMobileById = async (productId) => {
             ],
             group: ['product_images.id']
         });
+
+        response.shop.ownerId = response.shop.user.id;
 
         const payload = {
             products: [response]
