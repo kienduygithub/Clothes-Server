@@ -799,7 +799,7 @@ export const cancelOrderUser = async (user_id, order_id) => {
                                 created_at: ownerNotification.createdAt
                             }
                         };
-                        pushNotificationUser(orderShop.shop.id, notificationPayload);
+                        pushNotificationUser(shopOwner.id, notificationPayload);
                     } catch (socketError) {
                         console.error('Failed to emit socket notification for customer:', socketError);
                     }
