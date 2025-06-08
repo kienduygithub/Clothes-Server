@@ -190,7 +190,7 @@ export const fetchOrderDetails = async (user_id, order_id) => {
         const order = await db.Order.findOne({
             where: {
                 id: order_id,
-                user_id: user_id,
+                // user_id: user_id,
             },
             include: [
                 {

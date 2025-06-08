@@ -64,7 +64,7 @@ export const markAllNotificationAsRead = async (req, res) => {
 export const fetchOrderDetails = async (req, res) => {
     try {
         const user_id = req.params.userId;
-        const order_id = req.params.orderId
+        const order_id = req.params.orderId;
         const response = await NotificationService.fetchOrderDetails(user_id, order_id);
         return res.status(response.status).json(response);
     } catch (error) {
