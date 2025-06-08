@@ -117,9 +117,19 @@ export const markNotificationAsRead = async (user_id, notification_id) => {
             }, { transaction });
         }
 
+        const unreadCount = await Notification.count({
+            where: {
+                user_id: user_id,
+                is_read: false
+            },
+            transaction
+        });
+
         await transaction.commit();
 
-        return ResponseModel.success("Đọc thông báo thành công", {});
+        return ResponseModel.success("Đọc thông báo thành công", {
+            unreadCount
+        });
     } catch (error) {
         await transaction.rollback();
         ResponseModel.error(error?.status, error?.message, error?.body);
