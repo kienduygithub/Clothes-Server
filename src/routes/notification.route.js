@@ -21,6 +21,11 @@ NotificationRouter.patch(
     NotificationController.markNotificationAsRead
 )
 
+NotificationRouter.patch(
+    '/notification/user/:userId/read',
+    NotificationController.markAllNotificationAsRead
+)
+
 NotificationRouter.get(
     '/order/user/:userId/:orderId/read',
     NotificationController.fetchOrderDetails

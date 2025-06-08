@@ -47,6 +47,20 @@ export const markNotificationAsRead = async (req, res) => {
     }
 }
 
+export const markAllNotificationAsRead = async (req, res) => {
+    try {
+        const user_id = req.params.userId;
+        const response = await NotificationService.markAllNotificationAsRead(user_id);
+        return res.status(response.status).json(response);
+    } catch (error) {
+        return res.status(error?.status || HttpErrors.INTERNAL_SERVER_ERROR).json({
+            status: error?.status || HttpErrors.INTERNAL_SERVER_ERROR,
+            message: error?.message || 'UNKNOWN',
+            body: error?.body || {}
+        })
+    }
+}
+
 export const fetchOrderDetails = async (req, res) => {
     try {
         const user_id = req.params.userId;

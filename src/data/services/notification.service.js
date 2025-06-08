@@ -126,6 +126,48 @@ export const markNotificationAsRead = async (user_id, notification_id) => {
     }
 }
 
+export const markAllNotificationAsRead = async (user_id) => {
+    const transaction = await sequelize.transaction();
+    try {
+        if (!user_id) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, "Thiếu thông tin cần thiết", {
+                user_id: user_id ?? '',
+            });
+        }
+
+        const unreadNotifications = await Notification.findAll({
+            where: {
+                user_id: user_id,
+                is_read: false
+            },
+            transaction
+        });
+
+        if (!unreadNotifications.length) {
+            await transaction.commit();
+            return ResponseModel.success("Không có thông báo chưa đọc", {});
+        }
+
+        await Notification.update(
+            { is_read: true },
+            {
+                where: {
+                    user_id: user_id,
+                    is_read: false
+                },
+                transaction
+            }
+        )
+
+        await transaction.commit();
+
+        return ResponseModel.success("Đã đánh dấu tất cả thông báo là đã đọc", {});
+    } catch (error) {
+        await transaction.rollback();
+        ResponseModel.error(error?.status, error?.message, error?.body);
+    }
+}
+
 export const fetchOrderDetails = async (user_id, order_id) => {
     try {
         if (!user_id || !order_id || isNaN(user_id) || !order_id) {

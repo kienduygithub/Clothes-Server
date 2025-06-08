@@ -311,7 +311,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                     where: {
                         user_id: shopOwner.id,
                         type: NotificationType.ORDER_NEW,
-                        reference_id: order.id,
+                        reference_id: orderShop.id,
                         is_read: false
                     }
                 });
@@ -321,7 +321,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                         user_id: shopOwner.id,
                         roles: UserRoles.OWNER,
                         type: NotificationType.ORDER_NEW,
-                        reference_id: order.id,
+                        reference_id: orderShop.id,
                         reference_type: NotificationReferenceType.ORDER,
                         data: {
                             order_id: order.id,
@@ -760,7 +760,7 @@ export const cancelOrderUser = async (user_id, order_id) => {
                     where: {
                         user_id: shopOwner.id,
                         type: NotificationType.ORDER_CANCELED,
-                        reference_id: order_id,
+                        reference_id: orderShop.id,
                         is_read: false
                     },
                     transaction
@@ -771,7 +771,7 @@ export const cancelOrderUser = async (user_id, order_id) => {
                         user_id: shopOwner.id,
                         roles: UserRoles.OWNER,
                         type: NotificationType.ORDER_CANCELED,
-                        reference_id: order_id,
+                        reference_id: orderShop.id,
                         reference_type: NotificationReferenceType.ORDER,
                         data: {
                             order_id: order_id,
