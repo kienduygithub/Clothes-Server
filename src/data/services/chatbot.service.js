@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import db from '../models';
-import { Op } from 'sequelize';
+import db, { Sequelize } from '../models';
+import { Op, where } from 'sequelize';
 import { sequelize } from '../models';
 import { TRAINING_DATA, VIETNAMESE_STOPWORDS } from './training.data';
 
@@ -30,12 +30,16 @@ const PRODUCT_SEARCH_PROMPT = `
 
     Khi trả lời về sản phẩm:
 
-    1. Trả lời trực tiếp:
-    - Nếu tìm thấy: "Đây là [số lượng] sản phẩm phù hợp:"
-    - Nếu không tìm thấy: "Không tìm thấy sản phẩm [mô tả]. Vui lòng thử tìm kiếm khác."
+    1. Xác nhận ý định tìm kiếm:
+    - "Dạ, để em tìm [mô tả sản phẩm] cho anh/chị nhé."
+    - "Dạ, em hiểu anh/chị đang tìm [mô tả sản phẩm] đúng không ạ?"
+
+    2. Trả lời kết quả:
+    - Nếu tìm thấy: "Em tìm được [số lượng] sản phẩm phù hợp:"
+    - Nếu không tìm thấy: "Em xin lỗi, em không tìm thấy [mô tả]. Anh/chị có thể thử tìm với tiêu chí khác ạ."
     - Nếu có category: "Các sản phẩm thuộc [tên category]:"
 
-    2. Format sản phẩm:
+    3. Format sản phẩm:
     - [Tên sản phẩm]
     - Giá: [giá] VNĐ
     - Rating: [X/5 sao] ([số lượng] đánh giá) (nếu có thì mới hiển thị)
@@ -43,7 +47,7 @@ const PRODUCT_SEARCH_PROMPT = `
     - Màu: [danh sách màu]
     - Shop: [tên shop]
 
-    3. Quy tắc:
+    4. Quy tắc:
     - KHÔNG hỏi thêm thông tin
     - KHÔNG giải thích kết quả
     - KHÔNG gợi ý tìm kiếm khác
@@ -53,14 +57,27 @@ const PRODUCT_SEARCH_PROMPT = `
 const SHOP_SEARCH_PROMPT = `
     ${BASE_SYSTEM_PROMPT}
 
-    When showing shop information:
-    1. Present shop details in a friendly, informative way
-    2. Include shop name, contact info, and ratings if available
-    3. Mention total number of products and reviews
-    4. Highlight shop's specialties or popular items
-    5. If showing shop products, present them as examples
-    6. Include shop ratings and customer feedback if available
-    7. Mention shop policies or special features
+    Khi trả lời về shop:
+
+    1. Xác nhận ý định tìm kiếm:
+    - "Dạ, để em tìm cửa hàng [mô tả] cho anh/chị nhé."
+    - "Dạ, em hiểu anh/chị đang muốn tìm shop [mô tả] đúng không ạ?"
+
+    2. Trả lời kết quả:
+    - Nếu tìm thấy: "Em tìm được [số lượng] cửa hàng phù hợp:"
+    - Nếu không tìm thấy: "Em xin lỗi, em không tìm thấy cửa hàng [mô tả]. Anh/chị có thể thử tìm với tiêu chí khác ạ."
+
+    3. Format thông tin shop:
+    - Tên shop: [tên]
+    - Địa chỉ: [địa chỉ] (nếu có)
+    - Email: [email] (nếu có)
+    - Một số sản phẩm tiêu biểu: (nếu có)
+
+    4. Quy tắc:
+    - KHÔNG hỏi thêm thông tin
+    - KHÔNG giải thích kết quả
+    - KHÔNG gợi ý tìm kiếm khác
+    - KHÔNG dùng từ "cửa hàng số X"
 `;
 
 const SOCIAL_PROMPT = `
@@ -119,7 +136,7 @@ export const processMessage = async (userId, userMessage) => {
     try {
         /** Tìm kiếm sản phẩm dựa trên message của người dùng **/
         const searchTerms = await extractSearchTerms(userMessage);
-        const searchResults = await searchProducts(searchTerms);
+        const searchResults = await searchProductOrShop(searchTerms);
 
         /** Tạo response từ bot dựa trên message và kết quả tìm kiếm **/
         const botResponse = await generateBotResponse([{ role: 'user', content: userMessage }], searchResults);
@@ -174,7 +191,7 @@ const extractSearchTermsWithGemini = async (message) => {
 
         // 2. Tạo prompt với examples và context
         const prompt = `
-            Phân tích yêu cầu tìm kiếm sản phẩm thời trang và trích xuất các thông tin quan trọng.
+            Phân tích yêu cầu tìm kiếm sản phẩm hoặc cửa hàng thời trang và trích xuất các thông tin quan trọng.
 
             Dưới đây là một số ví dụ về cách phân tích:
 
@@ -193,7 +210,9 @@ const extractSearchTermsWithGemini = async (message) => {
                 "gender": "", // Giới tính (Male/Female/Unisex/Kids)
                 "minPrice": null, // Giá tối thiểu (VND)
                 "maxPrice": null, // Giá tối đa (VND)
-                "requiresGoodRating": false // true nếu yêu cầu đánh giá tốt/chất lượng cao
+                "requiresGoodRating": false // true nếu yêu cầu đánh giá tốt/chất lượng cao,
+                "isShopSearch": false, // true nếu đang tìm kiếm cửa hàng
+                "shopKeywords": "" // Từ khóa tìm kiếm cửa hàng
             }
 
             Quy tắc:
@@ -210,6 +229,8 @@ const extractSearchTermsWithGemini = async (message) => {
             11. Set requiresGoodRating = true khi có các từ khóa: "tốt", "chất lượng cao", "đánh giá cao", "uy tín", "nổi tiếng"
             12. Luôn cố gắng trích xuất category_name là danh mục chính (áo, quần, váy...) từ câu hỏi đã được làm sạch
             13. Nếu có tên sản phẩm cụ thể, điền vào trường name từ câu hỏi đã được làm sạch
+            14. Set isShopSearch = true khi có các từ khóa: "shop", "cửa hàng", "tiệm", "nơi bán"
+            15. Nếu isShopSearch = true, trích xuất shopKeywords từ nội dung tìm kiếm
 
             Ví dụ:
             - "Cho tôi tất cả áo" -> category_name: "áo", name: ""
@@ -247,7 +268,8 @@ const extractSearchTermsWithGemini = async (message) => {
             minPrice: geminiResults.minPrice,
             maxPrice: geminiResults.maxPrice,
             requiresGoodRating: geminiResults.requiresGoodRating || false,
-            isShopSearch: false,
+            isShopSearch: geminiResults.isShopSearch || false,
+            shopKeywords: geminiResults.shopKeywords || '',
             isSocialOnly: false
         };
 
@@ -369,14 +391,19 @@ const extractSearchTerms = async (message) => {
     }
 };
 
-/** Tìm kiếm sản phẩm **/
-const searchProducts = async (searchTerms) => {
+/** Tìm kiếm sản phẩm hoặc shop **/
+const searchProductOrShop = async (searchTerms) => {
     try {
         // Log để debug
         console.log('Search terms:', searchTerms);
         if (!searchTerms || typeof searchTerms !== 'object') {
             console.error('Invalid searchTerms:', searchTerms);
             return { type: 'error', message: 'Invalid search terms' };
+        }
+
+        // Nếu là tìm kiếm shop, chuyển sang searchShops
+        if (searchTerms.isShopSearch) {
+            return await searchShops(searchTerms);
         }
 
         // Kiểm tra xem có điều kiện tìm kiếm nào không
@@ -590,27 +617,186 @@ const searchProducts = async (searchTerms) => {
 };
 
 /** Tìm kiếm shop **/
-const searchShops = async (searchTerms, includeProducts = false) => {
+const searchShops = async (searchTerms) => {
     try {
         const query = {
-            where: {}
+            where: {},
+            include: [
+                {
+                    model: db.Product,
+                    as: 'products',
+                    required: false,
+                    attributes: [
+                        'id',
+                        'product_name',
+                        'unit_price',
+                        'gender',
+                        'description',
+                        [
+                            sequelize.literal(`(
+                                SELECT AVG(rating)
+                                FROM Reviews
+                                WHERE Reviews.product_id = products.id
+                            )`),
+                            'avg_rating'
+                        ],
+                        [
+                            sequelize.literal(`(
+                                SELECT COUNT(*)
+                                FROM Reviews
+                                WHERE Reviews.product_id = products.id
+                            )`),
+                            'review_count'
+                        ]
+                    ],
+                    include: [
+                        {
+                            model: db.ProductVariant,
+                            as: 'variants',
+                            attributes: ['id', 'sku', 'stock_quantity', 'image_url'],
+                            include: [
+                                {
+                                    model: db.Size,
+                                    as: 'size',
+                                    attributes: ['id', 'size_code']
+                                },
+                                {
+                                    model: db.Color,
+                                    as: 'color',
+                                    attributes: ['id', 'color_name', 'color_code']
+                                }
+                            ]
+                        },
+                        {
+                            model: db.ProductImages,
+                            as: 'product_images',
+                            attributes: ['id', 'image_url']
+                        }
+                    ]
+                }
+            ],
+            attributes: [
+                'id',
+                'shop_name',
+                'contact_email',
+                'contact_address',
+                'logo_url',
+                [
+                    sequelize.literal(`(
+                        SELECT AVG(r.rating)
+                        FROM Reviews r
+                        JOIN Products p ON r.product_id = p.id
+                        WHERE p.shopId = Shop.id
+                    )`),
+                    'avg_rating'
+                ],
+                [
+                    sequelize.literal(`(
+                        SELECT COUNT(r.id)
+                        FROM Reviews r
+                        JOIN Products p ON r.product_id = p.id
+                        WHERE p.shopId = Shop.id
+                    )`),
+                    'total_reviews'
+                ]
+            ]
         };
 
-        if (searchTerms.shopName) {
-            query.where.shop_name = {
-                [Op.like]: `%${searchTerms.shopName}%`
+        // Tìm theo tên shop
+        if (searchTerms.shopKeywords) {
+            query.where[Op.or] = [
+                { shop_name: { [Op.like]: `%${searchTerms.shopKeywords}%` } },
+                { description: { [Op.like]: `%${searchTerms.shopKeywords}%` } }
+            ];
+        }
+
+        // Nếu có yêu cầu về category hoặc gender, thêm điều kiện cho products
+        if (searchTerms.categoryIds?.length > 0 || searchTerms.gender) {
+            const productConditions = {};
+
+            if (searchTerms.categoryIds?.length > 0) {
+                productConditions.categoryId = { [Op.in]: searchTerms.categoryIds };
+            }
+
+            if (searchTerms.gender) {
+                productConditions.gender = searchTerms.gender;
+            }
+
+            query.include[0].where = productConditions;
+            query.include[0].required = true;
+        }
+
+        // Nếu yêu cầu đánh giá tốt
+        if (searchTerms.requiresGoodRating) {
+            query.having = sequelize.literal('avg_rating >= 4.0');
+        }
+
+        // Thực hiện tìm kiếm
+        const shops = await db.Shop.findAll({
+            ...query,
+            group: ['Shop.id', 'products.id', 'products->variants.id', 'products->variants->size.id', 'products->variants->color.id', 'products->product_images.id'],
+            having: query.having
+        });
+
+        // Nếu không tìm thấy shop nào
+        if (!shops || shops.length === 0) {
+            return {
+                type: 'shops',
+                data: [],
+                total: 0,
+                message: 'Không tìm thấy cửa hàng phù hợp với yêu cầu của bạn'
             };
         }
 
-        const shops = await db.Shop.findAll(query);
+        // Format kết quả và lấy 5 shop đầu tiên
+        const formattedShops = shops.slice(0, 5).map(shop => {
+            // Format thông tin shop
+            const shopData = {
+                id: shop.id,
+                name: shop.shop_name,
+                email: shop.contact_email,
+                address: shop.contact_address,
+                logo_url: shop.logo_url,
+                avg_rating: shop.getDataValue('avg_rating')
+                    ? parseFloat(shop.getDataValue('avg_rating')).toFixed(1)
+                    : "Chưa có đánh giá",
+                total_reviews: parseInt(shop.getDataValue('total_reviews') || 0),
+                total_products: shop.products ? shop.products.length : 0
+            };
 
-        /** Nếu không tìm thấy shop nhưng yêu cầu sản phẩm **/
-        if (shops.length === 0 && includeProducts) {
-            const fallbackShops = await db.Shop.findAll({ limit: 3 });
-            return await formatShopResults(fallbackShops, true);
-        }
+            // Format sản phẩm của shop
+            if (shop.products && shop.products.length > 0) {
+                shopData.products = shop.products.slice(0, 3).map(product => ({
+                    id: product.id,
+                    name: product.product_name,
+                    price: product.unit_price,
+                    gender: product.gender,
+                    description: product.description,
+                    image_url: product.product_images && product.product_images[0]
+                        ? product.product_images[0].image_url
+                        : null,
+                    sizes: [...new Set(product.variants
+                        .filter(v => v.size)
+                        .map(v => v.size.size_code))],
+                    colors: [...new Set(product.variants
+                        .filter(v => v.color)
+                        .map(v => v.color.color_name))],
+                    rating: product.getDataValue('avg_rating')
+                        ? parseFloat(product.getDataValue('avg_rating')).toFixed(1)
+                        : "Chưa có đánh giá",
+                    review_count: parseInt(product.getDataValue('review_count') || 0)
+                }));
+            }
 
-        return await formatShopResults(shops, includeProducts);
+            return shopData;
+        });
+
+        return {
+            type: 'shops',
+            data: formattedShops,
+            total: shops.length
+        };
+
     } catch (error) {
         console.error('Shop search error:', error);
         return { type: 'error', message: error.message };
@@ -701,74 +887,6 @@ const formatProductsForResponse = (products) => {
     });
 };
 
-/** Format kết quả shop **/
-const formatShopResults = async (shops, includeProducts = false) => {
-    const formattedShops = [];
-
-    for (const shop of shops) {
-        const shopData = {
-            id: shop.id,
-            name: shop.shop_name,
-            email: shop.contact_email,
-            address: shop.contact_address,
-            logo_url: shop.logo_url
-        };
-
-        /** Thêm thông tin shop khác **/
-        const [productCount, reviewStats] = await Promise.all([
-            db.Product.count({ where: { shop_id: shop.id } }),
-            db.Review.findOne({
-                attributes: [
-                    [db.sequelize.fn('AVG', db.sequelize.col('star_point')), 'avg_rating'],
-                    [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'total_reviews']
-                ],
-                where: { shop_id: shop.id }
-            })
-        ]);
-
-        shopData.total_products = productCount || 0;
-        shopData.avg_rating = reviewStats && reviewStats.dataValues.avg_rating
-            ? parseFloat(reviewStats.dataValues.avg_rating).toFixed(1)
-            : "Chưa có đánh giá";
-        shopData.total_reviews = reviewStats ? reviewStats.dataValues.total_reviews : 0;
-
-        /** Nếu yêu cầu sản phẩm **/
-        if (includeProducts) {
-            const products = await db.Product.findAll({
-                where: { shop_id: shop.id },
-                limit: 3,
-                include: [
-                    {
-                        model: db.ProductImages,
-                        as: 'product_images',
-                    },
-                    {
-                        model: db.ProductVariant,
-                        as: 'variants',
-                        include: [
-                            {
-                                model: db.Size,
-                                as: 'size',
-                                attributes: ['id', 'size_code']
-                            },
-                            {
-                                model: db.Color,
-                                as: 'color',
-                                attributes: ['id', 'color_name', 'color_code']
-                            }
-                        ]
-                    }
-                ]
-            });
-            shopData.products = formatProductsForResponse(products);
-        }
-
-        formattedShops.push(shopData);
-    }
-
-    return { type: 'shops', data: formattedShops };
-};
-
 const generateBotResponse = async (messages, searchResults) => {
     /** Chọn prompt phù hợp dựa trên kết quả tìm kiếm **/
     let systemContext = BASE_SYSTEM_PROMPT;
@@ -816,7 +934,6 @@ const generateBotResponse = async (messages, searchResults) => {
                 systemContext += `- Tên: ${shop.name}\n`;
                 if (shop.email) systemContext += `- Email: ${shop.email}\n`;
                 if (shop.address) systemContext += `- Địa chỉ: ${shop.address}\n`;
-                if (shop.avg_rating) systemContext += `- Đánh giá: ${shop.avg_rating}\n`;
                 if (shop.total_reviews) systemContext += `- Số lượng đánh giá: ${shop.total_reviews}\n`;
                 if (shop.total_products) systemContext += `- Số lượng sản phẩm: ${shop.total_products}\n`;
 
@@ -888,7 +1005,7 @@ export const processGuestMessage = async (userMessage, sessionId) => {
     try {
         /** Tìm kiếm sản phẩm dựa trên tin nhắn của người dùng **/
         const searchTerms = await extractSearchTerms(userMessage);
-        const searchResults = await searchProducts(searchTerms);
+        const searchResults = await searchProductOrShop(searchTerms);
 
         /** Tạo response từ bot **/
         const botResponse = await generateBotResponse([{ role: 'user', content: userMessage }], searchResults);
@@ -929,7 +1046,7 @@ export const sendMessageToSession = async (sessionId, userId, userMessage) => {
 
         // Tìm kiếm sản phẩm
         const searchTerms = await extractSearchTerms(userMessage);
-        const searchResults = await searchProducts(searchTerms);
+        const searchResults = await searchProductOrShop(searchTerms);
 
         // Tạo response từ bot
         const botResponse = await generateBotResponse(messages, searchResults);

@@ -6,7 +6,8 @@ export const TRAINING_DATA = [
             name: "áo thun",
             gender: "Male",
             color: "Đen",
-            maxPrice: 500000
+            maxPrice: 500000,
+            isShopSearch: false
         }
     },
     {
@@ -15,7 +16,8 @@ export const TRAINING_DATA = [
             category_name: "váy/đầm",
             name: "váy đầm dự tiệc",
             color: "Đỏ",
-            size: "M"
+            size: "M",
+            isShopSearch: false
         }
     },
     {
@@ -24,7 +26,8 @@ export const TRAINING_DATA = [
             name: "quần jean",
             gender: "Male",
             minPrice: 200000,
-            maxPrice: 400000
+            maxPrice: 400000,
+            isShopSearch: false
         }
     },
     {
@@ -34,20 +37,23 @@ export const TRAINING_DATA = [
             gender: "Female",
             color: "Trắng",
             size: "L",
-            requiresGoodRating: true
+            requiresGoodRating: true,
+            isShopSearch: false
         }
     },
     {
         query: "Tôi đang tìm sản phẩm dưới 500k, màu đen",
         extraction: {
             maxPrice: 500000,
-            color: "Đen"
+            color: "Đen",
+            isShopSearch: false
         }
     },
     {
         query: "Các sản phẩm đánh giá tốt nhất",
         extraction: {
-            requiresGoodRating: true
+            requiresGoodRating: true,
+            isShopSearch: false
         }
     },
     {
@@ -55,21 +61,25 @@ export const TRAINING_DATA = [
         extraction: {
             category_name: "áo thun",
             name: "áo thun",
-            gender: "Unisex"
+            gender: "Unisex",
+            isShopSearch: false
         }
     },
     {
         query: "Quần áo trẻ em",
         extraction: {
             category_name: "quần áo trẻ em",
-            gender: "Kids"
+            gender: "Kids",
+            isShopSearch: false
         }
     },
     {
         query: "Shop uy tín bán áo khoác",
         extraction: {
             name: "áo khoác",
-            requiresGoodRating: true
+            requiresGoodRating: true,
+            isShopSearch: true,
+            shopKeywords: "uy tín"
         }
     },
     {
@@ -77,7 +87,48 @@ export const TRAINING_DATA = [
         extraction: {
             name: "áo sơ mi",
             gender: "Male",
-            minPrice: 1000000
+            minPrice: 1000000,
+            isShopSearch: false
+        }
+    },
+    // Thêm các mẫu tìm kiếm shop
+    {
+        query: "Tìm shop bán quần áo nam",
+        extraction: {
+            gender: "Male",
+            isShopSearch: true,
+            shopKeywords: "quần áo nam"
+        }
+    },
+    {
+        query: "Shop nào bán đồ thể thao",
+        extraction: {
+            category_name: "đồ thể thao",
+            isShopSearch: true,
+            shopKeywords: "đồ thể thao"
+        }
+    },
+    {
+        query: "Cửa hàng có đánh giá tốt",
+        extraction: {
+            isShopSearch: true,
+            requiresGoodRating: true
+        }
+    },
+    {
+        query: "Shop bán váy đầm dự tiệc",
+        extraction: {
+            category_name: "váy/đầm",
+            name: "váy đầm dự tiệc",
+            isShopSearch: true,
+            shopKeywords: "váy đầm dự tiệc"
+        }
+    },
+    {
+        query: "Tìm shop có nhiều review tốt",
+        extraction: {
+            isShopSearch: true,
+            requiresGoodRating: true
         }
     }
 ];
