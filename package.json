@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "serve": "nodemon --exec babel-node src/index.js"
+    "serve": "nodemon --exec babel-node src/index.js",
+    "start": "babel-node src/index.js",
+    "build": "babel src -d dist"
   },
   "author": "Kiến Duy",
   "license": "ISC",
