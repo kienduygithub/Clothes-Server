@@ -463,7 +463,8 @@ export const createNewShop = async (userInfo, shopInfo, files) => {
             contact_email: contact_email ?? '',
             contact_address: contact_address ?? '',
             description: description ?? '',
-            status: ShopStatus.ACTIVE
+            status: ShopStatus.ACTIVE,
+            statusChangedAt: new Date()
         }, { transaction });
 
         await db.User.create({
