@@ -100,9 +100,10 @@ export const fetchListLatestOrderShop = async (req, res) => {
 
 export const createNewShop = async (req, res) => {
     try {
+        const userInfo = req.body.userInfo;
         const shopInfo = req.body.shopInfo;
         const files = req.files;
-        const response = await shopServices.createNewShop(shopInfo, files);
+        const response = await shopServices.createNewShop(userInfo, shopInfo, files);
         return res.status(response.status).json(response);
     } catch (error) {
         return res.status(error.status).json({

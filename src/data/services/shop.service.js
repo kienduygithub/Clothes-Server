@@ -73,7 +73,7 @@ export const fetchListShopNotPending = async () => {
         const response = await db.Shop.findAll({
             where: {
                 status: {
-                    [Op.not]: 'pending'
+                    [Op.not]: ShopStatus.PENDING
                 }
             },
             attributes: {
@@ -386,13 +386,24 @@ export const fetchListLatestOrderShop = async (tokenShopId, { dateRanges }) => {
     }
 }
 
-export const createNewShop = async (shopInfo, files) => {
+export const createNewShop = async (userInfo, shopInfo, files) => {
+    const transaction = await sequelize.transaction();
     try {
-        if (!shopInfo) {
+        if (!shopInfo || !userInfo) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
-                shopInfo: shopInfo
+                shopInfo: shopInfo,
+                userInfo: userInfo ?? ''
             });
         }
+
+        const {
+            name,
+            email,
+            address,
+            password,
+            phone,
+            gender
+        } = JSON.parse(userInfo);
 
         const {
             shop_name,
@@ -400,6 +411,15 @@ export const createNewShop = async (shopInfo, files) => {
             contact_address,
             description
         } = JSON.parse(shopInfo);
+
+        if (!name || !password || !email || !phone) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
+                name: name ?? '',
+                email: email ?? '',
+                phone: phone ?? '',
+                password: password ?? ''
+            });
+        }
 
         if (!shop_name || !contact_email || !contact_address) {
             ResponseModel.error(HttpErrors.BAD_REQUEST, 'Thiếu trường cần thiết', {
@@ -409,7 +429,30 @@ export const createNewShop = async (shopInfo, files) => {
             });
         }
 
-        await db.Shop.create({
+        const existingUser = await db.User.findOne({
+            where: { email: contact_email },
+            transaction
+        });
+
+        if (existingUser) {
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Email đã được sử dụng', {
+                contact_email: contact_email
+            });
+        }
+
+        const existingShop = await db.Shop.findOne({
+            where: { contact_email: contact_email },
+            transaction
+        });
+
+        if (existingShop) {
+            await transaction.rollback();
+            ResponseModel.error(HttpErrors.BAD_REQUEST, 'Email liên hệ của cửa hàng đã được sử dụng', {
+                contact_email: contact_email
+            });
+        }
+
+        const createdShop = await db.Shop.create({
             shop_name: shop_name,
             logo_url: files && files['logoShopFile']
                 ? `shops/${files['logoShopFile'][0].filename}`
@@ -419,12 +462,32 @@ export const createNewShop = async (shopInfo, files) => {
                 : '',
             contact_email: contact_email ?? '',
             contact_address: contact_address ?? '',
-            description: description ?? ''
-        });
+            description: description ?? '',
+            status: ShopStatus.ACTIVE
+        }, { transaction });
 
-        return ResponseModel.success('Tạo cửa hàng thành công.', null);
+        await db.User.create({
+            name: name,
+            email: email,
+            address: address ?? '',
+            password: hashPassword(password),
+            phone: phone,
+            gender: gender,
+            image_url: files && files['adminOwnerFile']
+                ? `admin-owners/${files['adminOwnerFile'][0].filename}`
+                : '',
+            shopId: createdShop.id
+        }, { transaction })
+
+        await transaction.commit();
+
+        return ResponseModel.success('Tạo cửa hàng thành công.', {});
     } catch (error) {
         console.log(error);
+        await transaction.rollback();
+        await handleDeleteImageAsFailed(files['adminOwnerFile'][0]);
+        await handleDeleteImageAsFailed(files['logoShopFile'][0]);
+        await handleDeleteImageAsFailed(files['backgroundShopFile'][0]);
         ResponseModel.error(error.status, error.message, error?.body);
     }
 }

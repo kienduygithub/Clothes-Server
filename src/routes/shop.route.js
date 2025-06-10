@@ -71,6 +71,7 @@ ShopRouter.post(
     '/shop/admin/create',
     checkUserAuthentication,
     uploadServer.fields([
+        { name: 'adminOwnerFile', maxCount: 1 },
         { name: 'logoShopFile', maxCount: 1 },
         { name: 'backgroundShopFile', maxCount: 1 }
     ]),
@@ -81,6 +82,7 @@ ShopRouter.patch(
     '/shop/admin/:id',
     checkUserAuthentication,
     uploadServer.fields([
+        { name: 'adminOwnerFile', maxCount: 1 },
         { name: 'logoShopFile', maxCount: 1 },
         { name: 'backgroundShopFile', maxCount: 1 }
     ]),
