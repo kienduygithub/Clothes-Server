@@ -6,8 +6,9 @@ import { comparePassword, hashPassword } from "../../common/utils/user.common";
 import { generalAccessToken, generalRefreshToken } from "../../common/middleware/jwt.middleware";
 import { handleDeleteImageAsFailed, handleDeleteImages } from "../../common/middleware/upload.middleware";
 import { sendActivateStoreMailer } from "../../common/mails/mailer.config";
-import { OrderStatus, ShopStatus } from "../../common/utils/status";
+import { NotificationActionType, NotificationReferenceType, NotificationType, OrderStatus, ShopStatus } from "../../common/utils/status";
 import { UserRoles } from "../../common/utils/roles";
+import { pushNotificationUser } from "../../common/utils/socket.service";
 
 export const signIn = async (info) => {
     try {
@@ -126,12 +127,6 @@ export const signUp = async (
         await user.update({ shopId: shop.id, roles: UserRoles.OWNER }, { transaction });
 
         await transaction.commit();
-
-        await sendActivateStoreMailer(
-            'buikienduy2020@gmail.com',
-            shopOwnerName,
-            shop.shop_name
-        )
 
         return ResponseModel.success('Đăng ký chủ cửa hàng thành công', {
             user: user,
@@ -420,13 +415,46 @@ export const registerShopMobile = async (
             }
         );
 
-        await transaction.commit();
+        const admins = await User.findAll({
+            where: { roles: UserRoles.ADMIN }
+        });
 
-        await sendActivateStoreMailer(
-            'buikienduy2020@gmail.com',
-            user.name,
-            shop_name
-        )
+        for (const admin of admins) {
+            const adminNotification = await db.Notification.create({
+                user_id: admin.id,
+                roles: UserRoles.ADMIN,
+                type: NotificationType.STORE_REGISTRATION_REQUEST,
+                reference_id: shop.id,
+                reference_type: NotificationReferenceType.STORE_REGISTRATION,
+                data: {
+                    owner_id: id,
+                    shop_name: shop.shop_name,
+                },
+                action: NotificationActionType.VIEW_REGISTRATION,
+                is_read: false,
+                created_at: new Date(),
+            }, { transaction });
+
+            const notificationPayload = {
+                type: 'notification',
+                notification: {
+                    id: adminNotification.id,
+                    user_id: adminNotification.user_id,
+                    roles: adminNotification.roles,
+                    type: adminNotification.type,
+                    reference_id: adminNotification.reference_id,
+                    reference_type: adminNotification.reference_type,
+                    data: adminNotification.data,
+                    action: adminNotification.action,
+                    is_read: adminNotification.is_read,
+                    created_at: adminNotification.createdAt
+                }
+            };
+
+            pushNotificationUser(admin.id, notificationPayload);
+        }
+
+        await transaction.commit();
 
         return ResponseModel.success('Đăng ký chủ cửa hàng thành công', {});
     } catch (error) {
