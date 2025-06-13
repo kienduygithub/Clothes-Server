@@ -23,7 +23,7 @@ import {
     sequelize,
     Sequelize
 } from "../models";
-import { NotificationActionType, NotificationReferenceType, NotificationType, OrderStatus } from "../../common/utils/status";
+import { DiscountTypes, NotificationActionType, NotificationReferenceType, NotificationType, OrderStatus } from "../../common/utils/status";
 import { UserRoles } from "../../common/utils/roles";
 import { pushNotificationUser } from "../../common/utils/socket.service";
 
@@ -69,6 +69,7 @@ export const createOrderMobile = async (user_id, cartInfo) => {
 
         /** 3. Tạo OrderShop và OrderItem */
         const orderShops = [];
+        const currentTime = new Date();
         for (const cart_shop of cart_shops) {
             const {
                 cart_shop_id, /** Có vẻ không dùng */
@@ -110,54 +111,88 @@ export const createOrderMobile = async (user_id, cartInfo) => {
                 const coupon = await Coupon.findOne({
                     where: {
                         id: finalCouponId,
-                        [Op.or]: [
-                            { valid_from: { [Op.lte]: new Date() } },
-                            { valid_from: null }
-                        ],
-                        [Op.or]: [
-                            { valid_to: { [Op.gte]: new Date() } },
-                            { valid_to: null }
-                        ],
-                        [Op.or]: [
-                            { max_usage: null },
-                            { max_usage: -1 },
-                            { max_usage: { [Op.gt]: sequelize.col('times_used') } }
+                        [Op.and]: [
+                            {
+                                [Op.or]: [
+                                    { valid_from: { [Op.lte]: currentTime } },
+                                    { valid_from: null }
+                                ]
+                            },
+                            {
+                                [Op.or]: [
+                                    { valid_to: { [Op.gte]: currentTime } },
+                                    { valid_to: null }
+                                ]
+                            },
+                            {
+                                [Op.or]: [
+                                    { max_usage: null },
+                                    { max_usage: -1 },
+                                    { max_usage: { [Op.gt]: Sequelize.col('times_used') } }
+                                ]
+                            }
                         ]
                     },
                     transaction: t
                 });
-
+                console.log(coupon);
                 if (!coupon) {
-                    finalCouponId = null;
-                    finalDiscountShop = 0;
-                    finalTotalShop = shop_total;
-                    console.warn(`KM ${selected_coupon.id} không hợp lệ (ngoài thời gian hiệu lực hoặc hết lượt)`);
-                } else {
-                    /** Kiểm tra UserCoupon */
-                    const userCoupon = await UserCoupon.findOne({
-                        where: {
-                            user_id: user_id,
-                            coupon_id: coupon.id,
-                            is_used: false
-                        },
-                        transaction: t
-                    });
-
-                    if (!userCoupon) {
-                        finalCouponId = null;
-                        finalDiscountShop = 0;
-                        finalTotalShop = shop_total;
-                        console.warn(`UserCoupon KM ${coupon.id} không hợp lệ hoặc đã sử dụng`);
-                    } else {
-                        /** Kiểm tra min_order_value */
-                        if (shop_total < coupon.min_order_value) {
-                            finalCouponId = null;
-                            finalDiscountShop = 0;
-                            finalTotalShop = shop_total;
-                            console.warn(`Coupon ${coupon.id} không đủ min_order_value`);
-                        }
-                    }
+                    ResponseModel.error(
+                        HttpErrors.BAD_REQUEST,
+                        `Tồn tại mã khuyến mãi không hợp lệ hoặc đã hết hạn`,
+                        { coupon_id: finalCouponId }
+                    );
                 }
+                /** Kiểm tra UserCoupon */
+                const userCoupon = await UserCoupon.findOne({
+                    where: {
+                        user_id: user_id,
+                        coupon_id: coupon.id,
+                        is_used: false
+                    },
+                    transaction: t
+                });
+
+                if (!userCoupon) {
+                    ResponseModel.error(
+                        HttpErrors.BAD_REQUEST,
+                        `Tồn tại mã khuyến mãi đã sử dụng hoặc không tồn tại`,
+                        { coupon_id: finalCouponId }
+                    );
+                }
+                /** Kiểm tra min_order_value */
+                if (shop_total < coupon.min_order_value) {
+                    ResponseModel.error(
+                        HttpErrors.BAD_REQUEST,
+                        `Đơn hàng không đủ giá trị tối thiểu để áp dụng mã khuyến mãi ${coupon.id}`,
+                        { min_order_value: coupon.min_order_value }
+                    );
+                }
+
+                /** Kiểm tra tính toán giảm giá */
+                let calculatedDiscount = 0;
+                if (coupon.discount_type === DiscountTypes.PERCENTAGE) {
+                    calculatedDiscount = (shop_total * coupon.discount_value) / 100;
+                    if (coupon.max_discount && calculatedDiscount > coupon.max_discount) {
+                        calculatedDiscount = coupon.max_discount;
+                    }
+                } else if (coupon.discount_type === DiscountTypes.FIXED) {
+                    calculatedDiscount = coupon.discount_value;
+                }
+
+                if (Math.abs(calculatedDiscount - shop_discount) > 0.01 || shop_final_total !== Math.max(0, shop_total - calculatedDiscount)) {
+                    ResponseModel.error(
+                        HttpErrors.BAD_REQUEST,
+                        `Giá trị giảm giá hoặc tổng tiền cửa hàng không khớp với mã khuyến mãi`,
+                        { coupon_id: finalCouponId }
+                    );
+                }
+            } else if (shop_discount > 0 || shop_final_total !== shop_total) {
+                ResponseModel.error(
+                    HttpErrors.BAD_REQUEST,
+                    `Thông tin giảm giá không hợp lệ khi không sử dụng mã khuyến mãi`,
+                    { shop_discount, shop_final_total }
+                );
             }
             /** Tạo OrderShop */
             const orderShop = await OrderShop.create({

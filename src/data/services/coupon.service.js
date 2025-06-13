@@ -1,7 +1,7 @@
 import { Op } from "sequelize";
 import HttpErrors from "../../common/errors/http-errors";
 import { ResponseModel } from "../../common/errors/response";
-import { Coupon, UserCoupon, User, Shop, sequelize } from "../models";
+import { Coupon, UserCoupon, User, Shop, sequelize, Sequelize } from "../models";
 
 export const fetchShopCoupons = async (shopId) => {
     try {
@@ -313,9 +313,32 @@ export const fetchShopCouponMobile = async (userId, shopId) => {
                 shopId: shopId ?? ''
             })
         }
+
+        const currentTime = new Date();
         const coupons = await Coupon.findAll({
             where: {
                 shop_id: shopId,
+                [Op.and]: [
+                    {
+                        [Op.or]: [
+                            { valid_from: { [Op.lte]: currentTime } },
+                            { valid_from: null }
+                        ]
+                    },
+                    {
+                        [Op.or]: [
+                            { valid_to: { [Op.gte]: currentTime } },
+                            { valid_to: null }
+                        ]
+                    },
+                    {
+                        [Op.or]: [
+                            { max_usage: null },
+                            { max_usage: -1 },
+                            { max_usage: { [Op.gt]: Sequelize.col('times_used') } }
+                        ]
+                    }
+                ]
             },
             attributes: { exclude: ['createdAt', 'updatedAt'] },
             include: [
@@ -369,9 +392,32 @@ export const fetchShopCouponOnlyMobile = async (shopId) => {
                 shopId: shopId ?? ''
             })
         }
+
+        const currentTime = new Date();
         const coupons = await Coupon.findAll({
             where: {
                 shop_id: shopId,
+                [Op.and]: [
+                    {
+                        [Op.or]: [
+                            { valid_from: { [Op.lte]: currentTime } },
+                            { valid_from: null }
+                        ]
+                    },
+                    {
+                        [Op.or]: [
+                            { valid_to: { [Op.gte]: currentTime } },
+                            { valid_to: null }
+                        ]
+                    },
+                    {
+                        [Op.or]: [
+                            { max_usage: null },
+                            { max_usage: -1 },
+                            { max_usage: { [Op.gt]: Sequelize.col('times_used') } }
+                        ]
+                    }
+                ]
             },
             attributes: { exclude: ['createdAt', 'updatedAt'] },
             include: [
@@ -380,7 +426,7 @@ export const fetchShopCouponOnlyMobile = async (shopId) => {
                     as: 'shop',
                     attributes: ['id', 'shop_name', 'logo_url']
                 }
-            ]
+            ],
         });
 
         const formattedCoupons = coupons.map(coupon => ({
@@ -415,18 +461,26 @@ export const fetchCouponUserMobile = async (userId) => {
         }
         const coupons = await Coupon.findAll({
             where: {
-                [Op.or]: [
-                    { valid_from: { [Op.lte]: new Date() } },
-                    { valid_from: null }
-                ],
-                [Op.or]: [
-                    { valid_to: { [Op.gte]: new Date() } },
-                    { valid_to: null }
-                ],
-                [Op.or]: [
-                    { max_usage: -1 },
-                    { max_usage: null },
-                    { max_usage: { [Op.gt]: sequelize.col('times_used') } },
+                [Op.and]: [
+                    {
+                        [Op.or]: [
+                            { valid_from: { [Op.lte]: new Date() } },
+                            { valid_from: null }
+                        ],
+                    },
+                    {
+                        [Op.or]: [
+                            { valid_to: { [Op.gte]: new Date() } },
+                            { valid_to: null }
+                        ],
+                    },
+                    {
+                        [Op.or]: [
+                            { max_usage: -1 },
+                            { max_usage: null },
+                            { max_usage: { [Op.gt]: sequelize.col('times_used') } },
+                        ]
+                    }
                 ]
             },
             attributes: { exclude: ['createdAt', 'updatedAt'] },

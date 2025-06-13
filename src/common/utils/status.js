@@ -32,4 +32,9 @@ export const NotificationActionType = Object.freeze({
     NONE: 'NONE'
 });
 
+export const DiscountTypes = Object.freeze({
+    PERCENTAGE: 'percentage',
+    FIXED: 'fixed'
+})
+
 
