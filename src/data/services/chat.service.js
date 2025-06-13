@@ -373,7 +373,13 @@ export const createMessage = async (
         /** Nếu là shop và offline thì tạo tin nhắn thông báo **/
         if (receiver.shopId) {
             const shopWs = ShopClient.get(receiver.shopId);
-            if (!shopWs || shopWs.readyState !== shopWs.OPEN) {
+            const shopOwnerWs = UserClient.get(receiverId);
+
+            if (
+                (!shopWs && !shopOwnerWs) ||
+                (shopWs && shopWs.readyState !== shopWs.OPEN) ||
+                (shopOwnerWs && shopOwnerWs.readyState !== shopOwnerWs.OPEN)
+            ) {
                 const offlineMessage = await Chat.create(
                     {
                         senderId: receiverId,

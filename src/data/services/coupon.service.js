@@ -460,29 +460,6 @@ export const fetchCouponUserMobile = async (userId) => {
             })
         }
         const coupons = await Coupon.findAll({
-            where: {
-                [Op.and]: [
-                    {
-                        [Op.or]: [
-                            { valid_from: { [Op.lte]: new Date() } },
-                            { valid_from: null }
-                        ],
-                    },
-                    {
-                        [Op.or]: [
-                            { valid_to: { [Op.gte]: new Date() } },
-                            { valid_to: null }
-                        ],
-                    },
-                    {
-                        [Op.or]: [
-                            { max_usage: -1 },
-                            { max_usage: null },
-                            { max_usage: { [Op.gt]: sequelize.col('times_used') } },
-                        ]
-                    }
-                ]
-            },
             attributes: { exclude: ['createdAt', 'updatedAt'] },
             include: [
                 {

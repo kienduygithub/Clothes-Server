@@ -638,6 +638,7 @@ export const declineRegisterShopById = async (shopId) => {
 
         await existShop.user.update({
             roles: UserRoles.CUSTOMER,
+            shopId: null
         }, { transaction })
 
         await db.Shop.destroy({
