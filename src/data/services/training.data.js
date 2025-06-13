@@ -250,6 +250,565 @@ export const TRAINING_DATA = [
             requiresGoodRating: true,
             shopKeywords: "đồ thể thao nam chính hãng"
         }
+    },
+    {
+        query: "Tìm áo đẹp",
+        extraction: {
+            category_name: "áo",
+            requiresGoodRating: true,
+            keywords: "áo"
+        }
+    },
+    {
+        query: "Tìm áo đẹp giá hời",
+        extraction: {
+            category_name: "áo",
+            requiresGoodRating: true,
+            name: 'áo',
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: "áo"
+        }
+    },
+    {
+        query: "Tìm áo thun đẹp giá dưới 200k chất lượng tốt",
+        extraction: {
+            category_name: "áo thun",
+            requiresGoodRating: true,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: "áo thun"
+        }
+    },
+    {
+        query: "Tìm áo thun nam đẹp giá dưới 200k chất lượng tốt",
+        extraction: {
+            category_name: "áo thun",
+            requiresGoodRating: true,
+            gender: "Male",
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: "áo thun nam"
+        }
+    },
+    {
+        query: "Tìm áo sơ mi nữ giá từ 250k đến 450k chất lượng cao",
+        extraction: {
+            category_name: "áo sơ mi",
+            requiresGoodRating: true,
+            gender: "Female",
+            minPrice: 250000,
+            maxPrice: 450000,
+            keywords: "áo sơ mi nữ"
+        }
+    },
+    {
+        query: "Tìm áo khoác unisex giá rẻ dưới 300k",
+        extraction: {
+            category_name: "áo khoác",
+            requiresGoodRating: false,
+            gender: "Unisex",
+            minPrice: null,
+            maxPrice: 300000,
+            keywords: "áo khoác unisex"
+        }
+    },
+    {
+        query: "Tìm áo len trẻ em chất lượng tốt giá từ 150k",
+        extraction: {
+            category_name: "áo len",
+            requiresGoodRating: true,
+            gender: "Kids",
+            minPrice: 150000,
+            maxPrice: null,
+            keywords: "áo len trẻ em"
+        }
+    },
+    {
+        query: "Tìm áo hoodie không phân biệt giới tính giá dưới 400k chất lượng ổn",
+        extraction: {
+            category_name: "áo hoodie",
+            requiresGoodRating: true,
+            gender: "Other",
+            minPrice: null,
+            maxPrice: 400000,
+            keywords: "áo hoodie"
+        }
+    },
+    {
+        query: "Tìm áo phông nam giá rẻ dưới 120k",
+        extraction: {
+            category_name: "áo phông",
+            requiresGoodRating: false,
+            gender: "Male",
+            minPrice: null,
+            maxPrice: 120000,
+            keywords: "áo phông nam"
+        }
+    },
+    {
+        query: "Tìm áo polo nữ cao cấp giá từ 300k đến 600k",
+        extraction: {
+            category_name: "áo polo",
+            requiresGoodRating: true,
+            gender: "Female",
+            minPrice: 300000,
+            maxPrice: 600000,
+            keywords: "áo polo nữ"
+        }
+    },
+    {
+        query: "Tìm áo croptop unisex giá dưới 200k chất lượng tốt",
+        extraction: {
+            category_name: "áo croptop",
+            requiresGoodRating: true,
+            gender: "Unisex",
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: "áo croptop unisex"
+        }
+    },
+    {
+        query: "Tìm áo khoác gió trẻ em giá từ 100k đến 250k chất lượng cao",
+        extraction: {
+            category_name: "áo khoác gió",
+            requiresGoodRating: true,
+            gender: "Kids",
+            minPrice: 100000,
+            maxPrice: 250000,
+            keywords: "áo khoác gió trẻ em"
+        }
+    },
+    {
+        query: "Tìm áo thun in hình không phân biệt giới tính giá rẻ dưới 150k",
+        extraction: {
+            category_name: "áo thun",
+            requiresGoodRating: false,
+            gender: "Other",
+            minPrice: null,
+            maxPrice: 150000,
+            keywords: "áo thun in hình"
+        }
+    },
+    {
+        query: "Tìm áo thun nam giá hời dưới 150k mà chất xịn",
+        extraction: {
+            category_name: "áo thun",
+            requiresGoodRating: true,
+            gender: "Male",
+            minPrice: null,
+            maxPrice: 150000,
+            keywords: "áo thun nam"
+        }
+    },
+    {
+        query: "Tìm áo sơ mi nữ giá rẻ bèo mà đẹp từ 100k đến 250k",
+        extraction: {
+            category_name: "áo sơ mi",
+            requiresGoodRating: true,
+            gender: "Female",
+            minPrice: 100000,
+            maxPrice: 250000,
+            keywords: "áo sơ mi nữ"
+        }
+    },
+    {
+        query: "Tìm áo khoác unisex giá siêu hời dưới 200k",
+        extraction: {
+            category_name: "áo khoác",
+            requiresGoodRating: false,
+            gender: "Unisex",
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: "áo khoác unisex"
+        }
+    },
+    {
+        query: "Tìm áo len trẻ em giá mềm mà chất lượng tốt",
+        extraction: {
+            category_name: "áo len",
+            requiresGoodRating: true,
+            gender: "Kids",
+            minPrice: null,
+            maxPrice: null,
+            keywords: "áo len trẻ em"
+        }
+    },
+    {
+        query: "Tìm áo hoodie không phân biệt giới tính giá rẻ dã man dưới 300k",
+        extraction: {
+            category_name: "áo hoodie",
+            requiresGoodRating: false,
+            gender: "Other",
+            minPrice: null,
+            maxPrice: 300000,
+            keywords: "áo hoodie"
+        }
+    },
+    {
+        query: "Tìm áo phông nam giá hạt dẻ dưới 100k",
+        extraction: {
+            category_name: "áo phông",
+            requiresGoodRating: false,
+            gender: "Male",
+            minPrice: null,
+            maxPrice: 100000,
+            keywords: "áo phông nam"
+        }
+    },
+    {
+        query: "Tìm áo polo nữ giá hời mà xịn từ 200k đến 400k",
+        extraction: {
+            category_name: "áo polo",
+            requiresGoodRating: true,
+            gender: "Female",
+            minPrice: 200000,
+            maxPrice: 400000,
+            keywords: "áo polo nữ"
+        }
+    },
+    {
+        query: "Tìm áo croptop unisex giá rẻ xịn dưới 180k",
+        extraction: {
+            category_name: "áo croptop",
+            requiresGoodRating: true,
+            gender: "Unisex",
+            minPrice: null,
+            maxPrice: 180000,
+            keywords: "áo croptop unisex"
+        }
+    },
+    {
+        query: "Tìm áo khoác gió trẻ em giá rẻ chất lượng từ 120k đến 250k",
+        extraction: {
+            category_name: "áo khoác gió",
+            requiresGoodRating: true,
+            gender: "Kids",
+            minPrice: 120000,
+            maxPrice: 250000,
+            keywords: "áo khoác gió trẻ em"
+        }
+    },
+    {
+        query: "Tìm áo thun in hình giá siêu rẻ dưới 130k",
+        extraction: {
+            category_name: "áo thun",
+            requiresGoodRating: false,
+            gender: "Other",
+            minPrice: null,
+            maxPrice: 130000,
+            keywords: "áo thun in hình"
+        }
+    },
+    {
+        query: "Tìm áo thun giá hời dưới 100k",
+        extraction: {
+            category_name: "áo thun",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 100000,
+            keywords: "áo thun"
+        }
+    },
+    {
+        query: "Tìm áo sơ mi giá rẻ bèo dưới 200k",
+        extraction: {
+            category_name: "áo sơ mi",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: "áo sơ mi"
+        }
+    },
+    {
+        query: "Tìm áo khoác giá siêu hời từ 150k đến 300k",
+        extraction: {
+            category_name: "áo khoác",
+            requiresGoodRating: false,
+            minPrice: 150000,
+            maxPrice: 300000,
+            keywords: "áo khoác"
+        }
+    },
+    {
+        query: "Tìm áo len giá mềm dưới 250k",
+        extraction: {
+            category_name: "áo len",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 250000,
+            keywords: "áo len"
+        }
+    },
+    {
+        query: "Tìm áo hoodie giá rẻ dã man dưới 350k",
+        extraction: {
+            category_name: "áo hoodie",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 350000,
+            keywords: "áo hoodie"
+        }
+    },
+    {
+        query: "Tìm áo polo giá rẻ xịn dưới 180k",
+        extraction: {
+            category_name: "áo polo",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 180000,
+            keywords: "áo polo"
+        }
+    },
+    {
+        query: "Tìm áo croptop giá hạt dẻ dưới 120k",
+        extraction: {
+            category_name: "áo croptop",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 120000,
+            keywords: "áo croptop"
+        }
+    },
+    {
+        query: "Sản phẩm giá rẻ, siêu hời",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá rẻ",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 150000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá tốt",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá mềm",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá rẻ",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 150000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá tốt",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá mềm",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá hời",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 180000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá rẻ bèo",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 150000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá siêu tốt",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá siêu hời",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 170000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá rẻ xịn",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 190000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá hạt dẻ",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 160000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá rẻ hết sảy",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá rẻ",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 150000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá tốt",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá mềm",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 200000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá rẻ chẳng hạn",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 180000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá rẻ bèo",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 150000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá siêu hời",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: null,
+            maxPrice: 170000,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá cao xịn",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: 500000,
+            maxPrice: null,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá đắt nhưng chất",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: true,
+            minPrice: 200000,
+            maxPrice: null,
+            keywords: ""
+        }
+    },
+    {
+        query: "Sản phẩm giá mắc xịn",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: 700000,
+            maxPrice: null,
+            keywords: ""
+        }
+    },
+    {
+        query: "Các sản phẩm giá cao cấp",
+        extraction: {
+            category_name: "",
+            requiresGoodRating: false,
+            minPrice: 800000,
+            maxPrice: null,
+            keywords: ""
+        }
     }
 ];
 

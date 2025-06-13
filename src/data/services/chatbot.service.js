@@ -210,7 +210,7 @@ const extractSearchTermsWithGemini = async (message) => {
                 "gender": "", // Giới tính (Male/Female/Unisex/Kids)
                 "minPrice": null, // Giá tối thiểu (VND)
                 "maxPrice": null, // Giá tối đa (VND)
-                "requiresGoodRating": false // true nếu yêu cầu đánh giá tốt/chất lượng cao,
+                "requiresGoodRating": false // true nếu yêu cầu đẹp/tốt/đánh giá tốt/chất lượng cao,
                 "isShopSearch": false, // true nếu đang tìm kiếm cửa hàng
                 "shopKeywords": "" // Từ khóa tìm kiếm cửa hàng
             }
@@ -226,16 +226,22 @@ const extractSearchTermsWithGemini = async (message) => {
             8. Với "dưới X", maxPrice = X và minPrice = null
             9. Với "từ X", minPrice = X và maxPrice = null
             10. Với "từ X đến Y", minPrice = X và maxPrice = Y
-            11. Set requiresGoodRating = true khi có các từ khóa: "tốt", "chất lượng cao", "đánh giá cao", "uy tín", "nổi tiếng"
+            11. Đặt requiresGoodRating = true khi có các từ khóa: "đẹp", "tốt", "chất lượng cao", "đánh giá cao", "uy tín", "nổi tiếng"
             12. Luôn cố gắng trích xuất category_name là danh mục chính (áo, quần, váy...) từ câu hỏi đã được làm sạch
             13. Nếu có tên sản phẩm cụ thể, điền vào trường name từ câu hỏi đã được làm sạch
             14. Set isShopSearch = true khi có các từ khóa: "shop", "cửa hàng", "tiệm", "nơi bán"
             15. Nếu isShopSearch = true, trích xuất shopKeywords từ nội dung tìm kiếm
+            16. Xử lý các cách diễn đạt tự nhiên trong tiếng Việt, như tiếng lóng ("xịn", "chất", "cool") hoặc cách viết tắt ("500k", "1m", "100tr").
+            17. Nếu input không rõ ràng, ưu tiên suy luận dựa trên ngữ cảnh phổ biến trong lĩnh vực thời trang tiếng Việt.
+            18. Nếu có nhiều màu sắc hoặc kích cỡ được đề cập, chọn màu sắc/kích cỡ được nhấn mạnh nhất (thường là cái đầu tiên).
 
             Ví dụ:
             - "Cho tôi tất cả áo" -> category_name: "áo", name: ""
             - "Tìm áo da mùa đông" -> category_name: "áo da", name: "áo da mùa đông"
             - "Tìm áo khoác da màu đen" -> category_name: "áo khoác", name: "áo khoác da", color: "đen"
+            - "Shop bán váy vintage ở Hà Nội" -> isShopSearch: true, category_name: "váy", style: "vintage", location: "Hà Nội", shopKeywords: "shop váy vintage"
+            - "Áo thun Zara giá dưới 500k" -> category_name: "áo thun", name: "áo thun", brand: "Zara", maxPrice: 500000
+            - "Quần jeans xịn cho nữ" -> category_name: "quần jeans", name: "quần jeans", gender: "Female", requiresGoodRating: true, material: "jeans"
 
             Trả về JSON theo format sau (chỉ điền các trường được đề cập trong input):
         `;
